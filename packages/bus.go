@@ -16,14 +16,12 @@ package gameboypackage
 */
 
 func BusRead(address uint16) byte {
-
 	if address < 0x8000 {
 		return CartRead(address)
 	}
 
 	var temporary byte
 	return temporary
-
 }
 func BusWrite(address uint16, data byte) {
 

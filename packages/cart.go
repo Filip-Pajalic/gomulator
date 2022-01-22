@@ -224,7 +224,11 @@ func cartLoad(cart string) bool {
 	fmt.Printf("\t RAM Size : %2.2X\n", ctx.header.RamSize)
 	fmt.Printf("\t LIC Code : %2.2X (%s)\n", ctx.header.LicCode, cartLicName())
 	fmt.Printf("\t ROM Vers : %2.2X\n", ctx.header.Version)
-	fmt.Printf("\t Checksum : %2.2X (%s)\n", ctx.header.Checksum, checkSumChecker(ctx.header.Checksum))
+	fmt.Printf(
+		"\t Checksum : %2.2X (%s)\n",
+		ctx.header.Checksum,
+		checkSumChecker(ctx.header.Checksum),
+	)
 	return true
 }
 

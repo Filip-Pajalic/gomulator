@@ -2,6 +2,7 @@ package gameboypackage
 
 import (
 	"fmt"
+
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
@@ -41,6 +42,7 @@ func Emu_run(argc int, argv []string) int {
 	fmt.Printf("TTF INIT\n")
 
 	CpuInit()
+	initInstructions()
 
 	Etx.Running = true
 	Etx.Paused = false
@@ -61,6 +63,10 @@ func Emu_run(argc int, argv []string) int {
 	}
 
 	return 0
+}
+
+func EmuCycles(cpuCycles int) {
+
 }
 
 func getEmuContext() *emuContext {
