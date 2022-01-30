@@ -46,3 +46,17 @@ func BusWrite(address uint16, data byte) {
 	Logger.Warnf("UNSUPPORTED bus_write(%04X)\n", address)
 
 }
+
+func BusWrite16(address uint16, data uint16) {
+
+	BusWrite(address+1, byte((data>>8)&0xFF))
+	BusWrite(address, byte(data&0xFF))
+
+}
+
+func BusRead16(address uint16) uint16 {
+	var lo = uint16(BusRead(address))
+	var hi = uint16(BusRead(address + 1))
+
+	return lo | (hi << 8)
+}

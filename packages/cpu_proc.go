@@ -1,15 +1,47 @@
 package gameboypackage
 
-func procNone(cpucontext *CpuContext) {
+func procNone(ctx *CpuContext) {
 	Logger.Fatalf("Invalid Instruction!")
 }
 
-func procLd(cpucontext *CpuContext) {
-	Logger.Warnf("Not implemented Instruction!")
+func procLd(ctx *CpuContext) {
+	if ctx.DestIsMem {
+		//LD (BC), A for instance...
+
+		if ctx.currentInst.Reg2 >= RT_AF {
+			//if 16 bit register...
+			EmuCycles(1)
+			BusWrite16(ctx.MemDest, ctx.FetchedData)
+		} else {
+			BusWrite(ctx.MemDest, byte(ctx.FetchedData))
+		}
+
+		return
+	}
+
+	if ctx.currentInst.Mode == AM_HL_SPR {
+		var hflag byte = (CpuRegRead(ctx.currentInst.Reg2)&0xF)+
+			(ctx.FetchedData&0xF) >= 0x10
+
+		var cflag byte = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
+			(ctx.FetchedData&0xFF) >= 0x100
+
+		CpuSetFlags(*ctx, nil, nil, &hflag, &cflag)
+		CpuSetReg(ctx.currentInst.Reg1,
+			CpuRegRead(ctx.currentInst.Reg2)+ctx.FetchedData)
+
+		return
+	}
+
+	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
 }
 
 func procNop(cpucontext *CpuContext) {
 
+}
+
+func ProcDi(ctx *CpuContext) {
+	ctx.IntMasterEnabled = false
 }
 
 func ProcJp(ctx *CpuContext) {
