@@ -1,55 +1,81 @@
 package gameboypackage
 
-import (
-	"fmt"
-	"os"
-)
-
 func procNone(cpucontext *CpuContext) {
-	fmt.Printf("Invalid Instruction!")
-	os.Exit(7)
+	Logger.Fatalf("Invalid Instruction!")
 }
 
 func procLd(cpucontext *CpuContext) {
-	fmt.Printf("Invalid Instruction!")
-	os.Exit(7)
+	Logger.Warnf("Not implemented Instruction!")
 }
 
 func procNop(cpucontext *CpuContext) {
 
 }
 
-func procName(ctx *CpuContext) {
-	fmt.Println("iproc")
+func ProcJp(ctx *CpuContext) {
+	if CheckCondition(ctx) {
+		ctx.Regs.pc = ctx.FetchedData
+		EmuCycles(1)
+	}
+}
+
+func CheckCondition(ctx *CpuContext) bool {
+	z := CpuFlagZ()
+	c := CpuFlagC()
+
+	switch CpuCtx.currentInst.Condition {
+	case CT_NONE:
+		return true
+	case CT_C:
+		return c
+	case CT_NC:
+		return !c
+	case CT_Z:
+		return z
+	case CT_NZ:
+		return !z
+
+	}
+	return false
 
 }
 
 //Function pointer MAP
 type InProc func(ctx *CpuContext)
 
-var processors = make(map[string]InProc)
+var processors = make(map[InType]InProc)
 
-func initProcessors() {
-	processors["PROC_NONE"] = procNone
-	processors["PROC_NOP"] = procNop
-	processors["PROC_LD"] = procLd
-	processors["PROC_NAME"] = procName
+func InitProcessors() {
+	processors[IN_NONE] = procNone
+	processors[IN_NOP] = procNop
+	processors[IN_LD] = procLd
+	processors[IN_JP] = ProcJp
 }
 
-func CpuSetFlags(ctx *CpuContext, z *byte, n *byte, h *byte, c *byte) {
+func InstGetProccessor(intype InType) InProc {
+
+	if val, ok := processors[intype]; ok {
+		return val
+	} else {
+		return processors[IN_NONE]
+	}
+
+}
+
+func CpuSetFlags(ctx CpuContext, z *byte, n *byte, h *byte, c *byte) {
 	if z != nil {
-		BitSet(ctx.Regs.f, 7, z)
+		BitSet(&ctx.Regs.f, 7, z)
 	}
 
 	if n != nil {
-		BitSet(ctx.Regs.f, 6, n)
+		BitSet(&ctx.Regs.f, 6, n)
 	}
 
 	if h != nil {
-		BitSet(ctx.Regs.f, 5, h)
+		BitSet(&ctx.Regs.f, 5, h)
 	}
 
 	if c != nil {
-		BitSet(ctx.Regs.f, 4, c)
+		BitSet(&ctx.Regs.f, 4, c)
 	}
 }

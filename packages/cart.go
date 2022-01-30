@@ -176,7 +176,7 @@ func readNextBytes(file *os.File, number int, offset int64) []byte {
 
 	_, err := file.ReadAt(bytes, offset)
 	if err != nil {
-		log.Fatal(err)
+		Logger.Fatal(err)
 	}
 	return bytes
 }
@@ -186,10 +186,10 @@ func cartLoad(cart string) bool {
 
 	file, err := os.Open(cart)
 	if err != nil {
-		log.Fatal("Error while opening file", err)
+		Logger.Fatalf("Error while opening file", err)
 	}
 	defer file.Close()
-	fmt.Printf("Opened: %s\n", ctx.filename)
+	Logger.Infof("Opened: %s\n", ctx.filename)
 
 	fi, err := file.Stat()
 	if err != nil {
@@ -216,16 +216,15 @@ func cartLoad(cart string) bool {
 	}
 	ctx.header = &rh
 	ctx.header.Title[15] = 0
-
-	fmt.Printf("Cartridge Loaded:\n")
-	fmt.Printf("\t Title    : %s\n", string(ctx.header.Title[:]))
-	fmt.Printf("\t Type     : %2.2X (%s)\n", ctx.header.CartType, cartTypeName())
-	fmt.Printf("\t ROM Size : %d KB\n", 32<<ctx.header.RomSize)
-	fmt.Printf("\t RAM Size : %2.2X\n", ctx.header.RamSize)
-	fmt.Printf("\t LIC Code : %2.2X (%s)\n", ctx.header.LicCode, cartLicName())
-	fmt.Printf("\t ROM Vers : %2.2X\n", ctx.header.Version)
-	fmt.Printf(
-		"\t Checksum : %2.2X (%s)\n",
+	Logger.Info("Cartridge Loaded:")
+	Logger.Infof("Title    : %s", string(ctx.header.Title[:]))
+	Logger.Infof("Type     : %2.2X (%s)", ctx.header.CartType, cartTypeName())
+	Logger.Infof("ROM Size : %d KB", 32<<ctx.header.RomSize)
+	Logger.Infof("RAM Size : %2.2X", ctx.header.RamSize)
+	Logger.Infof("LIC Code : %2.2X (%s)", ctx.header.LicCode, cartLicName())
+	Logger.Infof("ROM Vers : %2.2X", ctx.header.Version)
+	Logger.Infof(
+		"Checksum : %2.2X (%s)",
 		ctx.header.Checksum,
 		checkSumChecker(ctx.header.Checksum),
 	)

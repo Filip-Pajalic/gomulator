@@ -1,8 +1,11 @@
 package gameboypackage
 
-//reverse byte how is this done, can it be easier
-func reverse(n uint16) uint16 {
-	return ((n & 0xFF00) >> 8) | ((n & 0x00FF) << 8)
+func CpuFlagZ() bool {
+	return Bit(CpuCtx.Regs.f, 7)
+}
+
+func CpuFlagC() bool {
+	return Bit(CpuCtx.Regs.f, 4)
 }
 
 func CpuRegRead(regType regTypes) uint16 {
@@ -25,13 +28,13 @@ func CpuRegRead(regType regTypes) uint16 {
 		return uint16(CpuCtx.Regs.l)
 	//Pointer magic here?
 	case RT_AF:
-		return reverse(uint16(CpuCtx.Regs.a))
+		return Reverse(uint16(CpuCtx.Regs.a))
 	case RT_BC:
-		return reverse(uint16(CpuCtx.Regs.b))
+		return Reverse(uint16(CpuCtx.Regs.b))
 	case RT_DE:
-		return reverse(uint16(CpuCtx.Regs.d))
+		return Reverse(uint16(CpuCtx.Regs.d))
 	case RT_HL:
-		return reverse(uint16(CpuCtx.Regs.h))
+		return Reverse(uint16(CpuCtx.Regs.h))
 
 	case RT_PC:
 		return CpuCtx.Regs.pc
@@ -39,5 +42,57 @@ func CpuRegRead(regType regTypes) uint16 {
 		return CpuCtx.Regs.sp
 	default:
 		return 0
+	}
+}
+
+//could be problem with cast here
+func CpuSetReg(regType regTypes, val uint16) {
+	switch regType {
+	case RT_A:
+		CpuCtx.Regs.a = byte(val & 0xFF)
+		break
+	case RT_F:
+		CpuCtx.Regs.f = byte(val & 0xFF)
+		break
+	case RT_B:
+		CpuCtx.Regs.b = byte(val & 0xFF)
+		break
+	case RT_C:
+		CpuCtx.Regs.c = byte(val & 0xFF)
+		break
+	case RT_D:
+		CpuCtx.Regs.d = byte(val & 0xFF)
+		break
+	case RT_E:
+		CpuCtx.Regs.e = byte(val & 0xFF)
+		break
+	case RT_H:
+		CpuCtx.Regs.h = byte(val & 0xFF)
+		break
+	case RT_L:
+		CpuCtx.Regs.l = byte(val & 0xFF)
+		break
+
+	case RT_AF:
+		CpuCtx.Regs.a = byte(Reverse(val))
+		break
+	case RT_BC:
+		CpuCtx.Regs.b = byte(Reverse(val))
+		break
+	case RT_DE:
+		CpuCtx.Regs.d = byte(Reverse(val))
+		break
+	case RT_HL:
+		CpuCtx.Regs.h = byte(Reverse(val))
+		break
+
+	case RT_PC:
+		CpuCtx.Regs.pc = val
+		break
+	case RT_SP:
+		CpuCtx.Regs.sp = val
+		break
+	case RT_NONE:
+		break
 	}
 }

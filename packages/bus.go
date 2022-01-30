@@ -15,18 +15,34 @@ package gameboypackage
 0xFFFF	0xFFFF	Interrupt Enable register (IE)
 */
 
+/*
+Reads data from the cartridge, memory locations above represent what the different adresses access
+@Param address - where to read
+@return byte with value read from memory
+*/
+
 func BusRead(address uint16) byte {
 	if address < 0x8000 {
 		return CartRead(address)
 	}
+	// Further development needed for other memory locations
+	Logger.Warnf("UNSUPPORTED bus_read(%04X)\n", address)
 
-	var temporary byte
-	return temporary
+	return byte(0)
 }
+
+/*
+Writes data from the cartridge, memory locations above represent what the different adresses access
+@Param address - where to write
+@Param byte - what to write
+*/
+
 func BusWrite(address uint16, data byte) {
 
 	if address < 0x8000 {
 		CartWrite(address, data)
 	}
+
+	Logger.Warnf("UNSUPPORTED bus_write(%04X)\n", address)
 
 }

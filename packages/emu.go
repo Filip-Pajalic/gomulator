@@ -1,8 +1,9 @@
 package gameboypackage
 
 import (
-	"fmt"
+	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
@@ -16,6 +17,16 @@ import (
   |Timer|
 */
 
+var Logger = logrus.New()
+
+func init() {
+	Logger.Out = os.Stdout
+	Logger.Formatter = &logrus.TextFormatter{
+		DisableTimestamp: true,
+	}
+	Logger.Level = logrus.DebugLevel
+}
+
 var Etx emuContext
 
 type emuContext struct {
@@ -26,21 +37,20 @@ type emuContext struct {
 
 func Emu_run(argc int, argv []string) int {
 	if len(argv) < 2 {
-		fmt.Printf("Usage: emu <rom_file>\n")
-		return -1
+		Logger.Error("Usage: emu <rom_file>")
 	}
 
 	if !cartLoad(argv[1]) {
-		fmt.Printf("Failed to load ROM file: %s\n", argv[1])
-		return -2
+		Logger.WithFields(logrus.Fields{
+			"rom": argv[1],
+		}).Error("Failed to load ROM file:")
 	}
-	fmt.Printf("Cart loaded..\n")
 
+	Logger.Info("Cart loaded..")
 	sdl.Init(sdl.INIT_VIDEO)
-	fmt.Printf("SDL INIT\n")
+	Logger.Info("SDL INIT")
 	ttf.Init()
-	fmt.Printf("TTF INIT\n")
-
+	Logger.Info("TTF INIT")
 	CpuInit()
 	initInstructions()
 
@@ -55,8 +65,7 @@ func Emu_run(argc int, argv []string) int {
 		}
 
 		if !CpuStep() {
-			fmt.Printf("CPU Stopped\n")
-			return -3
+			Logger.Error("CPU Stopped")
 		}
 
 		Etx.Ticks++
