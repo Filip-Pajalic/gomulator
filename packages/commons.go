@@ -1,7 +1,7 @@
 package gameboypackage
 
-func BitSet(a *byte, n byte, on *byte) {
-	if on != nil {
+func BitSet(a *byte, n byte, on *bool) {
+	if *on {
 		*a |= 1 << n
 	} else {
 		*a &= ^(1 << n)

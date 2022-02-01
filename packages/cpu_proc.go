@@ -20,10 +20,10 @@ func procLd(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
-		var hflag byte = (CpuRegRead(ctx.currentInst.Reg2)&0xF)+
+		var hflag = (CpuRegRead(ctx.currentInst.Reg2)&0xF)+
 			(ctx.FetchedData&0xF) >= 0x10
 
-		var cflag byte = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
+		var cflag = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
 			(ctx.FetchedData&0xFF) >= 0x100
 
 		CpuSetFlags(*ctx, nil, nil, &hflag, &cflag)
@@ -49,6 +49,16 @@ func ProcJp(ctx *CpuContext) {
 		ctx.Regs.pc = ctx.FetchedData
 		EmuCycles(1)
 	}
+}
+
+func procXor(ctx *CpuContext) {
+	ctx.Regs.a ^= byte(ctx.FetchedData & 0xFF)
+	var zflag = false
+	if ctx.Regs.a == 0 {
+		zflag = true
+	}
+	CpuSetFlags(*ctx, &zflag, nil, nil, nil)
+
 }
 
 func CheckCondition(ctx *CpuContext) bool {
@@ -94,7 +104,7 @@ func InstGetProccessor(intype InType) InProc {
 
 }
 
-func CpuSetFlags(ctx CpuContext, z *byte, n *byte, h *byte, c *byte) {
+func CpuSetFlags(ctx CpuContext, z *bool, n *bool, h *bool, c *bool) {
 	if z != nil {
 		BitSet(&ctx.Regs.f, 7, z)
 	}

@@ -238,6 +238,5 @@ func CartWrite(address uint16, data byte) {
 }
 
 func CartRead(address uint16) byte {
-
 	return ctx.romData[address]
 }

@@ -26,7 +26,7 @@ func BusRead(address uint16) byte {
 		return CartRead(address)
 	}
 	// Further development needed for other memory locations
-	Logger.Warnf("UNSUPPORTED bus_read(%04X)\n", address)
+	Logger.Warnf("UNSUPPORTED BusRead(%04X)\n", address)
 
 	return byte(0)
 }
@@ -43,7 +43,7 @@ func BusWrite(address uint16, data byte) {
 		CartWrite(address, data)
 	}
 
-	Logger.Warnf("UNSUPPORTED bus_write(%04X)\n", address)
+	Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
 
 }
 

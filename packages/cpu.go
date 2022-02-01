@@ -65,15 +65,15 @@ var CpuCtx CpuContext
 
 func CpuInit() {
 	CpuCtx.Regs.pc = 0x100
-
+	CpuCtx.Regs.a = 0x01
 	CpuCtx.Halted = false
 	InitProcessors()
 }
 
 func fetchInstruction() {
 	CpuCtx.CurOpCode = BusRead(CpuCtx.Regs.pc)
-	CpuCtx.Regs.pc++
 	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
+	CpuCtx.Regs.pc++
 
 }
 
@@ -97,7 +97,7 @@ func CpuStep() bool {
 			pc, getInstructionName(CpuCtx.currentInst.Type), CpuCtx.CurOpCode,
 			BusRead(pc+1), BusRead(pc+2), CpuCtx.Regs.a, CpuCtx.Regs.b, CpuCtx.Regs.c)
 
-		if CpuCtx.currentInst.Type == 0 {
+		if CpuCtx.currentInst == nil {
 			Logger.Warnf("Unknown instruction! %02X\n", CpuCtx.CurOpCode)
 			os.Exit(1)
 		}

@@ -8,7 +8,7 @@ A16 means 16 bit address
 R8  means 8 bit signed data, which are added to program counter
 
 */
-type addrMode int
+type addrMode byte
 
 const (
 	AM_IMP addrMode = iota + 1
@@ -34,7 +34,7 @@ const (
 	AM_R_A16
 )
 
-type regTypes int
+type regTypes byte
 
 const (
 	RT_NONE regTypes = iota + 1
@@ -54,10 +54,10 @@ const (
 	RT_PC
 )
 
-type InType int
+type InType byte
 
 const (
-	IN_NONE InType = iota + 1
+	IN_NONE InType = iota
 	IN_NOP
 	IN_LD
 	IN_INC
@@ -108,7 +108,7 @@ const (
 	IN_SET
 )
 
-type conditionTypes int
+type conditionTypes byte
 
 const (
 	CT_NONE conditionTypes = iota

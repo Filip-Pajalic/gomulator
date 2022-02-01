@@ -163,7 +163,7 @@ func FetchData() {
 		EmuCycles(1)
 		return
 	default:
-		Logger.Warnf("Unknown adressing mode! %d\n", CpuCtx.currentInst.Mode)
+		Logger.Warnf("Unknown Addressing Mode! %d (%02X)\n", CpuCtx.currentInst.Mode, CpuCtx.CurOpCode)
 		//os.Exit(1)
 		return
 	}
