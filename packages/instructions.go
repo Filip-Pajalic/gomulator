@@ -11,7 +11,7 @@ R8  means 8 bit signed data, which are added to program counter
 type addrMode byte
 
 const (
-	AM_IMP addrMode = iota + 1
+	AM_IMP addrMode = iota
 	AM_R_D16
 	AM_R_R
 	AM_MR_R
@@ -37,7 +37,7 @@ const (
 type regTypes byte
 
 const (
-	RT_NONE regTypes = iota + 1
+	RT_NONE regTypes = iota
 	RT_A
 	RT_F
 	RT_B
@@ -220,7 +220,7 @@ func initInstructions() {
 	inst[0x0A].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_MR), Reg1: re(RT_A), Reg2: re(RT_BC)})
 
 	inst[0x0E].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D8), Reg1: re(RT_C)})
-
+	//0x1X
 	inst[0x11].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D16), Reg1: re(RT_DE)})
 	inst[0x12].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_MR_R), Reg1: re(RT_DE), Reg2: re(RT_A)})
 	inst[0x15].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_D)})
@@ -362,6 +362,5 @@ func instructionByOpcode(opcode byte) (instruction *Instruction) {
 }
 
 func getInstructionName(t InType) []byte {
-	b := []byte(instLookup[t])
-	return b
+	return []byte(instLookup[t])
 }

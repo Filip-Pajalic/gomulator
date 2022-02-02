@@ -1,10 +1,10 @@
 package gameboypackage
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"unsafe"
@@ -181,9 +181,34 @@ func readNextBytes(file *os.File, number int, offset int64) []byte {
 	return bytes
 }
 
+func loadCart(romName string) {
+
+	fi, err := os.Open(romName)
+	if err != nil {
+		fmt.Println(romName, "is an invalid file. Could not open.")
+		panic(err)
+	}
+
+	memory := make([]uint8, 0, 65536)
+	buf := make([]byte, 1024)
+	for {
+		bytesRead, error := fi.Read(buf)
+		slice := buf[0:bytesRead]
+		memory = append(memory, slice...) // The ... means to expand the second argument
+
+		if error == io.EOF {
+			break
+		}
+	}
+
+	emptyMemory := make([]uint8, cap(memory)-len(memory)) // Make sure that we have a full 64KB of memory
+	ctx.romData = append(memory, emptyMemory...)
+
+}
+
 func cartLoad(cart string) bool {
 	copy(ctx.filename[:], fmt.Sprintf("%s", cart))
-
+	loadCart(cart)
 	file, err := os.Open(cart)
 	if err != nil {
 		Logger.Fatalf("Error while opening file", err)
@@ -197,13 +222,17 @@ func cartLoad(cart string) bool {
 	}
 	ctx.romSize = uint32(fi.Size())
 
-	var lines []byte
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		temp := scanner.Bytes()
-		lines = append(lines, temp...)
+	romData := make([]uint8, 0, ctx.romSize)
+	buf := make([]byte, 1024)
+	currentData, e := file.Read(buf)
+	for e != io.EOF {
+		temp := buf[0:currentData]
+		romData = append(romData, temp...)
+		currentData, e = file.Read(buf)
 	}
-	ctx.romData = lines
+
+	emptyMemory := make([]uint8, cap(romData)-len(romData))
+	ctx.romData = append(romData, emptyMemory...)
 
 	rh := romHeader{}
 
@@ -223,11 +252,13 @@ func cartLoad(cart string) bool {
 	Logger.Infof("RAM Size : %2.2X", ctx.header.RamSize)
 	Logger.Infof("LIC Code : %2.2X (%s)", ctx.header.LicCode, cartLicName())
 	Logger.Infof("ROM Vers : %2.2X", ctx.header.Version)
+
 	Logger.Infof(
 		"Checksum : %2.2X (%s)",
 		ctx.header.Checksum,
 		checkSumChecker(ctx.header.Checksum),
 	)
+	loadCart(cart)
 	return true
 }
 

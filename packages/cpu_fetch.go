@@ -15,6 +15,10 @@ func FetchData() {
 	CpuCtx.MemDest = 0
 	CpuCtx.DestIsMem = false
 
+	if CpuCtx.currentInst == nil {
+		return
+	}
+
 	switch CpuCtx.currentInst.Mode {
 	case AM_IMP:
 		return
@@ -30,7 +34,18 @@ func FetchData() {
 		EmuCycles(1)
 		CpuCtx.Regs.pc++
 		return
-	case AM_R_D16, AM_D16:
+	case AM_R_D16:
+		var lo = uint16(BusRead(CpuCtx.Regs.pc))
+
+		EmuCycles(1)
+		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
+
+		EmuCycles(1)
+		CpuCtx.FetchedData = lo | (hi << 8)
+
+		CpuCtx.Regs.pc += 2
+		return
+	case AM_D16:
 		/*
 			Example:
 				lo = (0000000)01010000 (8 bit loaded into 16)
@@ -40,10 +55,13 @@ func FetchData() {
 
 		*/
 		var lo = uint16(BusRead(CpuCtx.Regs.pc))
+
 		EmuCycles(1)
 		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
+
 		EmuCycles(1)
 		CpuCtx.FetchedData = lo | (hi << 8)
+
 		CpuCtx.Regs.pc += 2
 		return
 

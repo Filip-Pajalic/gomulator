@@ -94,13 +94,10 @@ func InitProcessors() {
 	processors[IN_JP] = ProcJp
 }
 
+//fix this to return properly
 func InstGetProccessor(intype InType) InProc {
 
-	if val, ok := processors[intype]; ok {
-		return val
-	} else {
-		return processors[IN_NONE]
-	}
+	return processors[intype]
 
 }
 

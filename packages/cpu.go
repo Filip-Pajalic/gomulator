@@ -71,6 +71,7 @@ func CpuInit() {
 }
 
 func fetchInstruction() {
+
 	CpuCtx.CurOpCode = BusRead(CpuCtx.Regs.pc)
 	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
 	CpuCtx.Regs.pc++
@@ -79,12 +80,11 @@ func fetchInstruction() {
 
 func execute() {
 	var proc = InstGetProccessor(CpuCtx.currentInst.Type)
-
 	if proc == nil {
-		Logger.Fatalf("No processor for this execution!")
+		Logger.Warnf("No processor for this execution!")
+		return
 	}
 	proc(&CpuCtx)
-
 }
 
 func CpuStep() bool {

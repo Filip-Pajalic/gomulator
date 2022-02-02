@@ -1,5 +1,10 @@
 package gameboypackage
 
+import (
+	"fmt"
+	"strconv"
+)
+
 func BitSet(a *byte, n byte, on *bool) {
 	if *on {
 		*a |= 1 << n
@@ -25,4 +30,9 @@ func Between(a byte, b byte, c byte) bool {
 
 func Reverse(n uint16) uint16 {
 	return ((n & 0xFF00) >> 8) | ((n & 0x00FF) << 8)
+}
+
+func IntToHex(n uint16) uint16 {
+	h, _ := strconv.ParseUint(fmt.Sprintf("%02x", n), 0, 64)
+	return uint16(h)
 }
