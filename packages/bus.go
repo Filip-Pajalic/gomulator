@@ -5,7 +5,7 @@ package gameboypackage
 0x4000	0x7FFF	16 KiB ROM Bank 01~NN	From cartridge, switchable bank via mapper (if any)
 0x8000	0x9FFF	8 KiB Video RAM (VRAM)	In CGB mode, switchable bank 0/1
 0xA000	0xBFFF	8 KiB External RAM	From cartridge, switchable bank if any
-0xC000	0xCFFF	4 KiB Work RAM (WRAM)
+0xC000	0xCFFF	4 KiB Work RAM (WRAM) Ram bank 0 Cartridge
 0xD000	0xDFFF	4 KiB Work RAM (WRAM)	In CGB mode, switchable bank 1~7
 0xE000	0xFDFF	Mirror of C000~DDFF (ECHO RAM)	Nintendo says use of this area is prohibited.
 0xFE00	0xFE9F	Sprite attribute table (OAM)
@@ -24,11 +24,36 @@ Reads data from the cartridge, memory locations above represent what the differe
 func BusRead(address uint16) byte {
 	if address < 0x8000 {
 		return CartRead(address)
+	} else if address < 0xA000 {
+		//Char/Map Data
+		Logger.Warnf("Not implemented Char/mapData(%04X)\n", address)
+	} else if address < 0xC000 {
+		//Cartridge ram
+		return CartRead(address)
+	} else if address < 0xE000 {
+		//WRAM Working ram
+		return WramRead(address)
+	} else if address < 0xFE00 {
+		// Reserved eco ram, not used
+		return 0
+	} else if address < 0xFEA0 {
+		//Object attribute memory (OAM)
+		Logger.Warnf("Not implemented OAM(%04X)\n", address)
+
+	} else if address < 0xFF00 {
+		// Reserved not used
+		return 0
+	} else if address < 0xFF80 {
+		//Io registers
+		Logger.Warnf("Not implemented IOregisters(%04X)\n", address)
+
+	} else if address == 0xFFFF {
+		//CPU interupt enable register
+		return CpuGetIERegister()
 	}
-	// Further development needed for other memory locations
 	Logger.Warnf("UNSUPPORTED BusRead(%04X)\n", address)
 
-	return byte(0)
+	return HramRead(address)
 }
 
 /*
@@ -41,6 +66,33 @@ func BusWrite(address uint16, data byte) {
 
 	if address < 0x8000 {
 		CartWrite(address, data)
+	} else if address < 0xA000 {
+		//Char/Map Data
+		Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
+	} else if address < 0xC000 {
+		//EXT-RAM
+		CartWrite(address, data)
+	} else if address < 0xE000 {
+		//WRAM
+		WramWrite(address, data)
+	} else if address < 0xFE00 {
+		//reserved echo ram
+	} else if address < 0xFEA0 {
+		//OAM
+
+		//TODO
+		Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
+
+	} else if address < 0xFF00 {
+		//unusable reserved
+	} else if address < 0xFF80 {
+		//IO Registers
+		Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
+	} else if address == 0xFFFF {
+		//CPU SET ENABLE REGISTER
+		CpuSetIERegister(data)
+	} else {
+		HramWrite(address, data)
 	}
 
 	Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)

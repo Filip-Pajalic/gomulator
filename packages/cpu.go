@@ -59,6 +59,8 @@ type CpuContext struct {
 	Stepping bool
 
 	IntMasterEnabled bool
+
+	IERegister byte
 }
 
 var CpuCtx CpuContext
@@ -104,4 +106,12 @@ func CpuStep() bool {
 		execute()
 	}
 	return true
+}
+
+func CpuGetIERegister() byte {
+	return CpuCtx.IERegister
+}
+
+func CpuSetIERegister(n byte) {
+	CpuCtx.IERegister = n
 }
