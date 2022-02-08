@@ -321,10 +321,13 @@ func initInstructions() {
 	inst[0xC3].addInst(InstPointer{Type: in(IN_JP), Mode: ad(AM_D16)})
 
 	//0xEX
+	inst[0xE0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_A8_R), Reg1: re(RT_NONE), Reg2: re(RT_A)})
 	inst[0xE2].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_MR_R), Reg1: re(RT_C), Reg2: re(RT_A)})
 	inst[0xEA].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_A16_R), Reg1: re(RT_NONE), Reg2: re(RT_A)})
 
 	//0xFX
+	inst[0xF0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
+
 	inst[0xF2].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_MR), Reg1: re(RT_A), Reg2: re(RT_C)})
 	inst[0xF3].addInst(InstPointer{Type: in(IN_DI)})
 	inst[0xFA].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_A16), Reg1: re(RT_A)})

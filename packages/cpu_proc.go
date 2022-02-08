@@ -44,11 +44,21 @@ func ProcDi(ctx *CpuContext) {
 	ctx.IntMasterEnabled = false
 }
 
-func ProcJp(ctx *CpuContext) {
+func procJp(ctx *CpuContext) {
 	if CheckCondition(ctx) {
 		ctx.Regs.pc = ctx.FetchedData
 		EmuCycles(1)
 	}
+}
+
+func procLdh(ctx *CpuContext) {
+	//Ensure this is proper
+	if ctx.currentInst.Reg1 == RT_A {
+		CpuSetReg(ctx.currentInst.Reg1, uint16(BusRead(0xFF00|uint16(ctx.Regs.c))))
+	} else {
+		BusWrite(0xFF00|ctx.FetchedData, ctx.Regs.a)
+	}
+	EmuCycles(1)
 }
 
 func procXor(ctx *CpuContext) {
@@ -91,7 +101,9 @@ func InitProcessors() {
 	processors[IN_NONE] = procNone
 	processors[IN_NOP] = procNop
 	processors[IN_LD] = procLd
-	processors[IN_JP] = ProcJp
+	processors[IN_JP] = procJp
+	processors[IN_XOR] = procXor
+	processors[IN_LDH] = procLdh
 }
 
 //fix this to return properly
