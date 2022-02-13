@@ -1,14 +1,14 @@
 package gameboypackage
 
 /*
-AM - Adressing mode, LD , JR, ADD , RET, POP ,PUSH ..
+AM - Addressing mode, LD , JR, ADD , RET, POP ,PUSH ..
 MR	- Memory address for register
 R	- Register
-D8	- means immediate 8 bit data
-D16	- means immediate 16 bit data
-A8	- means 8 bit unsigned data, which are added to $FF00 in certain instructions (replacement for missing IN and OUT instructions)
-A16	- means 16 bit address
-R8	- means 8 bit signed data, which are added to program counter
+D8	- means immediate 8-bit data
+D16	- means immediate 16-bit data
+A8	- means 8-bit unsigned data, which are added to $FF00 in certain instructions (replacement for missing IN and OUT instructions)
+A16	- means 16-bit address
+R8	- means 8-bit signed data, which are added to program counter
 */
 
 func FetchData() {

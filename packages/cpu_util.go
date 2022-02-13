@@ -96,3 +96,7 @@ func CpuSetReg(regType regTypes, val uint16) {
 		break
 	}
 }
+
+func CpuGetRegs() *CpuRegisters {
+	return &CpuCtx.Regs
+}

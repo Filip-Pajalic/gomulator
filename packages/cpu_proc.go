@@ -40,15 +40,81 @@ func procNop(cpucontext *CpuContext) {
 
 }
 
-func ProcDi(ctx *CpuContext) {
+func procDi(ctx *CpuContext) {
 	ctx.IntMasterEnabled = false
 }
 
-func procJp(ctx *CpuContext) {
+func procPop(ctx *CpuContext) {
+	var lo = uint16(StackPop())
+	EmuCycles(1)
+	var hi = uint16(StackPop())
+	EmuCycles(1)
+	var n = (hi << 8) | lo
+	CpuSetReg(ctx.currentInst.Reg1, n)
+
+	if ctx.currentInst.Reg1 == RT_AF {
+		CpuSetReg(ctx.currentInst.Reg1, n&0xFFF0)
+	}
+}
+
+func procPush(ctx *CpuContext) {
+	var hi = (CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF
+	EmuCycles(1)
+	StackPush(byte(hi))
+	var lo = (CpuRegRead(ctx.currentInst.Reg2)) & 0xFF
+	EmuCycles(1)
+	StackPush(byte(lo))
+	EmuCycles(1)
+}
+
+func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 	if CheckCondition(ctx) {
-		ctx.Regs.pc = ctx.FetchedData
+		if pushpc {
+			EmuCycles(2)
+			StackPush16(ctx.Regs.pc)
+		}
+		ctx.Regs.pc = addr
 		EmuCycles(1)
 	}
+}
+
+func procJp(ctx *CpuContext) {
+	goToAddr(ctx, ctx.FetchedData, false)
+}
+
+//Jump relative
+func procJr(ctx *CpuContext) {
+	var rel = byte(ctx.FetchedData & 0xFF) //casting cause it might be negative
+	var addr = ctx.Regs.pc + uint16(rel)
+	goToAddr(ctx, addr, false)
+}
+
+func procCall(ctx *CpuContext) {
+	goToAddr(ctx, ctx.FetchedData, true)
+}
+
+func procRet(ctx *CpuContext) {
+	if ctx.currentInst.Condition != CT_NONE {
+		EmuCycles(1)
+	}
+
+	if CheckCondition(ctx) {
+		var lo = StackPop()
+		EmuCycles(1)
+
+		var hi = StackPop()
+		EmuCycles(1)
+
+		var n = uint16((hi << 8) | lo)
+		ctx.Regs.pc = n
+
+		EmuCycles(1)
+	}
+}
+
+func procReti(ctx *CpuContext) {
+	ctx.IntMasterEnabled = true
+	procRet(ctx)
 }
 
 func procLdh(ctx *CpuContext) {
@@ -102,8 +168,15 @@ func InitProcessors() {
 	processors[IN_NOP] = procNop
 	processors[IN_LD] = procLd
 	processors[IN_JP] = procJp
+	processors[IN_JR] = procJr
+	processors[IN_CALL] = procCall
 	processors[IN_XOR] = procXor
+	processors[IN_POP] = procPop
+	processors[IN_PUSH] = procPush
 	processors[IN_LDH] = procLdh
+	processors[IN_RET] = procRet
+	processors[IN_RETI] = procReti
+	processors[IN_DI] = procDi
 }
 
 //fix this to return properly

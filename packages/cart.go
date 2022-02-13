@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+
 	"os"
 	"unsafe"
 )
@@ -172,13 +173,13 @@ func checkSumChecker(checksum byte) string {
 }
 
 func readNextBytes(file *os.File, number int, offset int64) []byte {
-	bytes := make([]byte, number)
+	bbytes := make([]byte, number)
 
-	_, err := file.ReadAt(bytes, offset)
+	_, err := file.ReadAt(bbytes, offset)
 	if err != nil {
 		Logger.Fatal(err)
 	}
-	return bytes
+	return bbytes
 }
 
 func loadCart(romName string) {
@@ -192,11 +193,11 @@ func loadCart(romName string) {
 	memory := make([]uint8, 0, 65536)
 	buf := make([]byte, 1024)
 	for {
-		bytesRead, error := fi.Read(buf)
+		bytesRead, err := fi.Read(buf)
 		slice := buf[0:bytesRead]
 		memory = append(memory, slice...) // The ... means to expand the second argument
 
-		if error == io.EOF {
+		if err == io.EOF {
 			break
 		}
 	}
@@ -241,7 +242,7 @@ func cartLoad(cart string) bool {
 	buffer := bytes.NewBuffer(data)
 	err = binary.Read(buffer, binary.LittleEndian, &rh)
 	if err != nil {
-		log.Fatal("binary.Read failed", err)
+		Logger.Fatal("binary.Read failed", err)
 	}
 	ctx.header = &rh
 	ctx.header.Title[15] = 0
