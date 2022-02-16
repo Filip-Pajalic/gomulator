@@ -95,8 +95,6 @@ func BusWrite(address uint16, data byte) {
 		HramWrite(address, data)
 	}
 
-	Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
-
 }
 
 func BusWrite16(address uint16, data uint16) {

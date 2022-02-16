@@ -99,17 +99,21 @@ func procRet(ctx *CpuContext) {
 	}
 
 	if CheckCondition(ctx) {
-		var lo = StackPop()
+		var lo = uint16(StackPop())
 		EmuCycles(1)
 
-		var hi = StackPop()
+		var hi = uint16(StackPop())
 		EmuCycles(1)
 
-		var n = uint16((hi << 8) | lo)
+		var n = (hi << 8) | lo
 		ctx.Regs.pc = n
 
 		EmuCycles(1)
 	}
+}
+
+func procRst(ctx *CpuContext) {
+	goToAddr(ctx, uint16(ctx.currentInst.Param), true)
 }
 
 func procReti(ctx *CpuContext) {
@@ -122,7 +126,7 @@ func procLdh(ctx *CpuContext) {
 	if ctx.currentInst.Reg1 == RT_A {
 		CpuSetReg(ctx.currentInst.Reg1, uint16(BusRead(0xFF00|uint16(ctx.Regs.c))))
 	} else {
-		BusWrite(0xFF00|ctx.FetchedData, ctx.Regs.a)
+		BusWrite(ctx.MemDest, ctx.Regs.a)
 	}
 	EmuCycles(1)
 }
@@ -177,6 +181,7 @@ func InitProcessors() {
 	processors[IN_RET] = procRet
 	processors[IN_RETI] = procReti
 	processors[IN_DI] = procDi
+	processors[IN_RST] = procRst
 }
 
 //fix this to return properly
