@@ -39,7 +39,7 @@ func procLd(ctx *CpuContext) {
 
 		return
 	}
-
+	//probleem när ctx.FetchedData är 143? Efter CALL?
 	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
 }
 
@@ -130,8 +130,10 @@ func procReti(ctx *CpuContext) {
 
 func procLdh(ctx *CpuContext) {
 	//Ensure this is proper
+	a := uint16(BusRead(0xFF00 | uint16(ctx.FetchedData)))
+
 	if ctx.currentInst.Reg1 == RT_A {
-		CpuSetReg(ctx.currentInst.Reg1, uint16(BusRead(0xFF00|uint16(ctx.Regs.c))))
+		CpuSetReg(ctx.currentInst.Reg1, a)
 	} else {
 		BusWrite(ctx.MemDest, ctx.Regs.a)
 	}

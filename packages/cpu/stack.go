@@ -7,13 +7,16 @@ func StackPush(data byte) {
 }
 
 func StackPush16(data uint16) {
-	StackPush(byte((data >> 8) & 0xFF))
-	StackPush(byte(data & 0xFF))
+	value := (data >> 8) & 0xFF
+	value2 := data & 0xFF
+	StackPush(byte(value))
+	StackPush(byte(value2))
 }
 
 func StackPop() byte {
+	result := BusRead(CpuGetRegs().sp)
 	CpuGetRegs().sp++
-	return BusRead(CpuGetRegs().sp)
+	return result
 }
 
 func StackPop16() uint16 {

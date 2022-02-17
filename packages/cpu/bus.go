@@ -52,6 +52,7 @@ func BusRead(address uint16) byte {
 	} else if address < 0xFF80 {
 		//Io registers
 		log.Warn("Not implemented IOregisters(%04X)\n", address)
+		return 0
 
 	} else if address == 0xFFFF {
 		//CPU interupt enable register

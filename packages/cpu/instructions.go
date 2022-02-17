@@ -361,7 +361,7 @@ func InitInstructions() {
 
 	//0xFX
 	inst[0xF0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
-	inst[0xF1].addInst(InstPointer{Type: in(IN_POP), Mode: ad(AM_IMP), Reg1: re(RT_AF)})
+	inst[0xF1].addInst(InstPointer{Type: in(IN_POP), Mode: ad(AM_R), Reg1: re(RT_AF)})
 	inst[0xF2].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_MR), Reg1: re(RT_A), Reg2: re(RT_C)})
 	inst[0xF3].addInst(InstPointer{Type: in(IN_DI)})
 	inst[0xF5].addInst(InstPointer{Type: in(IN_PUSH), Mode: ad(AM_R), Reg1: re(RT_AF)})

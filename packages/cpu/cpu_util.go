@@ -12,6 +12,7 @@ func CpuFlagC() bool {
 	return common.Bit(CpuCtx.Regs.f, 4)
 }
 
+//Broken here
 func CpuRegRead(regType regTypes) uint16 {
 	switch regType {
 	case RT_A:
@@ -32,13 +33,25 @@ func CpuRegRead(regType regTypes) uint16 {
 		return uint16(CpuCtx.Regs.l)
 	//Pointer magic here?
 	case RT_AF:
-		return common.Reverse(uint16(CpuCtx.Regs.a))
+		hi := byte((CpuCtx.Regs.f >> 8) & 0xFF)
+		lo := byte(CpuCtx.Regs.a & 0xFF)
+		var reversable = uint16(lo | (hi << 8))
+		return common.Reverse(reversable)
 	case RT_BC:
-		return common.Reverse(uint16(CpuCtx.Regs.b))
+		hi := byte((CpuCtx.Regs.c >> 8) & 0xFF)
+		lo := byte(CpuCtx.Regs.b & 0xFF)
+		var reversable = uint16(lo | (hi << 8))
+		return common.Reverse(reversable)
 	case RT_DE:
-		return common.Reverse(uint16(CpuCtx.Regs.d))
+		hi := byte((CpuCtx.Regs.e >> 8) & 0xFF)
+		lo := byte(CpuCtx.Regs.d & 0xFF)
+		var reversable = uint16(lo | (hi << 8))
+		return common.Reverse(reversable)
 	case RT_HL:
-		return common.Reverse(uint16(CpuCtx.Regs.h))
+		hi := byte((CpuCtx.Regs.l >> 8) & 0xFF)
+		lo := byte(CpuCtx.Regs.h & 0xFF)
+		var reversable = uint16(lo | (hi << 8))
+		return common.Reverse(reversable)
 
 	case RT_PC:
 		return CpuCtx.Regs.pc
@@ -78,16 +91,24 @@ func CpuSetReg(regType regTypes, val uint16) {
 		break
 
 	case RT_AF:
-		CpuCtx.Regs.a = byte(common.Reverse(val))
+		result := common.Reverse(val)
+		CpuCtx.Regs.f = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.a = byte((result) & 0xFF)
 		break
 	case RT_BC:
-		CpuCtx.Regs.b = byte(common.Reverse(val))
+		result := common.Reverse(val)
+		CpuCtx.Regs.c = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.b = byte((result) & 0xFF)
 		break
 	case RT_DE:
-		CpuCtx.Regs.d = byte(common.Reverse(val))
+		result := common.Reverse(val)
+		CpuCtx.Regs.e = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.d = byte((result) & 0xFF)
 		break
 	case RT_HL:
-		CpuCtx.Regs.h = byte(common.Reverse(val))
+		result := common.Reverse(val)
+		CpuCtx.Regs.l = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.h = byte((result) & 0xFF)
 		break
 
 	case RT_PC:
