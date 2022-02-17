@@ -1,4 +1,9 @@
-package gameboypackage
+package cpu
+
+import (
+	"pajalic.go.emulator/packages/emulator"
+	log "pajalic.go.emulator/packages/logger"
+)
 
 /*
 AM - Addressing mode, LD , JR, ADD , RET, POP ,PUSH ..
@@ -31,16 +36,16 @@ func FetchData() {
 		return
 	case AM_R_D8:
 		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.Regs.pc++
 		return
 	case AM_R_D16:
 		var lo = uint16(BusRead(CpuCtx.Regs.pc))
 
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
 
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.FetchedData = lo | (hi << 8)
 
 		CpuCtx.Regs.pc += 2
@@ -56,10 +61,10 @@ func FetchData() {
 		*/
 		var lo = uint16(BusRead(CpuCtx.Regs.pc))
 
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
 
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.FetchedData = lo | (hi << 8)
 
 		CpuCtx.Regs.pc += 2
@@ -91,17 +96,17 @@ func FetchData() {
 		}
 
 		CpuCtx.FetchedData = uint16(BusRead(addr))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 
 	case AM_R_HLI:
 		CpuCtx.FetchedData = uint16(BusRead(CpuRegRead(CpuCtx.currentInst.Reg2)))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuSetReg(RT_HL, CpuRegRead(RT_HL)+1)
 		return
 
 	case AM_R_HLD:
 		CpuCtx.FetchedData = uint16(BusRead(CpuRegRead(CpuCtx.currentInst.Reg2)))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuSetReg(RT_HL, CpuRegRead(RT_HL)-1)
 		return
 
@@ -121,34 +126,34 @@ func FetchData() {
 
 	case AM_R_A8:
 		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.Regs.pc++
 		return
 
 	case AM_A8_R:
 		CpuCtx.MemDest = uint16(BusRead(CpuCtx.Regs.pc)) | 0xFF00
 		CpuCtx.DestIsMem = true
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.Regs.pc++
 		return
 
 	case AM_HL_SPR:
 		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.Regs.pc++
 		return
 
 	case AM_D8:
 		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.Regs.pc++
 		return
 
 	case AM_A16_R, AM_D16_R:
 		var lo = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.MemDest = lo | (hi << 8)
 		CpuCtx.DestIsMem = true
 		CpuCtx.Regs.pc += 2
@@ -157,7 +162,7 @@ func FetchData() {
 
 	case AM_MR_D8:
 		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		CpuCtx.Regs.pc++
 		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
 		CpuCtx.DestIsMem = true
@@ -167,21 +172,21 @@ func FetchData() {
 		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
 		CpuCtx.DestIsMem = true
 		CpuCtx.FetchedData = uint16(BusRead(CpuRegRead(CpuCtx.currentInst.Reg1)))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		return
 
 	case AM_R_A16:
 		var lo = uint16(BusRead(CpuCtx.Regs.pc))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		var addr = lo | (hi << 8)
 		CpuCtx.Regs.pc += 2
 		CpuCtx.FetchedData = uint16(BusRead(addr))
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		return
 	default:
-		Logger.Warnf("Unknown Addressing Mode! %d (%02X)\n", CpuCtx.currentInst.Mode, CpuCtx.CurOpCode)
+		log.Warn("Unknown Addressing Mode! %d (%02X)\n", CpuCtx.currentInst.Mode, CpuCtx.CurOpCode)
 		//os.Exit(1)
 		return
 	}

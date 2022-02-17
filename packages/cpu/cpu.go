@@ -1,7 +1,9 @@
-package gameboypackage
+package cpu
 
 import (
 	"os"
+
+	log "pajalic.go.emulator/packages/logger"
 )
 
 /*
@@ -83,7 +85,7 @@ func fetchInstruction() {
 func execute() {
 	var proc = InstGetProccessor(CpuCtx.currentInst.Type)
 	if proc == nil {
-		Logger.Warnf("No processor for this execution!")
+		log.Warn("No processor for this execution!")
 		return
 	}
 	proc(&CpuCtx)
@@ -95,13 +97,13 @@ func CpuStep() bool {
 		fetchInstruction()
 		FetchData()
 
-		Logger.Debugf("%04X: %-7s (%02X %02X %02X) A: %02X BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
+		log.Info("%04X: %-7s (%02X %02X %02X) A: %02X BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
 			pc, getInstructionName(CpuCtx.currentInst.Type), CpuCtx.CurOpCode,
 			BusRead(pc+1), BusRead(pc+2), CpuCtx.Regs.a, CpuCtx.Regs.b, CpuCtx.Regs.c,
 			CpuCtx.Regs.d, CpuCtx.Regs.e, CpuCtx.Regs.h, CpuCtx.Regs.l)
 
 		if CpuCtx.currentInst == nil {
-			Logger.Warnf("Unknown instruction! %02X\n", CpuCtx.CurOpCode)
+			log.Warn("Unknown instruction! %02X\n", CpuCtx.CurOpCode)
 			os.Exit(1)
 		}
 		execute()

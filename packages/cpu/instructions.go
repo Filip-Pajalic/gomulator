@@ -1,4 +1,4 @@
-package gameboypackage
+package cpu
 
 /* Different instructionmodes needed
 D8  means immediate 8 bit data
@@ -190,7 +190,7 @@ type InstPointer struct {
 
 var inst [0x100]Instruction
 
-func initInstructions() {
+func InitInstructions() {
 	//DO NOP , adressing mode implied , does nothing
 	/*instructions[0x00].addInstructions(IN_NOP, AM_IMP, nil, nil, 0, 0)
 	instructions[0x05].addInstructions(IN_DEC, AM_IMP, RT_C, 0, 0, 0)

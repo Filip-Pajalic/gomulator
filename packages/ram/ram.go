@@ -1,4 +1,8 @@
-package gameboypackage
+package ram
+
+import (
+	log "pajalic.go.emulator/packages/logger"
+)
 
 type RamContext struct {
 	Wram [0x2000]byte
@@ -11,7 +15,7 @@ func WramRead(address uint16) byte {
 	address -= 0xC000
 
 	if address >= 0x2000 {
-		Logger.Errorf("INVALID WRAM ADDR %08X\n", address+0xC000)
+		log.Error("INVALID WRAM ADDR %08X\n", address+0xC000)
 	}
 
 	return RamCtx.Wram[address]

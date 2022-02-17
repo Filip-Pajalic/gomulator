@@ -1,4 +1,4 @@
-package gameboypackage
+package ppu
 
 func PpuInit() {
 

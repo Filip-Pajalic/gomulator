@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	gameboypackage "pajalic.go.emulator/packages"
+	"pajalic.go.emulator/packages/emulatorloop"
 )
 
 func main() {
-	gameboypackage.Emu_run(len(os.Args), os.Args)
+	emulatorloop.Run(len(os.Args), os.Args)
 }

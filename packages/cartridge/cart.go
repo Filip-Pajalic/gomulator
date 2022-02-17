@@ -1,14 +1,14 @@
-package gameboypackage
+package cartridge
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
-
 	"os"
 	"unsafe"
+
+	log "pajalic.go.emulator/packages/logger"
 )
 
 type cartContext struct {
@@ -177,7 +177,7 @@ func readNextBytes(file *os.File, number int, offset int64) []byte {
 
 	_, err := file.ReadAt(bbytes, offset)
 	if err != nil {
-		Logger.Fatal(err)
+		log.Fatal(err.Error())
 	}
 	return bbytes
 }
@@ -207,19 +207,19 @@ func loadCart(romName string) {
 
 }
 
-func cartLoad(cart string) bool {
+func CartLoad(cart string) bool {
 	copy(ctx.filename[:], fmt.Sprintf("%s", cart))
 	loadCart(cart)
 	file, err := os.Open(cart)
 	if err != nil {
-		Logger.Fatalf("Error while opening file", err)
+		log.Fatal("Error while opening file", err)
 	}
 	defer file.Close()
-	Logger.Infof("Opened: %s\n", ctx.filename)
+	log.Info("Opened: %s\n", ctx.filename)
 
 	fi, err := file.Stat()
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err.Error())
 	}
 	ctx.romSize = uint32(fi.Size())
 
@@ -242,19 +242,19 @@ func cartLoad(cart string) bool {
 	buffer := bytes.NewBuffer(data)
 	err = binary.Read(buffer, binary.LittleEndian, &rh)
 	if err != nil {
-		Logger.Fatal("binary.Read failed", err)
+		log.Fatal("binary.Read failed", err)
 	}
 	ctx.header = &rh
 	ctx.header.Title[15] = 0
-	Logger.Info("Cartridge Loaded:")
-	Logger.Infof("Title    : %s", string(ctx.header.Title[:]))
-	Logger.Infof("Type     : %2.2X (%s)", ctx.header.CartType, cartTypeName())
-	Logger.Infof("ROM Size : %d KB", 32<<ctx.header.RomSize)
-	Logger.Infof("RAM Size : %2.2X", ctx.header.RamSize)
-	Logger.Infof("LIC Code : %2.2X (%s)", ctx.header.LicCode, cartLicName())
-	Logger.Infof("ROM Vers : %2.2X", ctx.header.Version)
+	log.Info("Cartridge Loaded:")
+	log.Info("Title    : %s", string(ctx.header.Title[:]))
+	log.Info("Type     : %2.2X (%s)", ctx.header.CartType, cartTypeName())
+	log.Info("ROM Size : %d KB", 32<<ctx.header.RomSize)
+	log.Info("RAM Size : %2.2X", ctx.header.RamSize)
+	log.Info("LIC Code : %2.2X (%s)", ctx.header.LicCode, cartLicName())
+	log.Info("ROM Vers : %2.2X", ctx.header.Version)
 
-	Logger.Infof(
+	log.Info(
 		"Checksum : %2.2X (%s)",
 		ctx.header.Checksum,
 		checkSumChecker(ctx.header.Checksum),

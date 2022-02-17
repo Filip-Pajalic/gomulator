@@ -1,11 +1,15 @@
-package gameboypackage
+package cpu
+
+import (
+	"pajalic.go.emulator/packages/common"
+)
 
 func CpuFlagZ() bool {
-	return Bit(CpuCtx.Regs.f, 7)
+	return common.Bit(CpuCtx.Regs.f, 7)
 }
 
 func CpuFlagC() bool {
-	return Bit(CpuCtx.Regs.f, 4)
+	return common.Bit(CpuCtx.Regs.f, 4)
 }
 
 func CpuRegRead(regType regTypes) uint16 {
@@ -28,13 +32,13 @@ func CpuRegRead(regType regTypes) uint16 {
 		return uint16(CpuCtx.Regs.l)
 	//Pointer magic here?
 	case RT_AF:
-		return Reverse(uint16(CpuCtx.Regs.a))
+		return common.Reverse(uint16(CpuCtx.Regs.a))
 	case RT_BC:
-		return Reverse(uint16(CpuCtx.Regs.b))
+		return common.Reverse(uint16(CpuCtx.Regs.b))
 	case RT_DE:
-		return Reverse(uint16(CpuCtx.Regs.d))
+		return common.Reverse(uint16(CpuCtx.Regs.d))
 	case RT_HL:
-		return Reverse(uint16(CpuCtx.Regs.h))
+		return common.Reverse(uint16(CpuCtx.Regs.h))
 
 	case RT_PC:
 		return CpuCtx.Regs.pc
@@ -74,16 +78,16 @@ func CpuSetReg(regType regTypes, val uint16) {
 		break
 
 	case RT_AF:
-		CpuCtx.Regs.a = byte(Reverse(val))
+		CpuCtx.Regs.a = byte(common.Reverse(val))
 		break
 	case RT_BC:
-		CpuCtx.Regs.b = byte(Reverse(val))
+		CpuCtx.Regs.b = byte(common.Reverse(val))
 		break
 	case RT_DE:
-		CpuCtx.Regs.d = byte(Reverse(val))
+		CpuCtx.Regs.d = byte(common.Reverse(val))
 		break
 	case RT_HL:
-		CpuCtx.Regs.h = byte(Reverse(val))
+		CpuCtx.Regs.h = byte(common.Reverse(val))
 		break
 
 	case RT_PC:

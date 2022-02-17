@@ -1,7 +1,14 @@
-package gameboypackage
+package cpu
+
+import (
+	"log"
+
+	"pajalic.go.emulator/packages/common"
+	"pajalic.go.emulator/packages/emulator"
+)
 
 func procNone(ctx *CpuContext) {
-	Logger.Fatalf("Invalid Instruction!")
+	log.Fatal("Invalid Instruction!")
 }
 
 func procLd(ctx *CpuContext) {
@@ -10,7 +17,7 @@ func procLd(ctx *CpuContext) {
 
 		if ctx.currentInst.Reg2 >= RT_AF {
 			//if 16 bit register...
-			EmuCycles(1)
+			emulator.EmuCycles(1)
 			BusWrite16(ctx.MemDest, ctx.FetchedData)
 		} else {
 			BusWrite(ctx.MemDest, byte(ctx.FetchedData))
@@ -46,9 +53,9 @@ func procDi(ctx *CpuContext) {
 
 func procPop(ctx *CpuContext) {
 	var lo = uint16(StackPop())
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	var hi = uint16(StackPop())
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	var n = (hi << 8) | lo
 	CpuSetReg(ctx.currentInst.Reg1, n)
 
@@ -59,22 +66,22 @@ func procPop(ctx *CpuContext) {
 
 func procPush(ctx *CpuContext) {
 	var hi = (CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	StackPush(byte(hi))
 	var lo = (CpuRegRead(ctx.currentInst.Reg2)) & 0xFF
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	StackPush(byte(lo))
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 }
 
 func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 	if CheckCondition(ctx) {
 		if pushpc {
-			EmuCycles(2)
+			emulator.EmuCycles(2)
 			StackPush16(ctx.Regs.pc)
 		}
 		ctx.Regs.pc = addr
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 }
 
@@ -95,20 +102,20 @@ func procCall(ctx *CpuContext) {
 
 func procRet(ctx *CpuContext) {
 	if ctx.currentInst.Condition != CT_NONE {
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 
 	if CheckCondition(ctx) {
 		var lo = uint16(StackPop())
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 
 		var hi = uint16(StackPop())
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 
 		var n = (hi << 8) | lo
 		ctx.Regs.pc = n
 
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 }
 
@@ -128,7 +135,7 @@ func procLdh(ctx *CpuContext) {
 	} else {
 		BusWrite(ctx.MemDest, ctx.Regs.a)
 	}
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 }
 
 func procXor(ctx *CpuContext) {
@@ -193,18 +200,18 @@ func InstGetProccessor(intype InType) InProc {
 
 func CpuSetFlags(ctx CpuContext, z *bool, n *bool, h *bool, c *bool) {
 	if z != nil {
-		BitSet(&ctx.Regs.f, 7, z)
+		common.BitSet(&ctx.Regs.f, 7, z)
 	}
 
 	if n != nil {
-		BitSet(&ctx.Regs.f, 6, n)
+		common.BitSet(&ctx.Regs.f, 6, n)
 	}
 
 	if h != nil {
-		BitSet(&ctx.Regs.f, 5, h)
+		common.BitSet(&ctx.Regs.f, 5, h)
 	}
 
 	if c != nil {
-		BitSet(&ctx.Regs.f, 4, c)
+		common.BitSet(&ctx.Regs.f, 4, c)
 	}
 }

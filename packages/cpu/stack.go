@@ -1,4 +1,4 @@
-package gameboypackage
+package cpu
 
 func StackPush(data byte) {
 	CpuGetRegs().sp--

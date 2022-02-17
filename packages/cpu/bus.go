@@ -1,4 +1,10 @@
-package gameboypackage
+package cpu
+
+import (
+	"pajalic.go.emulator/packages/cartridge"
+	log "pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/ram"
+)
 
 /*
 0x0000	0x3FFF	16 KiB ROM bank 00	From cartridge, usually a fixed bank
@@ -23,37 +29,37 @@ Reads data from the cartridge, memory locations above represent what the differe
 
 func BusRead(address uint16) byte {
 	if address < 0x8000 {
-		return CartRead(address)
+		return cartridge.CartRead(address)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		Logger.Warnf("Not implemented Char/mapData(%04X)\n", address)
+		log.Warn("Not implemented Char/mapData(%04X)\n", address)
 	} else if address < 0xC000 {
 		//Cartridge ram
-		return CartRead(address)
+		return cartridge.CartRead(address)
 	} else if address < 0xE000 {
 		//WRAM Working ram
-		return WramRead(address)
+		return ram.WramRead(address)
 	} else if address < 0xFE00 {
 		// Reserved eco ram, not used
 		return 0
 	} else if address < 0xFEA0 {
 		//Object attribute memory (OAM)
-		Logger.Warnf("Not implemented OAM(%04X)\n", address)
+		log.Warn("Not implemented OAM(%04X)\n", address)
 
 	} else if address < 0xFF00 {
 		// Reserved not used
 		return 0
 	} else if address < 0xFF80 {
 		//Io registers
-		Logger.Warnf("Not implemented IOregisters(%04X)\n", address)
+		log.Warn("Not implemented IOregisters(%04X)\n", address)
 
 	} else if address == 0xFFFF {
 		//CPU interupt enable register
 		return CpuGetIERegister()
 	}
-	Logger.Warnf("UNSUPPORTED BusRead(%04X)\n", address)
+	log.Warn("UNSUPPORTED BusRead(%04X)\n", address)
 
-	return HramRead(address)
+	return ram.HramRead(address)
 }
 
 /*
@@ -65,34 +71,34 @@ Writes data from the cartridge, memory locations above represent what the differ
 func BusWrite(address uint16, data byte) {
 
 	if address < 0x8000 {
-		CartWrite(address, data)
+		cartridge.CartWrite(address, data)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
+		log.Warn("UNSUPPORTED BusWrite(%04X)\n", address)
 	} else if address < 0xC000 {
 		//EXT-RAM
-		CartWrite(address, data)
+		cartridge.CartWrite(address, data)
 	} else if address < 0xE000 {
 		//WRAM
-		WramWrite(address, data)
+		ram.WramWrite(address, data)
 	} else if address < 0xFE00 {
 		//reserved echo ram
 	} else if address < 0xFEA0 {
 		//OAM
 
 		//TODO
-		Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
+		log.Warn("UNSUPPORTED BusWrite(%04X)\n", address)
 
 	} else if address < 0xFF00 {
 		//unusable reserved
 	} else if address < 0xFF80 {
 		//IO Registers
-		Logger.Warnf("UNSUPPORTED BusWrite(%04X)\n", address)
+		log.Warn("UNSUPPORTED BusWrite(%04X)\n", address)
 	} else if address == 0xFFFF {
 		//CPU SET ENABLE REGISTER
 		CpuSetIERegister(data)
 	} else {
-		HramWrite(address, data)
+		ram.HramWrite(address, data)
 	}
 
 }

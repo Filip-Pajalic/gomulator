@@ -1,4 +1,4 @@
-package gameboypackage
+package common
 
 func TimerInit() {
 
