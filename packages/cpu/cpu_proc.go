@@ -100,6 +100,7 @@ func procCall(ctx *CpuContext) {
 	goToAddr(ctx, ctx.FetchedData, true)
 }
 
+//0000002D
 func procRet(ctx *CpuContext) {
 	if ctx.currentInst.Condition != CT_NONE {
 		emulator.EmuCycles(1)
@@ -150,6 +151,152 @@ func procXor(ctx *CpuContext) {
 
 }
 
+func procInc(ctx *CpuContext) {
+	var val = CpuRegRead(ctx.currentInst.Reg1) + 1
+
+	if is16bit(ctx.currentInst.Reg1) {
+		emulator.EmuCycles(1)
+	}
+
+	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
+		val = uint16(BusRead(CpuRegRead(RT_HL)) + 1)
+		val &= 0xFF
+		BusWrite(CpuRegRead(RT_HL), byte(val))
+	} else {
+		CpuSetReg(ctx.currentInst.Reg1, val)
+		val = CpuRegRead(ctx.currentInst.Reg1)
+	}
+
+	if (ctx.CurOpCode & 0x03) == 0x03 {
+		return
+	}
+	n := false
+	z := val == 0
+	h := (val & 0x0F) == 0
+	CpuSetFlags(*ctx, &z, &n, &h, nil)
+}
+
+func procDec(ctx *CpuContext) {
+	var val = CpuRegRead(ctx.currentInst.Reg1) - 1
+
+	if is16bit(ctx.currentInst.Reg1) {
+		emulator.EmuCycles(1)
+	}
+
+	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
+		val = uint16(BusRead(CpuRegRead(RT_HL)) - 1)
+		BusWrite(CpuRegRead(RT_HL), byte(val))
+	} else {
+		CpuSetReg(ctx.currentInst.Reg1, val)
+		val = CpuRegRead(ctx.currentInst.Reg1)
+	}
+
+	if (ctx.CurOpCode & 0x0B) == 0x0B {
+		return
+	}
+	n := true
+	z := val == 0
+	h := (val & 0x0F) == 0x0F
+	CpuSetFlags(*ctx, &z, &n, &h, nil)
+}
+
+func procSub(ctx *CpuContext) {
+	var val = CpuRegRead(ctx.currentInst.Reg1) - ctx.FetchedData
+
+	var z = val == 0
+	var h = (int32(CpuRegRead(ctx.currentInst.Reg1&0xF)) - int32(ctx.FetchedData&0xF)) < 0
+	var c = (int32(CpuRegRead(ctx.currentInst.Reg1)) - int32(ctx.FetchedData)) < 0
+
+	CpuSetReg(ctx.currentInst.Reg1, val)
+
+	n := true
+	CpuSetFlags(*ctx, &z, &n, &h, &c)
+}
+
+func procSbc(ctx *CpuContext) {
+	var c uint16 = 0
+	CpuFlagC()
+	if CpuFlagC() {
+		c = 1
+	}
+	var val = byte(ctx.FetchedData + c)
+
+	var z = CpuRegRead(ctx.currentInst.Reg1)-uint16(val) == 0
+
+	var h = (int32(CpuRegRead(ctx.currentInst.Reg1)&0xF) - int32(ctx.FetchedData&0xF) - int32(c)) < 0
+
+	var cf = (int32(CpuRegRead(ctx.currentInst.Reg1)) - int32(ctx.FetchedData) - int32(c)) < 0
+
+	CpuSetReg(ctx.currentInst.Reg1, CpuRegRead(ctx.currentInst.Reg1)-uint16(val))
+
+	n := true
+	CpuSetFlags(*ctx, &z, &n, &h, &cf)
+}
+
+func procAdc(ctx *CpuContext) {
+	var u = ctx.FetchedData
+	var a = uint16(ctx.Regs.a)
+	var c uint16 = 0
+	if CpuFlagC() {
+		c = 1
+	}
+
+	ctx.Regs.a = byte((a + u + c) & 0xFF)
+
+	zf := ctx.Regs.a == 0
+	hf := (a&0xF)+(u&0xF)+c > 0xF
+	cf := (a + u + c) > 0xFF
+
+	n := false
+	CpuSetFlags(*ctx, &zf, &n, &hf, &cf)
+}
+
+//Bool to Int problematik som sker i C men ej i GOlang
+func procAdd(ctx *CpuContext) {
+	var val = uint32(CpuRegRead(ctx.currentInst.Reg1) + ctx.FetchedData)
+
+	var is16bit = is16bit(ctx.currentInst.Reg1)
+
+	if is16bit {
+		emulator.EmuCycles(1)
+	}
+
+	if ctx.currentInst.Reg1 == RT_SP {
+		//prevent overflow
+		ctxFetchedByte := byte(ctx.FetchedData)
+		val = uint32(CpuRegRead(ctx.currentInst.Reg1) + uint16(ctxFetchedByte))
+	}
+
+	var z = (val & 0xFF) == 0
+	var h = (CpuRegRead(ctx.currentInst.Reg1)&0xF)+(ctx.FetchedData&0xF) >= 0x10
+	var c = (int)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int)(ctx.FetchedData&0xFF) >= 0x100
+
+	zptr := &z
+	hptr := &h
+	cptr := &c
+
+	if is16bit {
+		zptr = nil
+		*hptr = (CpuRegRead(ctx.currentInst.Reg1)&0xFFF)+(ctx.FetchedData&0xFFF) >= 0x1000
+		n := (uint32(CpuRegRead(ctx.currentInst.Reg1))) + uint32(ctx.FetchedData)
+		*cptr = n >= 0x10000
+	}
+
+	if ctx.currentInst.Reg1 == RT_SP {
+		zptr = nil
+		h = (CpuRegRead(ctx.currentInst.Reg1)&0xF)+(ctx.FetchedData&0xF) >= 0x10
+		c = (int32)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int32)(ctx.FetchedData&0xFF) > 0x100
+	}
+
+	n := false
+
+	CpuSetReg(ctx.currentInst.Reg1, uint16(val&0xFFFF))
+	CpuSetFlags(*ctx, zptr, &n, hptr, cptr)
+}
+
+func is16bit(rt regTypes) bool {
+	return rt >= RT_AF
+}
 func CheckCondition(ctx *CpuContext) bool {
 	z := CpuFlagZ()
 	c := CpuFlagC()
@@ -191,6 +338,12 @@ func InitProcessors() {
 	processors[IN_RETI] = procReti
 	processors[IN_DI] = procDi
 	processors[IN_RST] = procRst
+	processors[IN_ADD] = procAdd
+	processors[IN_ADC] = procAdc
+	processors[IN_INC] = procInc
+	processors[IN_DEC] = procDec
+	processors[IN_SUB] = procSub
+	processors[IN_SBC] = procSbc
 }
 
 //fix this to return properly

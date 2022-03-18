@@ -3,6 +3,7 @@ package cpu
 import (
 	"os"
 
+	emu "pajalic.go.emulator/packages/emulator"
 	log "pajalic.go.emulator/packages/logger"
 )
 
@@ -97,9 +98,45 @@ func CpuStep() bool {
 		fetchInstruction()
 		FetchData()
 
-		log.Info("%04X: %-7s (%02X %02X %02X) A: %02X BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
+		/*sprintf(flags, "%c%c%c%c",
+			ctx.regs.f & (1 << 7) ? 'Z' : '-',
+			ctx.regs.f & (1 << 6) ? 'N' : '-',
+			ctx.regs.f & (1 << 5) ? 'H' : '-',
+			ctx.regs.f & (1 << 4) ? 'C' : '-'
+		);*/
+
+		/*
+			printf("%08lX - %04X: %-7s (%02X %02X %02X) A: %02X F: %s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
+			            emu_get_context()->ticks,
+			            pc, inst_name(ctx.cur_inst->type), ctx.cur_opcode,
+			            bus_read(pc + 1), bus_read(pc + 2), ctx.regs.a, flags, ctx.regs.b, ctx.regs.c,
+			            ctx.regs.d, ctx.regs.e, ctx.regs.h, ctx.regs.l);
+		*/
+
+		var z = "-"
+		var n = "-"
+		var h = "-"
+		var c = "-"
+		if CpuCtx.Regs.f&(1<<7) == 1 {
+			z = "Z"
+		}
+
+		if CpuCtx.Regs.f&(1<<6) == 1 {
+			n = "N"
+		}
+
+		if CpuCtx.Regs.f&(1<<5) == 1 {
+			h = "H"
+		}
+
+		if CpuCtx.Regs.f&(1<<4) == 1 {
+			c = "C"
+		}
+
+		log.Info("%08X - %04X: %-6s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
+			emu.GetEmuContext().Ticks,
 			pc, getInstructionName(CpuCtx.currentInst.Type), CpuCtx.CurOpCode,
-			BusRead(pc+1), BusRead(pc+2), CpuCtx.Regs.a, CpuCtx.Regs.b, CpuCtx.Regs.c,
+			BusRead(pc+1), BusRead(pc+2), CpuCtx.Regs.a, z, n, h, c, CpuCtx.Regs.b, CpuCtx.Regs.c,
 			CpuCtx.Regs.d, CpuCtx.Regs.e, CpuCtx.Regs.h, CpuCtx.Regs.l)
 
 		if CpuCtx.currentInst == nil {

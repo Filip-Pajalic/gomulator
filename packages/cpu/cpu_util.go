@@ -31,28 +31,14 @@ func CpuRegRead(regType regTypes) uint16 {
 		return uint16(CpuCtx.Regs.h)
 	case RT_L:
 		return uint16(CpuCtx.Regs.l)
-	//Pointer magic here?
 	case RT_AF:
-		hi := byte((CpuCtx.Regs.f >> 8) & 0xFF)
-		lo := byte(CpuCtx.Regs.a & 0xFF)
-		var reversable = uint16(lo | (hi << 8))
-		return common.Reverse(reversable)
+		return common.Reverse(uint16(CpuCtx.Regs.f)<<8 | uint16(CpuCtx.Regs.a))
 	case RT_BC:
-		hi := byte((CpuCtx.Regs.c >> 8) & 0xFF)
-		lo := byte(CpuCtx.Regs.b & 0xFF)
-		var reversable = uint16(lo | (hi << 8))
-		return common.Reverse(reversable)
+		return common.Reverse(uint16(CpuCtx.Regs.c)<<8 | uint16(CpuCtx.Regs.b))
 	case RT_DE:
-		hi := byte((CpuCtx.Regs.e >> 8) & 0xFF)
-		lo := byte(CpuCtx.Regs.d & 0xFF)
-		var reversable = uint16(lo | (hi << 8))
-		return common.Reverse(reversable)
+		return common.Reverse(uint16(CpuCtx.Regs.e)<<8 | uint16(CpuCtx.Regs.d))
 	case RT_HL:
-		hi := byte((CpuCtx.Regs.l >> 8) & 0xFF)
-		lo := byte(CpuCtx.Regs.h & 0xFF)
-		var reversable = uint16(lo | (hi << 8))
-		return common.Reverse(reversable)
-
+		return common.Reverse(uint16(CpuCtx.Regs.l)<<8 | uint16(CpuCtx.Regs.h))
 	case RT_PC:
 		return CpuCtx.Regs.pc
 	case RT_SP:
