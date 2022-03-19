@@ -47,6 +47,205 @@ func procNop(cpucontext *CpuContext) {
 
 }
 
+var rtLookup = []regTypes{
+RT_B,
+RT_C,
+RT_D,
+RT_E,
+RT_H,
+RT_L,
+RT_HL,
+RT_A,
+}
+
+// probably wrong , probably needs to have a byte assigned to each rT
+func decodeReg(reg byte) regTypes {
+	if (reg > 0b111) {
+	return RT_NONE;
+	}
+
+	return rtLookup[reg];
+}
+
+func procCb(ctx *CpuContext) {
+	var op byte = byte(ctx.FetchedData)
+	var reg regTypes = decodeReg(op & 0b111)
+	var bit byte = (op >> 3) & 0b111
+	var bit_op byte = (op >> 6) & 0b11
+	var regval byte = CpuRegRead8(reg)
+	emulator.EmuCycles(1)
+
+
+
+	if (reg == RT_HL) {
+		emulator.EmuCycles(2);
+	}
+
+switch(bit_op) {
+case 1:
+//BIT
+CpuSetFlags(*ctx, !(regval & (1 << bit)), 0, 1, -1);
+return;
+
+case 2:
+//RST
+	regval &= ~(1 << bit);
+CpuSetReg8(reg, regval);
+return;
+
+case 3:
+//SET
+	regval |= (1 << bit);
+CpuSetReg8(reg, regval);
+return;
+}
+
+var flagC bool = CpuFlagC();
+
+switch(bit) {
+case 0: {
+//RLC
+var setC bool = false;
+var result byte = (regval << 1) & 0xFF;
+
+if ((regval & (1 << 7)) != 0) {
+result |= 1;
+setC = true;
+}
+
+CpuSetReg8(reg, result);
+CpuSetFlags(*ctx, result == 0, false, false, setC);
+} return;
+
+case 1: {
+//RRC
+var old byte = regval;
+regval >>= 1;
+regval |= (old << 7);
+
+CpuSetReg8(reg, regval);
+CpuSetFlags(*ctx, !regval, false, false, old & 1);
+} return;
+
+case 2: {
+//RL
+var old byte = regval;
+regval <<= 1;
+// byte to bool
+	var bitSetVar byte = 0
+
+	if flagC {
+		bitSetVar = 1
+	}
+regval |= bitSetVar;
+
+CpuSetReg8(reg, regval);
+// Clamp old between 0 and 1
+CpuSetFlags(*ctx, !regval, false, false, !!(old & 0x80));
+} return;
+
+case 3: {
+//RR
+var old byte = regval;
+regval >>= 1;
+	var bitSetVar byte = 0
+
+	if flagC {
+		bitSetVar = 1
+	}
+regval |= (byte(bitSetVar << 7);
+
+CpuSetReg8(reg, regval);
+CpuSetFlags(ctx, !regval, false, false, old & 1);
+} return;
+
+case 4: {
+//SLA
+var old byte = regval;
+regval <<= 1;
+
+CpuSetReg8(reg, regval);
+CpuSetFlags(ctx, !regval, false, false, !!(old & 0x80));
+} return;
+
+case 5: {
+//SRA
+	// what is int8_t
+var u byte = byte(regval >> 1);
+CpuSetReg8(reg, u);
+CpuSetFlags(ctx, !u, 0, 0, regval & 1);
+} return;
+
+case 6: {
+//SWAP
+regval = ((regval & 0xF0) >> 4) | ((regval & 0xF) << 4);
+CpuSetReg8(reg, regval);
+CpuSetFlags(ctx, regval == 0, false, false, false);
+} return;
+
+case 7: {
+//SRL
+var u byte = regval >> 1;
+CpuSetReg8(reg, u);
+CpuSetFlags(ctx, !u, 0, 0, regval & 1);
+} return;
+}
+	log.Fatal("ERROR: INVALID CB: %02X", op)
+
+}
+
+//Could be a problem with casting here
+func procAnd(ctx *CpuContext) {
+	ctx.Regs.a &= byte(ctx.FetchedData)
+	var zflag = false
+	var hflag = true
+	if ctx.Regs.a == 0 {
+		zflag = true
+	}
+	CpuSetFlags(*ctx, &zflag, nil, &hflag, nil)
+}
+
+func procXor(ctx *CpuContext) {
+	ctx.Regs.a ^= byte(ctx.FetchedData & 0xFF)
+	var zflag = false
+	if ctx.Regs.a == 0 {
+		zflag = true
+	}
+	CpuSetFlags(*ctx, &zflag, nil, nil, nil)
+
+}
+
+func procOr(ctx *CpuContext) {
+	ctx.Regs.a |= byte(ctx.FetchedData & 0xFF)
+	var zflag = false
+	if ctx.Regs.a == 0 {
+		zflag = true
+	}
+	CpuSetFlags(*ctx, &zflag, nil, nil, nil)
+}
+
+func procCp(ctx *CpuContext) {
+	n := int(ctx.Regs.a) - int(ctx.FetchedData)
+
+	var zflag = false
+	var nflag = true
+	var hflag = false
+	var cflag = false
+
+	if n == 0 {
+		zflag = true
+	}
+
+	if ((int(ctx.Regs.a) & 0x0F) - (int(ctx.FetchedData) & 0x0F)) < 0 {
+		hflag = true
+	}
+
+	if n < 0 {
+		cflag = true
+	}
+	CpuSetFlags(*ctx, &zflag, &nflag, &hflag, &cflag)
+}
+
 func procDi(ctx *CpuContext) {
 	ctx.IntMasterEnabled = false
 }
@@ -68,7 +267,7 @@ func procPush(ctx *CpuContext) {
 	var hi = (CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF
 	emulator.EmuCycles(1)
 	StackPush(byte(hi))
-	var lo = (CpuRegRead(ctx.currentInst.Reg2)) & 0xFF
+	var lo = (CpuRegRead(ctx.currentInst.Reg1)) & 0xFF
 	emulator.EmuCycles(1)
 	StackPush(byte(lo))
 	emulator.EmuCycles(1)
@@ -100,7 +299,7 @@ func procCall(ctx *CpuContext) {
 	goToAddr(ctx, ctx.FetchedData, true)
 }
 
-//0000002D
+//0000002D problem here with fetched data, why stack push wrong
 func procRet(ctx *CpuContext) {
 	if ctx.currentInst.Condition != CT_NONE {
 		emulator.EmuCycles(1)
@@ -139,16 +338,6 @@ func procLdh(ctx *CpuContext) {
 		BusWrite(ctx.MemDest, ctx.Regs.a)
 	}
 	emulator.EmuCycles(1)
-}
-
-func procXor(ctx *CpuContext) {
-	ctx.Regs.a ^= byte(ctx.FetchedData & 0xFF)
-	var zflag = false
-	if ctx.Regs.a == 0 {
-		zflag = true
-	}
-	CpuSetFlags(*ctx, &zflag, nil, nil, nil)
-
 }
 
 func procInc(ctx *CpuContext) {
@@ -344,6 +533,11 @@ func InitProcessors() {
 	processors[IN_DEC] = procDec
 	processors[IN_SUB] = procSub
 	processors[IN_SBC] = procSbc
+	processors[IN_AND] = procAnd
+	processors[IN_XOR] = procXor
+	processors[IN_OR] = procOr
+	processors[IN_CP] = procCp
+	processors[IN_CB] = procCb
 }
 
 //fix this to return properly

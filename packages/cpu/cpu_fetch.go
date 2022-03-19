@@ -30,7 +30,7 @@ func FetchData() {
 	case AM_R:
 		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg1)
 		return
-
+	//Problem on 2D , fetched data is 57339 instead of 2
 	case AM_R_R:
 		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
 		return
@@ -91,7 +91,7 @@ func FetchData() {
 
 	case AM_R_MR:
 		addr := CpuRegRead(CpuCtx.currentInst.Reg2)
-		if CpuCtx.currentInst.Reg1 == RT_C {
+		if CpuCtx.currentInst.Reg2 == RT_C {
 			addr |= 0xFF00
 		}
 

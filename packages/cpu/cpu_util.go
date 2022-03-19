@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"pajalic.go.emulator/packages/common"
+	log "pajalic.go.emulator/packages/logger"
 )
 
 func CpuFlagZ() bool {
@@ -105,6 +106,69 @@ func CpuSetReg(regType regTypes, val uint16) {
 		break
 	case RT_NONE:
 		break
+	}
+}
+
+func CpuRegRead8(rt regTypes) byte {
+	switch rt {
+	case RT_A:
+		return CpuCtx.Regs.a
+	case RT_F:
+		return CpuCtx.Regs.f
+	case RT_B:
+		return CpuCtx.Regs.b
+	case RT_C:
+		return CpuCtx.Regs.c
+	case RT_D:
+		return CpuCtx.Regs.d
+	case RT_E:
+		return CpuCtx.Regs.e
+	case RT_H:
+		return CpuCtx.Regs.h
+	case RT_L:
+		return CpuCtx.Regs.l
+	case RT_HL:
+		{
+			return BusRead(CpuRegRead(RT_HL))
+		}
+	default:
+		log.Fatal("**ERR INVALID REG8: %d\n", rt)
+
+	}
+	return 0
+}
+
+func CpuSetReg8(rt regTypes, val byte) {
+	switch rt {
+	case RT_A:
+		CpuCtx.Regs.a = val & 0xFF
+		break
+	case RT_F:
+		CpuCtx.Regs.f = val & 0xFF
+		break
+	case RT_B:
+		CpuCtx.Regs.b = val & 0xFF
+		break
+	case RT_C:
+		CpuCtx.Regs.c = val & 0xFF
+		break
+	case RT_D:
+		CpuCtx.Regs.d = val & 0xFF
+		break
+	case RT_E:
+		CpuCtx.Regs.e = val & 0xFF
+		break
+	case RT_H:
+		CpuCtx.Regs.h = val & 0xFF
+		break
+	case RT_L:
+		CpuCtx.Regs.l = val & 0xFF
+		break
+	case RT_HL:
+		BusWrite(CpuRegRead(RT_HL), val)
+		break
+	default:
+		log.Fatal("**ERR INVALID REG8: %d\n", rt)
 	}
 }
 

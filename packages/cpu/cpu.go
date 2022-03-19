@@ -78,8 +78,8 @@ func CpuInit() {
 func fetchInstruction() {
 
 	CpuCtx.CurOpCode = BusRead(CpuCtx.Regs.pc)
-	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
 	CpuCtx.Regs.pc++
+	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
 
 }
 
