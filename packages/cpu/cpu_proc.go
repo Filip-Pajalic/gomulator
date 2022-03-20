@@ -247,7 +247,7 @@ func procCb(ctx *CpuContext) {
 		{
 			//SRA
 			// what is int8_t MSB should not change, is this true
-			var u = byte(regval >> 1)
+			var u = byte(int8(regval) >> 1)
 
 			zflag := false
 			nflag := false
@@ -407,7 +407,7 @@ func procJp(ctx *CpuContext) {
 
 //Jump relative
 func procJr(ctx *CpuContext) {
-	var rel = byte(ctx.FetchedData & 0xFF) //casting cause it might be negative
+	var rel = int8(ctx.FetchedData & 0xFF) //casting cause it might be negative
 	var addr = ctx.Regs.pc + uint16(rel)
 	goToAddr(ctx, addr, false)
 }
