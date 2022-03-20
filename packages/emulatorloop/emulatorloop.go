@@ -13,6 +13,7 @@ import (
 
 func CpuRun() {
 	cpu.CpuInit()
+	cpu.InitInstructions()
 
 	emu.GetEmuContext().Running = true
 	emu.GetEmuContext().Paused = false
@@ -44,7 +45,7 @@ func Run(argc int, argv []string) int {
 	}
 
 	ui.UiInit()
-
+	emu.GetEmuContext().Die = false
 	go CpuRun()
 
 	for !emu.GetEmuContext().Die {
@@ -52,8 +53,7 @@ func Run(argc int, argv []string) int {
 		time.Sleep(1000)
 		ui.UiHandleEvents()
 	}
-
-	cpu.InitInstructions()
+	ui.DestroyWindow()
 
 	return 0
 
