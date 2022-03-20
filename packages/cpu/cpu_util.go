@@ -9,6 +9,14 @@ func CpuFlagZ() bool {
 	return common.Bit(CpuCtx.Regs.f, 7)
 }
 
+func CpuFlagN() bool {
+	return common.Bit(CpuCtx.Regs.f, 6)
+}
+
+func CpuFlagH() bool {
+	return common.Bit(CpuCtx.Regs.f, 5)
+}
+
 func CpuFlagC() bool {
 	return common.Bit(CpuCtx.Regs.f, 4)
 }
@@ -174,4 +182,12 @@ func CpuSetReg8(rt regTypes, val byte) {
 
 func CpuGetRegs() *CpuRegisters {
 	return &CpuCtx.Regs
+}
+
+func CpuGetIntFlags() byte {
+	return CpuCtx.IntFlags
+}
+
+func CpuSetIntFlags(value byte) {
+	CpuCtx.IntFlags = value
 }

@@ -25,6 +25,7 @@ type emuContext struct {
 	Paused  bool
 	Running bool
 	Ticks   uint64
+	Die     bool
 }
 
 func EmuCycles(cpuCycles int) {

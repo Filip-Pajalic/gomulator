@@ -316,6 +316,90 @@ func procAnd(ctx *CpuContext) {
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
 
+func procRlca(ctx *CpuContext) {
+	var u = ctx.Regs.a
+
+	var zflag = false
+	var nflag = false
+	var hflag = false
+	var cflag = false
+	var cbit byte = 0
+	if (u>>7)&1 == 1 {
+		cflag = true
+		cbit = 1
+	}
+	u = (u << 1) | cbit
+	ctx.Regs.a = u
+
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+
+}
+
+func procRrca(ctx *CpuContext) {
+
+	var zflag = false
+	var nflag = false
+	var hflag = false
+	var cflag = false
+
+	var b = ctx.Regs.a & 1
+	ctx.Regs.a >>= 1
+	ctx.Regs.a |= b << 7
+
+	if b == 1 {
+		cflag = true
+	}
+
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+
+}
+
+func procRla(ctx *CpuContext) {
+	var u = ctx.Regs.a
+
+	var zflag = false
+	var nflag = false
+	var hflag = false
+	var cflag = false
+
+	if (u>>7)&1 == 1 {
+		cflag = true
+
+	}
+	var cf byte = 0
+	if CpuFlagC() {
+		cf = 1
+	}
+
+	ctx.Regs.a = (u << 1) | cf
+
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+
+}
+func procRra(ctx *CpuContext) {
+
+	var zflag = false
+	var nflag = false
+	var hflag = false
+	var cflag = false
+
+	var new_c = ctx.Regs.a & 1
+
+	if new_c == 0 {
+		cflag = true
+	}
+
+	ctx.Regs.a >>= 1
+	var carry byte = 0
+	if CpuFlagC() {
+		carry = 1
+	}
+	ctx.Regs.a |= carry << 7
+
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+
+}
+
 func procXor(ctx *CpuContext) {
 	ctx.Regs.a ^= byte(ctx.FetchedData & 0xFF)
 	var zflag = false
@@ -365,6 +449,10 @@ func procCp(ctx *CpuContext) {
 
 func procDi(ctx *CpuContext) {
 	ctx.IntMasterEnabled = false
+}
+
+func procEi(ctx *CpuContext) {
+	ctx.enablingIme = false
 }
 
 func procPop(ctx *CpuContext) {
@@ -600,6 +688,78 @@ func procAdd(ctx *CpuContext) {
 	CpuSetFlags(ctx, zptr, &n, hptr, cptr)
 }
 
+func procStop(ctx *CpuContext) {
+	log.Fatal("STOPPING!")
+}
+
+func procDaa(ctx *CpuContext) {
+	var u byte = 0
+	var fc = 0
+
+	if CpuFlagH() || (!CpuFlagN() && (ctx.Regs.a&0xF) > 9) {
+		u = 6
+	}
+
+	if CpuFlagC() || (!CpuFlagN() && ctx.Regs.a > 0x99) {
+		u |= 0x60
+		fc = 1
+	}
+	if CpuFlagN() {
+		ctx.Regs.a += -u
+	} else {
+		ctx.Regs.a += u
+	}
+	var zflag = false
+	var hflag = false
+	var cflag = false
+
+	if ctx.Regs.a == 0 {
+		zflag = true
+	}
+
+	if fc == 0 {
+		cflag = true
+	}
+
+	CpuSetFlags(ctx, &zflag, nil, &hflag, &cflag)
+
+}
+
+func procCpl(ctx *CpuContext) {
+	ctx.Regs.a = ^ctx.Regs.a
+	var nflag = true
+	var hflag = true
+
+	CpuSetFlags(ctx, nil, &nflag, &hflag, nil)
+}
+
+func procScf(ctx *CpuContext) {
+	var nflag = false
+	var hflag = false
+	var cflag = true
+	CpuSetFlags(ctx, nil, &nflag, &hflag, &cflag)
+}
+
+func procCcf(ctx *CpuContext) {
+
+	var nflag = false
+	var hflag = false
+	var cflag = false
+	var cpuflagbit byte = 0
+	if CpuFlagC() {
+		cpuflagbit = 1
+	}
+	if (cpuflagbit ^ 1) == 1 {
+		cflag = true
+	}
+	CpuSetFlags(ctx, nil, &nflag, &hflag, &cflag)
+
+}
+
+func procHalt(ctx *CpuContext) {
+	ctx.Halted = true
+}
+
 func is16bit(rt regTypes) bool {
 	return rt >= RT_AF
 }
@@ -655,6 +815,17 @@ func InitProcessors() {
 	processors[IN_OR] = procOr
 	processors[IN_CP] = procCp
 	processors[IN_CB] = procCb
+	processors[IN_RLCA] = procRlca
+	processors[IN_RRCA] = procRrca
+	processors[IN_RLA] = procRla
+	processors[IN_RRA] = procRra
+	processors[IN_STOP] = procStop
+	processors[IN_HALT] = procHalt
+	processors[IN_DAA] = procDaa
+	processors[IN_CPL] = procCpl
+	processors[IN_SCF] = procScf
+	processors[IN_CCF] = procCcf
+	processors[IN_EI] = procEi
 }
 
 //fix this to return properly

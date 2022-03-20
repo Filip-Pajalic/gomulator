@@ -62,8 +62,9 @@ type CpuContext struct {
 	Stepping bool
 
 	IntMasterEnabled bool
-
-	IERegister byte
+	enablingIme      bool
+	IERegister       byte
+	IntFlags         byte
 }
 
 var CpuCtx CpuContext
@@ -129,7 +130,22 @@ func CpuStep() bool {
 			os.Exit(1)
 		}
 		execute()
+	} else {
+		emu.EmuCycles(1)
+
+		if CpuCtx.IntFlags == 1 {
+			CpuCtx.Halted = false
+		}
+
 	}
+	if CpuCtx.IntMasterEnabled {
+		CpuHandleInterrupts(&CpuCtx)
+		CpuCtx.enablingIme = false
+	}
+	if CpuCtx.enablingIme {
+		CpuCtx.IntMasterEnabled = true
+	}
+
 	return true
 }
 
