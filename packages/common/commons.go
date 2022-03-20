@@ -5,12 +5,13 @@ import (
 	"strconv"
 )
 
-func BitSet(a *byte, n byte, on *bool) {
+func BitSet(a byte, n byte, on *bool) byte {
 	if *on {
-		*a |= 1 << n
+		a |= 1 << n
 	} else {
-		*a &= ^(1 << n)
+		a &= ^(1 << n)
 	}
+	return a
 }
 
 //BIT(a, n) ((a & (1 << n)) ? 1 : 0)

@@ -117,19 +117,19 @@ func CpuStep() bool {
 		var n = "-"
 		var h = "-"
 		var c = "-"
-		if CpuCtx.Regs.f&(1<<7) == 1 {
+		if (CpuCtx.Regs.f & (1 << 7)) >= 1 {
 			z = "Z"
 		}
 
-		if CpuCtx.Regs.f&(1<<6) == 1 {
+		if CpuCtx.Regs.f&(1<<6) >= 1 {
 			n = "N"
 		}
 
-		if CpuCtx.Regs.f&(1<<5) == 1 {
+		if CpuCtx.Regs.f&(1<<5) >= 1 {
 			h = "H"
 		}
 
-		if CpuCtx.Regs.f&(1<<4) == 1 {
+		if CpuCtx.Regs.f&(1<<4) >= 1 {
 			c = "C"
 		}
 

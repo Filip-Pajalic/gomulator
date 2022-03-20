@@ -33,7 +33,7 @@ func procLd(ctx *CpuContext) {
 		var cflag = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
 			(ctx.FetchedData&0xFF) >= 0x100
 
-		CpuSetFlags(*ctx, nil, nil, &hflag, &cflag)
+		CpuSetFlags(ctx, nil, nil, &hflag, &cflag)
 		CpuSetReg(ctx.currentInst.Reg1,
 			CpuRegRead(ctx.currentInst.Reg2)+ctx.FetchedData)
 
@@ -48,148 +48,257 @@ func procNop(cpucontext *CpuContext) {
 }
 
 var rtLookup = []regTypes{
-RT_B,
-RT_C,
-RT_D,
-RT_E,
-RT_H,
-RT_L,
-RT_HL,
-RT_A,
+	RT_B,
+	RT_C,
+	RT_D,
+	RT_E,
+	RT_H,
+	RT_L,
+	RT_HL,
+	RT_A,
 }
 
 // probably wrong , probably needs to have a byte assigned to each rT
 func decodeReg(reg byte) regTypes {
-	if (reg > 0b111) {
-	return RT_NONE;
+	if reg > 0b111 {
+		return RT_NONE
 	}
 
-	return rtLookup[reg];
+	return rtLookup[reg]
 }
 
 func procCb(ctx *CpuContext) {
-	var op byte = byte(ctx.FetchedData)
-	var reg regTypes = decodeReg(op & 0b111)
-	var bit byte = (op >> 3) & 0b111
-	var bit_op byte = (op >> 6) & 0b11
-	var regval byte = CpuRegRead8(reg)
+	var op = byte(ctx.FetchedData)
+	var reg = decodeReg(op & 0b111)
+	var bit = (op >> 3) & 0b111
+	var bit_op = (op >> 6) & 0b11
+	var regval = CpuRegRead8(reg)
 	emulator.EmuCycles(1)
 
-
-
-	if (reg == RT_HL) {
-		emulator.EmuCycles(2);
+	if reg == RT_HL {
+		emulator.EmuCycles(2)
 	}
 
-switch(bit_op) {
-case 1:
-//BIT
-CpuSetFlags(*ctx, !(regval & (1 << bit)), 0, 1, -1);
-return;
+	switch bit_op {
+	case 1:
+		zflag := false
+		nflag := false
+		hflag := true
+		//BIT , is this correct, should it be equals to zero
+		if (regval & (1 << bit)) == 0 {
+			zflag = true
+		}
+		CpuSetFlags(ctx, &zflag, &nflag, &hflag, nil)
+		return
 
-case 2:
-//RST
-	regval &= ~(1 << bit);
-CpuSetReg8(reg, regval);
-return;
+	case 2:
+		//RST
+		//Does ^ equal ~ in c
+		regval &= ^(1 << bit)
+		CpuSetReg8(reg, regval)
+		return
 
-case 3:
-//SET
-	regval |= (1 << bit);
-CpuSetReg8(reg, regval);
-return;
-}
-
-var flagC bool = CpuFlagC();
-
-switch(bit) {
-case 0: {
-//RLC
-var setC bool = false;
-var result byte = (regval << 1) & 0xFF;
-
-if ((regval & (1 << 7)) != 0) {
-result |= 1;
-setC = true;
-}
-
-CpuSetReg8(reg, result);
-CpuSetFlags(*ctx, result == 0, false, false, setC);
-} return;
-
-case 1: {
-//RRC
-var old byte = regval;
-regval >>= 1;
-regval |= (old << 7);
-
-CpuSetReg8(reg, regval);
-CpuSetFlags(*ctx, !regval, false, false, old & 1);
-} return;
-
-case 2: {
-//RL
-var old byte = regval;
-regval <<= 1;
-// byte to bool
-	var bitSetVar byte = 0
-
-	if flagC {
-		bitSetVar = 1
+	case 3:
+		//SET
+		regval |= 1 << bit
+		CpuSetReg8(reg, regval)
+		return
 	}
-regval |= bitSetVar;
+	flagC := CpuFlagC()
 
-CpuSetReg8(reg, regval);
-// Clamp old between 0 and 1
-CpuSetFlags(*ctx, !regval, false, false, !!(old & 0x80));
-} return;
+	switch bit {
+	case 0:
+		{
+			//RLC
+			var setC = false
+			var result = (regval << 1) & 0xFF
 
-case 3: {
-//RR
-var old byte = regval;
-regval >>= 1;
-	var bitSetVar byte = 0
+			if (regval & (1 << 7)) != 0 {
+				result |= 1
+				setC = true
+			}
+			zflag := false
+			nflag := false
+			hflag := false
 
-	if flagC {
-		bitSetVar = 1
+			if result == 0 {
+				zflag = true
+			}
+
+			CpuSetReg8(reg, result)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &setC)
+			return
+		}
+
+	case 1:
+		{
+			//RRC
+			var old = regval
+			regval >>= 1
+			regval |= old << 7
+
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+
+			if regval == 0 {
+				zflag = true
+			}
+
+			if old&1 == 1 {
+				cflag = true
+			}
+
+			CpuSetReg8(reg, regval)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
+
+	case 2:
+		{
+			//RL
+			var old = regval
+			regval <<= 1
+			// byte to bool
+			var bitCflag byte = 0
+
+			if flagC {
+				bitCflag = 1
+			}
+			regval |= bitCflag
+
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+
+			if regval == 0 {
+				zflag = true
+			}
+			//Is this correct
+			if (old & 0x80) != 0 {
+				cflag = true
+			}
+			CpuSetReg8(reg, regval)
+			// Clamp old between 0 and 1
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
+
+	case 3:
+		{
+			//RR
+			var old = regval
+			regval >>= 1
+
+			var bitCflag byte = 0
+
+			if flagC {
+				bitCflag = 1
+			}
+			regval |= bitCflag
+
+			regval |= bitCflag << 7
+
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+
+			if regval == 0 {
+				zflag = true
+			}
+
+			if old&1 == 1 {
+				cflag = true
+			}
+
+			CpuSetReg8(reg, regval)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
+
+	case 4:
+		{
+			//SLA
+			var old = regval
+			regval <<= 1
+
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+
+			if regval == 0 {
+				zflag = true
+			}
+			//Is this correct
+			if (old & 0x80) != 0 {
+				cflag = true
+			}
+
+			CpuSetReg8(reg, regval)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
+
+	case 5:
+		{
+			//SRA
+			// what is int8_t MSB should not change, is this true
+			var u = byte(regval >> 1)
+
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+			if u == 0 {
+				zflag = true
+			}
+			if regval&1 == 1 {
+				zflag = true
+			}
+			CpuSetReg8(reg, u)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
+
+	case 6:
+		{
+			//SWAP
+			regval = ((regval & 0xF0) >> 4) | ((regval & 0xF) << 4)
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+			if regval == 0 {
+				zflag = true
+			}
+			CpuSetReg8(reg, regval)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
+
+	case 7:
+		{
+			//SRL
+			var u = regval >> 1
+			zflag := false
+			nflag := false
+			hflag := false
+			cflag := false
+			if u == 0 {
+				zflag = true
+			}
+			if regval&1 == 1 {
+				zflag = true
+			}
+			CpuSetReg8(reg, u)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+		}
 	}
-regval |= (byte(bitSetVar << 7);
-
-CpuSetReg8(reg, regval);
-CpuSetFlags(ctx, !regval, false, false, old & 1);
-} return;
-
-case 4: {
-//SLA
-var old byte = regval;
-regval <<= 1;
-
-CpuSetReg8(reg, regval);
-CpuSetFlags(ctx, !regval, false, false, !!(old & 0x80));
-} return;
-
-case 5: {
-//SRA
-	// what is int8_t
-var u byte = byte(regval >> 1);
-CpuSetReg8(reg, u);
-CpuSetFlags(ctx, !u, 0, 0, regval & 1);
-} return;
-
-case 6: {
-//SWAP
-regval = ((regval & 0xF0) >> 4) | ((regval & 0xF) << 4);
-CpuSetReg8(reg, regval);
-CpuSetFlags(ctx, regval == 0, false, false, false);
-} return;
-
-case 7: {
-//SRL
-var u byte = regval >> 1;
-CpuSetReg8(reg, u);
-CpuSetFlags(ctx, !u, 0, 0, regval & 1);
-} return;
-}
 	log.Fatal("ERROR: INVALID CB: %02X", op)
 
 }
@@ -198,30 +307,38 @@ CpuSetFlags(ctx, !u, 0, 0, regval & 1);
 func procAnd(ctx *CpuContext) {
 	ctx.Regs.a &= byte(ctx.FetchedData)
 	var zflag = false
+	var nflag = false
 	var hflag = true
+	var cflag = false
 	if ctx.Regs.a == 0 {
 		zflag = true
 	}
-	CpuSetFlags(*ctx, &zflag, nil, &hflag, nil)
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
 
 func procXor(ctx *CpuContext) {
 	ctx.Regs.a ^= byte(ctx.FetchedData & 0xFF)
 	var zflag = false
+	var nflag = false
+	var hflag = false
+	var cflag = false
 	if ctx.Regs.a == 0 {
 		zflag = true
 	}
-	CpuSetFlags(*ctx, &zflag, nil, nil, nil)
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 
 }
 
 func procOr(ctx *CpuContext) {
 	ctx.Regs.a |= byte(ctx.FetchedData & 0xFF)
 	var zflag = false
+	var nflag = false
+	var hflag = false
+	var cflag = false
 	if ctx.Regs.a == 0 {
 		zflag = true
 	}
-	CpuSetFlags(*ctx, &zflag, nil, nil, nil)
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
 
 func procCp(ctx *CpuContext) {
@@ -243,7 +360,7 @@ func procCp(ctx *CpuContext) {
 	if n < 0 {
 		cflag = true
 	}
-	CpuSetFlags(*ctx, &zflag, &nflag, &hflag, &cflag)
+	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
 
 func procDi(ctx *CpuContext) {
@@ -362,7 +479,7 @@ func procInc(ctx *CpuContext) {
 	n := false
 	z := val == 0
 	h := (val & 0x0F) == 0
-	CpuSetFlags(*ctx, &z, &n, &h, nil)
+	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
 
 func procDec(ctx *CpuContext) {
@@ -386,7 +503,7 @@ func procDec(ctx *CpuContext) {
 	n := true
 	z := val == 0
 	h := (val & 0x0F) == 0x0F
-	CpuSetFlags(*ctx, &z, &n, &h, nil)
+	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
 
 func procSub(ctx *CpuContext) {
@@ -399,7 +516,7 @@ func procSub(ctx *CpuContext) {
 	CpuSetReg(ctx.currentInst.Reg1, val)
 
 	n := true
-	CpuSetFlags(*ctx, &z, &n, &h, &c)
+	CpuSetFlags(ctx, &z, &n, &h, &c)
 }
 
 func procSbc(ctx *CpuContext) {
@@ -419,7 +536,7 @@ func procSbc(ctx *CpuContext) {
 	CpuSetReg(ctx.currentInst.Reg1, CpuRegRead(ctx.currentInst.Reg1)-uint16(val))
 
 	n := true
-	CpuSetFlags(*ctx, &z, &n, &h, &cf)
+	CpuSetFlags(ctx, &z, &n, &h, &cf)
 }
 
 func procAdc(ctx *CpuContext) {
@@ -437,7 +554,7 @@ func procAdc(ctx *CpuContext) {
 	cf := (a + u + c) > 0xFF
 
 	n := false
-	CpuSetFlags(*ctx, &zf, &n, &hf, &cf)
+	CpuSetFlags(ctx, &zf, &n, &hf, &cf)
 }
 
 //Bool to Int problematik som sker i C men ej i GOlang
@@ -480,7 +597,7 @@ func procAdd(ctx *CpuContext) {
 	n := false
 
 	CpuSetReg(ctx.currentInst.Reg1, uint16(val&0xFFFF))
-	CpuSetFlags(*ctx, zptr, &n, hptr, cptr)
+	CpuSetFlags(ctx, zptr, &n, hptr, cptr)
 }
 
 func is16bit(rt regTypes) bool {
@@ -547,20 +664,20 @@ func InstGetProccessor(intype InType) InProc {
 
 }
 
-func CpuSetFlags(ctx CpuContext, z *bool, n *bool, h *bool, c *bool) {
+func CpuSetFlags(ctx *CpuContext, z *bool, n *bool, h *bool, c *bool) {
 	if z != nil {
-		common.BitSet(&ctx.Regs.f, 7, z)
+		ctx.Regs.f = common.BitSet(ctx.Regs.f, 7, z)
 	}
 
 	if n != nil {
-		common.BitSet(&ctx.Regs.f, 6, n)
+		ctx.Regs.f = common.BitSet(ctx.Regs.f, 6, n)
 	}
 
 	if h != nil {
-		common.BitSet(&ctx.Regs.f, 5, h)
+		ctx.Regs.f = common.BitSet(ctx.Regs.f, 5, h)
 	}
 
 	if c != nil {
-		common.BitSet(&ctx.Regs.f, 4, c)
+		ctx.Regs.f = common.BitSet(ctx.Regs.f, 4, c)
 	}
 }
