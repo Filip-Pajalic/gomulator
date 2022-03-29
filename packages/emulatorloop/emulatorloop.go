@@ -4,32 +4,31 @@ import (
 	"time"
 
 	"github.com/veandco/go-sdl2/sdl"
-	"pajalic.go.emulator/packages/cartridge"
 	"pajalic.go.emulator/packages/cpu"
-	emu "pajalic.go.emulator/packages/emulator"
 	log "pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/ui"
 )
 
 func CpuRun() {
 	cpu.CpuInit()
+	cpu.TimerInit()
 	cpu.InitInstructions()
+	cpu.PpuInit()
 
-	emu.GetEmuContext().Running = true
-	emu.GetEmuContext().Paused = false
-	emu.GetEmuContext().Ticks = 0
+	cpu.GetEmuContext().Running = true
+	cpu.GetEmuContext().Paused = false
+	cpu.GetEmuContext().Ticks = 0
 
-	for emu.GetEmuContext().Running {
-		if emu.GetEmuContext().Paused {
+	for cpu.GetEmuContext().Running {
+		if cpu.GetEmuContext().Paused {
 			Delay(10)
 			continue
 		}
 
 		if !cpu.CpuStep() {
-			log.Error("CPU Stopped")
+			cpu.GetEmuContext().Die = true
+			log.Fatal("CPU Stopped")
 		}
-
-		emu.GetEmuContext().Ticks++
 	}
 }
 
@@ -38,20 +37,21 @@ func Run(argc int, argv []string) int {
 		log.Error("Usage: emu <rom_file>")
 	}
 
-	if !cartridge.CartLoad(argv[1]) {
+	if !cpu.CartLoad(argv[1]) {
 		log.Info("Failed to load ROM file:")
 		log.Error("cartridge: ", argv[1])
 
 	}
 
 	ui.UiInit()
-	emu.GetEmuContext().Die = false
+	cpu.GetEmuContext().Die = false
 	go CpuRun()
 
-	for !emu.GetEmuContext().Die {
+	for !cpu.GetEmuContext().Die {
 		//same as usleep?
 		time.Sleep(1000)
 		ui.UiHandleEvents()
+		ui.UiUpdate()
 	}
 	ui.DestroyWindow()
 

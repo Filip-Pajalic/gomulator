@@ -1,4 +1,4 @@
-package emulator
+package cpu
 
 /*
   Emu components:
@@ -19,7 +19,7 @@ func init() {
 	log.Level = logrus.DebugLevel
 }*/
 
-var ctx emuContext
+var ectx emuContext
 
 type emuContext struct {
 	Paused  bool
@@ -29,9 +29,16 @@ type emuContext struct {
 }
 
 func EmuCycles(cpuCycles int) {
+	for i := 0; i < cpuCycles; i++ {
+		for n := 0; n < 4; n++ {
+			ectx.Ticks++
+			TimerTick()
+		}
 
+		dmaTick()
+	}
 }
 
 func GetEmuContext() *emuContext {
-	return &ctx
+	return &ectx
 }

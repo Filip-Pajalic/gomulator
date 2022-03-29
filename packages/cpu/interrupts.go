@@ -1,13 +1,13 @@
 package cpu
 
-type interruptTyp byte
+type InterruptType byte
 
 const (
-	IT_VBLANK   interruptTyp = 1
-	IT_LCD_STAT              = 2
-	IT_TIMER                 = 4
-	IT_SERIAL                = 8
-	IT_JOYPAD                = 16
+	IT_VBLANK   InterruptType = 1
+	IT_LCD_STAT               = 2
+	IT_TIMER                  = 4
+	IT_SERIAL                 = 8
+	IT_JOYPAD                 = 16
 )
 
 func IntHandle(ctx *CpuContext, address uint16) {
@@ -16,7 +16,7 @@ func IntHandle(ctx *CpuContext, address uint16) {
 }
 
 //is this correct?
-func IntCheck(ctx *CpuContext, address uint16, it interruptTyp) bool {
+func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
 
 	if (ctx.IntFlags&byte(it)) == 1 && (ctx.IERegister&byte(it) == 1) {
 		IntHandle(ctx, address)

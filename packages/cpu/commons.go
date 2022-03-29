@@ -1,4 +1,4 @@
-package common
+package cpu
 
 import (
 	"fmt"
@@ -16,13 +16,21 @@ func BitSet(a byte, n byte, on *bool) byte {
 
 //BIT(a, n) ((a & (1 << n)) ? 1 : 0)
 func Bit(a byte, n byte) bool {
-	if a&(1<<n) == 1 {
+	//om > 0 om detta ej fungerar
+	if (a & (1 << n)) == (1 << n) {
 		return true
 	}
 	return false
 }
 
 func Between(a byte, b byte, c byte) bool {
+	if (a >= b) && (a <= c) {
+		return true
+	}
+	return false
+}
+
+func Between16(a uint16, b uint16, c uint16) bool {
 	if (a >= b) && (a <= c) {
 		return true
 	}

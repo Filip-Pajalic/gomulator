@@ -2,49 +2,10 @@ package cpu
 
 import (
 	"log"
-
-	"pajalic.go.emulator/packages/common"
-	"pajalic.go.emulator/packages/emulator"
 )
 
 func procNone(ctx *CpuContext) {
 	log.Fatal("Invalid Instruction!")
-}
-
-func procLd(ctx *CpuContext) {
-	if ctx.DestIsMem {
-		//LD (BC), A for instance...
-
-		if ctx.currentInst.Reg2 >= RT_AF {
-			//if 16 bit register...
-			emulator.EmuCycles(1)
-			BusWrite16(ctx.MemDest, ctx.FetchedData)
-		} else {
-			BusWrite(ctx.MemDest, byte(ctx.FetchedData))
-		}
-
-		return
-	}
-
-	if ctx.currentInst.Mode == AM_HL_SPR {
-		var hflag = (CpuRegRead(ctx.currentInst.Reg2)&0xF)+
-			(ctx.FetchedData&0xF) >= 0x10
-
-		var cflag = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
-			(ctx.FetchedData&0xFF) >= 0x100
-
-		CpuSetFlags(ctx, nil, nil, &hflag, &cflag)
-		CpuSetReg(ctx.currentInst.Reg1,
-			CpuRegRead(ctx.currentInst.Reg2)+ctx.FetchedData)
-
-		return
-	}
-	//probleem när ctx.FetchedData är 143? Efter CALL?
-	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
-}
-
-func procNop(cpucontext *CpuContext) {
-
 }
 
 var rtLookup = []regTypes{
@@ -67,16 +28,55 @@ func decodeReg(reg byte) regTypes {
 	return rtLookup[reg]
 }
 
+func procNop(cpucontext *CpuContext) {
+
+}
+
+func procLd(ctx *CpuContext) {
+	if ctx.DestIsMem {
+		//LD (BC), A for instance...
+
+		if is16bit(ctx.currentInst.Reg2) {
+			//if 16 bit register...
+			EmuCycles(1)
+			BusWrite16(ctx.MemDest, ctx.FetchedData)
+		} else {
+			BusWrite(ctx.MemDest, byte(ctx.FetchedData))
+		}
+		EmuCycles(1)
+		return
+	}
+
+	if ctx.currentInst.Mode == AM_HL_SPR {
+		var hflag = (CpuRegRead(ctx.currentInst.Reg2)&0x0F)+
+			(ctx.FetchedData&0x0F) >= 0x10
+
+		var cflag = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
+			(ctx.FetchedData&0xFF) >= 0x100
+
+		zflag := false
+		nflag := false
+
+		CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+		CpuSetReg(ctx.currentInst.Reg1,
+			CpuRegRead(ctx.currentInst.Reg2)+ctx.FetchedData)
+
+		return
+	}
+	//probleem när ctx.FetchedData är 143? Efter CALL?
+	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
+}
+
 func procCb(ctx *CpuContext) {
 	var op = byte(ctx.FetchedData)
 	var reg = decodeReg(op & 0b111)
 	var bit = (op >> 3) & 0b111
 	var bit_op = (op >> 6) & 0b11
 	var regval = CpuRegRead8(reg)
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 
 	if reg == RT_HL {
-		emulator.EmuCycles(2)
+		EmuCycles(2)
 	}
 
 	switch bit_op {
@@ -322,13 +322,11 @@ func procRlca(ctx *CpuContext) {
 	var zflag = false
 	var nflag = false
 	var hflag = false
-	var cflag = false
-	var cbit byte = 0
-	if (u>>7)&1 == 1 {
-		cflag = true
-		cbit = 1
+	var cflag = (u>>7)&1 == 1
+	u = (u << 1) | 0
+	if cflag {
+		u = (u << 1) | 1
 	}
-	u = (u << 1) | cbit
 	ctx.Regs.a = u
 
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
@@ -415,35 +413,24 @@ func procXor(ctx *CpuContext) {
 
 func procOr(ctx *CpuContext) {
 	ctx.Regs.a |= byte(ctx.FetchedData & 0xFF)
-	var zflag = false
-	var nflag = false
-	var hflag = false
-	var cflag = false
-	if ctx.Regs.a == 0 {
-		zflag = true
-	}
+	zflag := ctx.Regs.a == 0
+	nflag := false
+	hflag := false
+	cflag := false
+
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
 
 func procCp(ctx *CpuContext) {
+
+	//ctx reg a wrong is 1 too much how
 	n := int(ctx.Regs.a) - int(ctx.FetchedData)
 
-	var zflag = false
-	var nflag = true
-	var hflag = false
-	var cflag = false
+	zflag := n == 0
+	nflag := true
+	hflag := (((int)(ctx.Regs.a) & 0x0F) - ((int)(ctx.FetchedData) & 0x0F)) < 0
+	cflag := n < 0
 
-	if n == 0 {
-		zflag = true
-	}
-
-	if ((int(ctx.Regs.a) & 0x0F) - (int(ctx.FetchedData) & 0x0F)) < 0 {
-		hflag = true
-	}
-
-	if n < 0 {
-		cflag = true
-	}
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
 
@@ -452,14 +439,14 @@ func procDi(ctx *CpuContext) {
 }
 
 func procEi(ctx *CpuContext) {
-	ctx.enablingIme = false
+	ctx.enablingIme = true
 }
 
 func procPop(ctx *CpuContext) {
 	var lo = uint16(StackPop())
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 	var hi = uint16(StackPop())
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 	var n = (hi << 8) | lo
 	CpuSetReg(ctx.currentInst.Reg1, n)
 
@@ -470,22 +457,22 @@ func procPop(ctx *CpuContext) {
 
 func procPush(ctx *CpuContext) {
 	var hi = (CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 	StackPush(byte(hi))
 	var lo = (CpuRegRead(ctx.currentInst.Reg1)) & 0xFF
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 	StackPush(byte(lo))
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 }
 
 func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 	if CheckCondition(ctx) {
 		if pushpc {
-			emulator.EmuCycles(2)
+			EmuCycles(2)
 			StackPush16(ctx.Regs.pc)
 		}
 		ctx.Regs.pc = addr
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 	}
 }
 
@@ -507,20 +494,20 @@ func procCall(ctx *CpuContext) {
 //0000002D problem here with fetched data, why stack push wrong
 func procRet(ctx *CpuContext) {
 	if ctx.currentInst.Condition != CT_NONE {
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 	}
 
 	if CheckCondition(ctx) {
 		var lo = uint16(StackPop())
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 
 		var hi = uint16(StackPop())
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 
 		var n = (hi << 8) | lo
 		ctx.Regs.pc = n
 
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 	}
 }
 
@@ -534,22 +521,20 @@ func procReti(ctx *CpuContext) {
 }
 
 func procLdh(ctx *CpuContext) {
-	//Ensure this is proper
-	a := uint16(BusRead(0xFF00 | uint16(ctx.FetchedData)))
-
+	//is CpuSetReg correct here
 	if ctx.currentInst.Reg1 == RT_A {
-		CpuSetReg(ctx.currentInst.Reg1, a)
+		CpuSetReg(ctx.currentInst.Reg1, uint16(BusRead(0xFF00|ctx.FetchedData)))
 	} else {
 		BusWrite(ctx.MemDest, ctx.Regs.a)
 	}
-	emulator.EmuCycles(1)
+	EmuCycles(1)
 }
 
 func procInc(ctx *CpuContext) {
 	var val = CpuRegRead(ctx.currentInst.Reg1) + 1
 
 	if is16bit(ctx.currentInst.Reg1) {
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 	}
 
 	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
@@ -564,8 +549,8 @@ func procInc(ctx *CpuContext) {
 	if (ctx.CurOpCode & 0x03) == 0x03 {
 		return
 	}
-	n := false
 	z := val == 0
+	n := false
 	h := (val & 0x0F) == 0
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
@@ -574,7 +559,7 @@ func procDec(ctx *CpuContext) {
 	var val = CpuRegRead(ctx.currentInst.Reg1) - 1
 
 	if is16bit(ctx.currentInst.Reg1) {
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 	}
 
 	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
@@ -652,7 +637,7 @@ func procAdd(ctx *CpuContext) {
 	var is16bit = is16bit(ctx.currentInst.Reg1)
 
 	if is16bit {
-		emulator.EmuCycles(1)
+		EmuCycles(1)
 	}
 
 	if ctx.currentInst.Reg1 == RT_SP {
@@ -679,7 +664,7 @@ func procAdd(ctx *CpuContext) {
 	if ctx.currentInst.Reg1 == RT_SP {
 		zptr = nil
 		h = (CpuRegRead(ctx.currentInst.Reg1)&0xF)+(ctx.FetchedData&0xF) >= 0x10
-		c = (int32)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int32)(ctx.FetchedData&0xFF) > 0x100
+		c = (int32)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int32)(ctx.FetchedData&0xFF) >= 0x100
 	}
 
 	n := false
@@ -709,16 +694,12 @@ func procDaa(ctx *CpuContext) {
 	} else {
 		ctx.Regs.a += u
 	}
-	var zflag = false
+	var zflag = ctx.Regs.a == 0
 	var hflag = false
-	var cflag = false
+	var cflag = fc == 0
 
 	if ctx.Regs.a == 0 {
 		zflag = true
-	}
-
-	if fc == 0 {
-		cflag = true
 	}
 
 	CpuSetFlags(ctx, &zflag, nil, &hflag, &cflag)
@@ -767,7 +748,7 @@ func CheckCondition(ctx *CpuContext) bool {
 	z := CpuFlagZ()
 	c := CpuFlagC()
 
-	switch CpuCtx.currentInst.Condition {
+	switch ctx.currentInst.Condition {
 	case CT_NONE:
 		return true
 	case CT_C:
@@ -796,7 +777,6 @@ func InitProcessors() {
 	processors[IN_JP] = procJp
 	processors[IN_JR] = procJr
 	processors[IN_CALL] = procCall
-	processors[IN_XOR] = procXor
 	processors[IN_POP] = procPop
 	processors[IN_PUSH] = procPush
 	processors[IN_LDH] = procLdh
@@ -837,18 +817,18 @@ func InstGetProccessor(intype InType) InProc {
 
 func CpuSetFlags(ctx *CpuContext, z *bool, n *bool, h *bool, c *bool) {
 	if z != nil {
-		ctx.Regs.f = common.BitSet(ctx.Regs.f, 7, z)
+		ctx.Regs.f = BitSet(ctx.Regs.f, 7, z)
 	}
 
 	if n != nil {
-		ctx.Regs.f = common.BitSet(ctx.Regs.f, 6, n)
+		ctx.Regs.f = BitSet(ctx.Regs.f, 6, n)
 	}
 
 	if h != nil {
-		ctx.Regs.f = common.BitSet(ctx.Regs.f, 5, h)
+		ctx.Regs.f = BitSet(ctx.Regs.f, 5, h)
 	}
 
 	if c != nil {
-		ctx.Regs.f = common.BitSet(ctx.Regs.f, 4, c)
+		ctx.Regs.f = BitSet(ctx.Regs.f, 4, c)
 	}
 }

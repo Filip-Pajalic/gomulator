@@ -1,4 +1,4 @@
-package cartridge
+package cpu
 
 import (
 	"bytes"
@@ -136,22 +136,22 @@ var LIC_CODE = map[int][]byte{
 	0xA4: []byte("Konami (Yu-Gi-Oh!)"),
 }
 
-var ctx cartContext
+var cartctx cartContext
 
 const headerOffset = 0x100
 
 func cartLicName() []byte {
 
-	if ctx.header.CartType <= 0xA4 {
-		return LIC_CODE[int(ctx.header.LicCode)]
+	if cartctx.header.CartType <= 0xA4 {
+		return LIC_CODE[int(cartctx.header.LicCode)]
 	}
 
 	return nil
 }
 
 func cartTypeName() []byte {
-	if ctx.header.CartType <= 0x22 {
-		return ROM_TYPES[ctx.header.CartType]
+	if cartctx.header.CartType <= 0x22 {
+		return ROM_TYPES[cartctx.header.CartType]
 	}
 	return nil
 }
@@ -159,7 +159,7 @@ func cartTypeName() []byte {
 func checkSumChecker(checksum byte) string {
 	var x uint16 = 0
 	for i := uint16(0x134); i <= 0x14C; i++ {
-		x = x - uint16(ctx.romData[i]) - 1
+		x = x - uint16(cartctx.romData[i]) - 1
 	}
 	var result string
 
@@ -203,27 +203,27 @@ func loadCart(romName string) {
 	}
 
 	emptyMemory := make([]uint8, cap(memory)-len(memory)) // Make sure that we have a full 64KB of memory
-	ctx.romData = append(memory, emptyMemory...)
+	cartctx.romData = append(memory, emptyMemory...)
 
 }
 
 func CartLoad(cart string) bool {
-	copy(ctx.filename[:], fmt.Sprintf("%s", cart))
+	copy(cartctx.filename[:], fmt.Sprintf("%s", cart))
 	loadCart(cart)
 	file, err := os.Open(cart)
 	if err != nil {
 		log.Fatal("Error while opening file", err)
 	}
 	defer file.Close()
-	log.Info("Opened: %s\n", ctx.filename)
+	log.Info("Opened: %s\n", cartctx.filename)
 
 	fi, err := file.Stat()
 	if err != nil {
 		log.Error(err.Error())
 	}
-	ctx.romSize = uint32(fi.Size())
+	cartctx.romSize = uint32(fi.Size())
 
-	romData := make([]uint8, 0, ctx.romSize)
+	romData := make([]uint8, 0, cartctx.romSize)
 	buf := make([]byte, 1024)
 	currentData, e := file.Read(buf)
 	for e != io.EOF {
@@ -233,7 +233,7 @@ func CartLoad(cart string) bool {
 	}
 
 	emptyMemory := make([]uint8, cap(romData)-len(romData))
-	ctx.romData = append(romData, emptyMemory...)
+	cartctx.romData = append(romData, emptyMemory...)
 
 	rh := romHeader{}
 
@@ -244,20 +244,20 @@ func CartLoad(cart string) bool {
 	if err != nil {
 		log.Fatal("binary.Read failed", err)
 	}
-	ctx.header = &rh
-	ctx.header.Title[15] = 0
+	cartctx.header = &rh
+	cartctx.header.Title[15] = 0
 	log.Info("Cartridge Loaded:")
-	log.Info("Title    : %s", string(ctx.header.Title[:]))
-	log.Info("Type     : %2.2X (%s)", ctx.header.CartType, cartTypeName())
-	log.Info("ROM Size : %d KB", 32<<ctx.header.RomSize)
-	log.Info("RAM Size : %2.2X", ctx.header.RamSize)
-	log.Info("LIC Code : %2.2X (%s)", ctx.header.LicCode, cartLicName())
-	log.Info("ROM Vers : %2.2X", ctx.header.Version)
+	log.Info("Title    : %s", string(cartctx.header.Title[:]))
+	log.Info("Type     : %2.2X (%s)", cartctx.header.CartType, cartTypeName())
+	log.Info("ROM Size : %d KB", 32<<cartctx.header.RomSize)
+	log.Info("RAM Size : %2.2X", cartctx.header.RamSize)
+	log.Info("LIC Code : %2.2X (%s)", cartctx.header.LicCode, cartLicName())
+	log.Info("ROM Vers : %2.2X", cartctx.header.Version)
 
 	log.Info(
 		"Checksum : %2.2X (%s)",
-		ctx.header.Checksum,
-		checkSumChecker(ctx.header.Checksum),
+		cartctx.header.Checksum,
+		checkSumChecker(cartctx.header.Checksum),
 	)
 	loadCart(cart)
 	return true
@@ -265,10 +265,10 @@ func CartLoad(cart string) bool {
 
 func CartWrite(address uint16, data byte) {
 
-	//ctx.romData[address] = data
+	//cartctx.romData[address] = data
 
 }
 
 func CartRead(address uint16) byte {
-	return ctx.romData[address]
+	return cartctx.romData[address]
 }

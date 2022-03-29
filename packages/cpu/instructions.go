@@ -1,5 +1,10 @@
 package cpu
 
+import (
+	"fmt"
+	"log"
+)
+
 /* Different instructionmodes needed
 D8  means immediate 8 bit data
 D16 means immediate 16 bit data
@@ -247,6 +252,7 @@ func InitInstructions() {
 	inst[0x24].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_H)})
 	inst[0x25].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_H)})
 	inst[0x26].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D8), Reg1: re(RT_H)})
+	inst[0x27].addInst(InstPointer{Type: in(IN_DAA)})
 	inst[0x28].addInst(InstPointer{Type: in(IN_JR), Mode: ad(AM_D8), Condition: co(CT_Z)})
 	inst[0x29].addInst(InstPointer{Type: in(IN_ADD), Mode: ad(AM_R_R), Reg1: re(RT_HL), Reg2: re(RT_HL)})
 	inst[0x2A].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_HLI), Reg1: re(RT_A), Reg2: re(RT_HL)})
@@ -254,6 +260,7 @@ func InitInstructions() {
 	inst[0x2C].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_L)})
 	inst[0x2D].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_L)})
 	inst[0x2E].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D8), Reg1: re(RT_L)})
+	inst[0x2F].addInst(InstPointer{Type: in(IN_CPL)})
 
 	//0x3X
 	inst[0x30].addInst(InstPointer{Type: in(IN_JR), Mode: ad(AM_D8), Condition: co(CT_NC)})
@@ -263,6 +270,7 @@ func InitInstructions() {
 	inst[0x34].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_MR), Reg1: re(RT_HL)})
 	inst[0x35].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_HL)})
 	inst[0x36].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_MR_D8), Reg1: re(RT_HL)})
+	inst[0x37].addInst(InstPointer{Type: in(IN_SCF)})
 	inst[0x38].addInst(InstPointer{Type: in(IN_JR), Mode: ad(AM_D8), Condition: co(CT_C)})
 	inst[0x39].addInst(InstPointer{Type: in(IN_ADD), Mode: ad(AM_R_R), Reg1: re(RT_HL), Reg2: re(RT_SP)})
 	inst[0x3A].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_HLD), Reg1: re(RT_A), Reg2: re(RT_HL)})
@@ -270,6 +278,7 @@ func InitInstructions() {
 	inst[0x3C].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_A)})
 	inst[0x3D].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_A)})
 	inst[0x3E].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
+	inst[0x27].addInst(InstPointer{Type: in(IN_CCF)})
 
 	//0x4X
 	inst[0x40].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_R), Reg1: re(RT_B), Reg2: re(RT_B)})
@@ -422,7 +431,7 @@ func InitInstructions() {
 	inst[0xC3].addInst(InstPointer{Type: in(IN_JP), Mode: ad(AM_D16)})
 	inst[0xC4].addInst(InstPointer{Type: in(IN_CALL), Mode: ad(AM_D16), Condition: co(CT_NZ)})
 	inst[0xC5].addInst(InstPointer{Type: in(IN_PUSH), Mode: ad(AM_R), Reg1: re(RT_BC)})
-	inst[0xC6].addInst(InstPointer{Type: in(IN_ADD), Mode: ad(AM_R_A8), Reg1: re(RT_A)})
+	inst[0xC6].addInst(InstPointer{Type: in(IN_ADD), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xC7].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x00)})
 	inst[0xC8].addInst(InstPointer{Type: in(IN_RET), Mode: ad(AM_IMP), Condition: co(CT_Z)})
 	inst[0xC9].addInst(InstPointer{Type: in(IN_RET)})
@@ -438,7 +447,7 @@ func InitInstructions() {
 	inst[0xD2].addInst(InstPointer{Type: in(IN_JP), Mode: ad(AM_D16), Condition: co(CT_NC)})
 	inst[0xD4].addInst(InstPointer{Type: in(IN_CALL), Mode: ad(AM_D16), Condition: co(CT_NC)})
 	inst[0xD5].addInst(InstPointer{Type: in(IN_PUSH), Mode: ad(AM_R), Reg1: re(RT_DE)})
-	inst[0xD6].addInst(InstPointer{Type: in(IN_SUB), Mode: ad(AM_D8)})
+	inst[0xD6].addInst(InstPointer{Type: in(IN_SUB), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xD7].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x10)})
 	inst[0xD8].addInst(InstPointer{Type: in(IN_RET), Mode: ad(AM_IMP), Condition: co(CT_C)})
 	inst[0xD9].addInst(InstPointer{Type: in(IN_RETI)})
@@ -448,16 +457,16 @@ func InitInstructions() {
 	inst[0xDF].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x18)})
 
 	//0xEX
-	inst[0xE0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_A8_R), Reg1: re(RT_NONE), Reg2: re(RT_A)})
+	inst[0xE0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_A8_R), Reg2: re(RT_A)})
 	inst[0xE1].addInst(InstPointer{Type: in(IN_POP), Mode: ad(AM_R), Reg1: re(RT_HL)})
 	inst[0xE2].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_MR_R), Reg1: re(RT_C), Reg2: re(RT_A)})
 	inst[0xE5].addInst(InstPointer{Type: in(IN_PUSH), Mode: ad(AM_R), Reg1: re(RT_HL)})
-	inst[0xE6].addInst(InstPointer{Type: in(IN_AND), Mode: ad(AM_D8)})
+	inst[0xE6].addInst(InstPointer{Type: in(IN_AND), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xE7].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x20)})
 	inst[0xE8].addInst(InstPointer{Type: in(IN_ADD), Mode: ad(AM_R_D8), Reg1: re(RT_SP)})
-	inst[0xE9].addInst(InstPointer{Type: in(IN_JP), Mode: ad(AM_MR), Reg1: re(RT_HL)})
+	inst[0xE9].addInst(InstPointer{Type: in(IN_JP), Mode: ad(AM_R), Reg1: re(RT_HL)})
 	inst[0xEA].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_A16_R), Reg1: re(RT_NONE), Reg2: re(RT_A)})
-	inst[0xEE].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_D8)})
+	inst[0xEE].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xEF].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x28)})
 
 	//0xFX
@@ -465,14 +474,14 @@ func InitInstructions() {
 	inst[0xF1].addInst(InstPointer{Type: in(IN_POP), Mode: ad(AM_R), Reg1: re(RT_AF)})
 	inst[0xF2].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_MR), Reg1: re(RT_A), Reg2: re(RT_C)})
 	inst[0xF3].addInst(InstPointer{Type: in(IN_DI)})
-	inst[0xF6].addInst(InstPointer{Type: in(IN_OR), Mode: ad(AM_D8)})
+	inst[0xF6].addInst(InstPointer{Type: in(IN_OR), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xF5].addInst(InstPointer{Type: in(IN_PUSH), Mode: ad(AM_R), Reg1: re(RT_AF)})
 	inst[0xF7].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x30)})
 	inst[0xF8].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_HL_SPR), Reg1: re(RT_HL), Reg2: re(RT_SP)})
 	inst[0xF9].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_R), Reg1: re(RT_SP), Reg2: re(RT_HL)})
 	inst[0xFA].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_A16), Reg1: re(RT_A)})
 	inst[0xFB].addInst(InstPointer{Type: in(IN_EI)})
-	inst[0xFE].addInst(InstPointer{Type: in(IN_CP), Mode: ad(AM_D8)})
+	inst[0xFE].addInst(InstPointer{Type: in(IN_CP), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xFF].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x38)})
 }
 
@@ -509,4 +518,131 @@ func instructionByOpcode(opcode byte) (instruction *Instruction) {
 
 func getInstructionName(t InType) []byte {
 	return []byte(instLookup[t])
+}
+
+var rtLookupString = []string{
+	"<NONE>",
+	"A",
+	"F",
+	"B",
+	"C",
+	"D",
+	"E",
+	"H",
+	"L",
+	"AF",
+	"BC",
+	"DE",
+	"HL",
+	"SP",
+	"PC",
+}
+
+func instName(t InType) string {
+	return instLookup[t]
+}
+
+func instToStr(ctx *CpuContext, s *string) {
+	var inst = ctx.currentInst
+	*s = fmt.Sprintf("%s ", instName(inst.Type))
+
+	switch inst.Mode {
+	case AM_IMP:
+		return
+	case AM_R_D16:
+		*s = fmt.Sprintf("%s %s,$%04X", instName(inst.Type),
+			rtLookupString[inst.Reg1], ctx.FetchedData)
+		return
+	case AM_R_A16:
+		*s = fmt.Sprintf("%s %s,$%04X", instName(inst.Type),
+			rtLookupString[inst.Reg1], ctx.FetchedData)
+		return
+	case AM_R:
+		*s = fmt.Sprintf("%s %s", instName(inst.Type),
+			rtLookupString[inst.Reg1])
+		return
+
+	case AM_R_R:
+		*s = fmt.Sprintf("%s %s,%s", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_MR_R:
+		*s = fmt.Sprintf("%s (%s),%s", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_MR:
+		*s = fmt.Sprintf("%s (%s)", instName(inst.Type),
+			rtLookupString[inst.Reg1])
+		return
+
+	case AM_R_MR:
+		*s = fmt.Sprintf("%s %s,(%s)", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_R_D8:
+		*s = fmt.Sprintf("%s %s,$%02X", instName(inst.Type),
+			rtLookupString[inst.Reg1], ctx.FetchedData&0xFF)
+		return
+	case AM_R_A8:
+		*s = fmt.Sprintf("%s %s,$%02X", instName(inst.Type),
+			rtLookupString[inst.Reg1], ctx.FetchedData&0xFF)
+		return
+
+	case AM_R_HLI:
+		*s = fmt.Sprintf("%s %s,(%s+)", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_R_HLD:
+		*s = fmt.Sprintf("%s %s,(%s-)", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_HLI_R:
+		*s = fmt.Sprintf("%s (%s+),%s", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_HLD_R:
+		*s = fmt.Sprintf("%s (%s-),%s", instName(inst.Type),
+			rtLookupString[inst.Reg1], rtLookupString[inst.Reg2])
+		return
+
+	case AM_A8_R:
+		*s = fmt.Sprintf("%s $%02X,%s", instName(inst.Type),
+			BusRead(ctx.Regs.pc-1), rtLookupString[inst.Reg2])
+		return
+
+	case AM_HL_SPR:
+		*s = fmt.Sprintf("%s (%s),SP+%d", instName(inst.Type),
+			rtLookupString[inst.Reg1], ctx.FetchedData&0xFF)
+		return
+
+	case AM_D8:
+		*s = fmt.Sprintf("%s $%02X", instName(inst.Type),
+			ctx.FetchedData&0xFF)
+		return
+
+	case AM_D16:
+		*s = fmt.Sprintf("%s $%04X", instName(inst.Type),
+			ctx.FetchedData)
+		return
+
+	case AM_MR_D8:
+		*s = fmt.Sprintf("%s (%s),$%02X", instName(inst.Type),
+			rtLookupString[inst.Reg1], ctx.FetchedData&0xFF)
+		return
+
+	case AM_A16_R:
+		*s = fmt.Sprintf("%s ($%04X),%s", instName(inst.Type),
+			ctx.FetchedData, rtLookupString[inst.Reg2])
+		return
+
+	default:
+		log.Fatal("INVALID AM: %d\n", inst.Mode)
+
+	}
 }

@@ -1,7 +1,6 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/cartridge"
 	log "pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/ram"
 )
@@ -29,13 +28,13 @@ Reads data from the cartridge, memory locations above represent what the differe
 
 func BusRead(address uint16) byte {
 	if address < 0x8000 {
-		return cartridge.CartRead(address)
+		return CartRead(address)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		log.Warn("Not implemented Char/mapData(%04X)\n", address)
+		return PpuWramRead(address)
 	} else if address < 0xC000 {
-		//Cartridge ram
-		return cartridge.CartRead(address)
+		//Cartridge ram //not working
+		return CartRead(address)
 	} else if address < 0xE000 {
 		//WRAM Working ram
 		return ram.WramRead(address)
@@ -44,16 +43,17 @@ func BusRead(address uint16) byte {
 		return 0
 	} else if address < 0xFEA0 {
 		//Object attribute memory (OAM)
-		log.Warn("Not implemented OAM(%04X)\n", address)
+		if DmaTransferring() {
+			return 0xFF
+		}
+		return PpuOamRead(address)
 
 	} else if address < 0xFF00 {
 		// Reserved not used
 		return 0
 	} else if address < 0xFF80 {
 		//Io registers
-		log.Warn("Not implemented IOregisters(%04X)\n", address)
-		return 0
-
+		return IoRead(address)
 	} else if address == 0xFFFF {
 		//CPU interupt enable register
 		return CpuGetIERegister()
@@ -72,13 +72,13 @@ Writes data from the cartridge, memory locations above represent what the differ
 func BusWrite(address uint16, data byte) {
 
 	if address < 0x8000 {
-		cartridge.CartWrite(address, data)
+		CartWrite(address, data)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		log.Warn("UNSUPPORTED BusWrite(%04X)\n", address)
+		PpuWramWrite(address, data)
 	} else if address < 0xC000 {
 		//EXT-RAM
-		cartridge.CartWrite(address, data)
+		CartWrite(address, data)
 	} else if address < 0xE000 {
 		//WRAM
 		ram.WramWrite(address, data)
@@ -86,15 +86,15 @@ func BusWrite(address uint16, data byte) {
 		//reserved echo ram
 	} else if address < 0xFEA0 {
 		//OAM
-
-		//TODO
-		log.Warn("UNSUPPORTED BusWrite(%04X)\n", address)
-
+		if DmaTransferring() {
+			return
+		}
+		PpuOamWrite(address, data)
 	} else if address < 0xFF00 {
 		//unusable reserved
 	} else if address < 0xFF80 {
 		//IO Registers
-		log.Warn("UNSUPPORTED BusWrite(%04X)\n", address)
+		IoWrite(address, data)
 	} else if address == 0xFFFF {
 		//CPU SET ENABLE REGISTER
 		CpuSetIERegister(data)

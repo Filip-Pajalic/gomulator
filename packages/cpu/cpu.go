@@ -3,7 +3,6 @@ package cpu
 import (
 	"os"
 
-	emu "pajalic.go.emulator/packages/emulator"
 	log "pajalic.go.emulator/packages/logger"
 )
 
@@ -71,17 +70,31 @@ var CpuCtx CpuContext
 
 func CpuInit() {
 	CpuCtx.Regs.pc = 0x100
-	CpuCtx.Regs.a = 0x01
 	CpuCtx.Halted = false
+
+	CpuCtx.Regs.sp = 0xFFFE
+	CpuCtx.Regs.f = 0xB0
+	CpuCtx.Regs.a = 0x01
+	CpuCtx.Regs.c = 0x13
+	CpuCtx.Regs.b = 0x00
+	CpuCtx.Regs.e = 0xD8
+	CpuCtx.Regs.d = 0x00
+	CpuCtx.Regs.l = 0x4D
+	CpuCtx.Regs.h = 0x01
+	CpuCtx.IERegister = 0
+	CpuCtx.IntFlags = 0
+	CpuCtx.IntMasterEnabled = false
+	CpuCtx.enablingIme = false
+
+	GetTimerContext().div = 0xABCC
+
 	InitProcessors()
 }
 
 func fetchInstruction() {
-
 	CpuCtx.CurOpCode = BusRead(CpuCtx.Regs.pc)
 	CpuCtx.Regs.pc++
 	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
-
 }
 
 func execute() {
@@ -97,6 +110,7 @@ func CpuStep() bool {
 	if !CpuCtx.Halted {
 		pc := CpuCtx.Regs.pc
 		fetchInstruction()
+		EmuCycles(1)
 		FetchData()
 
 		var z = "-"
@@ -119,9 +133,12 @@ func CpuStep() bool {
 			c = "C"
 		}
 
-		log.Info("%08X - %04X: %-6s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
-			emu.GetEmuContext().Ticks,
-			pc, getInstructionName(CpuCtx.currentInst.Type), CpuCtx.CurOpCode,
+		var inst string
+		instToStr(&CpuCtx, &inst)
+		temp := GetEmuContext().Ticks
+		log.Info("%08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
+			temp,
+			pc, inst, CpuCtx.CurOpCode,
 			BusRead(pc+1), BusRead(pc+2), CpuCtx.Regs.a, z, n, h, c, CpuCtx.Regs.b, CpuCtx.Regs.c,
 			CpuCtx.Regs.d, CpuCtx.Regs.e, CpuCtx.Regs.h, CpuCtx.Regs.l)
 
@@ -129,9 +146,14 @@ func CpuStep() bool {
 			log.Warn("Unknown instruction! %02X\n", CpuCtx.CurOpCode)
 			os.Exit(1)
 		}
+
+		DbgUpdate()
+		if !DbgPrint() {
+			return false
+		}
 		execute()
 	} else {
-		emu.EmuCycles(1)
+		EmuCycles(1)
 
 		if CpuCtx.IntFlags == 1 {
 			CpuCtx.Halted = false
@@ -156,4 +178,8 @@ func CpuGetIERegister() byte {
 //Interupt enable register
 func CpuSetIERegister(n byte) {
 	CpuCtx.IERegister = n
+}
+
+func CpuRequestInterrupt(t InterruptType) {
+	CpuCtx.IntFlags |= byte(t)
 }
