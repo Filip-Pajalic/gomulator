@@ -1,7 +1,6 @@
 package cpu
 
 import (
-	log "pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/ram"
 )
 
@@ -58,7 +57,6 @@ func BusRead(address uint16) byte {
 		//CPU interupt enable register
 		return CpuGetIERegister()
 	}
-	log.Warn("UNSUPPORTED BusRead(%04X)\n", address)
 
 	return ram.HramRead(address)
 }

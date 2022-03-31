@@ -208,11 +208,9 @@ func InitInstructions() {
 
 	inst[0x00].addInst(InstPointer{Type: in(IN_NOP), Mode: ad(AM_IMP)})
 	inst[0x01].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D16), Reg1: re(RT_BC)})
-
 	inst[0x02].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_MR_R), Reg1: re(RT_BC), Reg2: re(RT_A)})
 	inst[0x03].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_BC)})
 	inst[0x04].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_B)})
-
 	inst[0x05].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_B)})
 	inst[0x06].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D8), Reg1: re(RT_B)})
 	inst[0x07].addInst(InstPointer{Type: in(IN_RLCA)})
@@ -268,7 +266,7 @@ func InitInstructions() {
 	inst[0x32].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_HLD_R), Reg1: re(RT_HL), Reg2: re(RT_A)})
 	inst[0x33].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_SP)})
 	inst[0x34].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_MR), Reg1: re(RT_HL)})
-	inst[0x35].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_HL)})
+	inst[0x35].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_MR), Reg1: re(RT_HL)})
 	inst[0x36].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_MR_D8), Reg1: re(RT_HL)})
 	inst[0x37].addInst(InstPointer{Type: in(IN_SCF)})
 	inst[0x38].addInst(InstPointer{Type: in(IN_JR), Mode: ad(AM_D8), Condition: co(CT_C)})
@@ -404,7 +402,7 @@ func InitInstructions() {
 	inst[0xAC].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_R_R), Reg1: re(RT_A), Reg2: re(RT_H)})
 	inst[0xAD].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_R_R), Reg1: re(RT_A), Reg2: re(RT_L)})
 	inst[0xAE].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_R_MR), Reg1: re(RT_A), Reg2: re(RT_HL)})
-	inst[0xAF].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_R), Reg1: re(RT_A)})
+	inst[0xAF].addInst(InstPointer{Type: in(IN_XOR), Mode: ad(AM_R_R), Reg1: re(RT_A), Reg2: re(RT_A)})
 
 	//0xBX
 	inst[0xB0].addInst(InstPointer{Type: in(IN_OR), Mode: ad(AM_R_R), Reg1: re(RT_A), Reg2: re(RT_B)})
@@ -470,12 +468,12 @@ func InitInstructions() {
 	inst[0xEF].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x28)})
 
 	//0xFX
-	inst[0xF0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
+	inst[0xF0].addInst(InstPointer{Type: in(IN_LDH), Mode: ad(AM_R_A8), Reg1: re(RT_A)})
 	inst[0xF1].addInst(InstPointer{Type: in(IN_POP), Mode: ad(AM_R), Reg1: re(RT_AF)})
 	inst[0xF2].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_MR), Reg1: re(RT_A), Reg2: re(RT_C)})
 	inst[0xF3].addInst(InstPointer{Type: in(IN_DI)})
-	inst[0xF6].addInst(InstPointer{Type: in(IN_OR), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xF5].addInst(InstPointer{Type: in(IN_PUSH), Mode: ad(AM_R), Reg1: re(RT_AF)})
+	inst[0xF6].addInst(InstPointer{Type: in(IN_OR), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
 	inst[0xF7].addInst(InstPointer{Type: in(IN_RST), Mode: ad(AM_IMP), Param: pa(0x30)})
 	inst[0xF8].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_HL_SPR), Reg1: re(RT_HL), Reg2: re(RT_SP)})
 	inst[0xF9].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_R), Reg1: re(RT_SP), Reg2: re(RT_HL)})
