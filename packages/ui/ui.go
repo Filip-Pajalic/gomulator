@@ -5,6 +5,7 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 	emu "pajalic.go.emulator/packages/cpu"
 	log "pajalic.go.emulator/packages/logger"
+	"unsafe"
 )
 
 var SCREEN_WIDTH int32 = 1024
@@ -77,7 +78,7 @@ func delay(ms uint32) {
 	sdl.Delay(ms)
 }
 
-//Might be wrong
+// Might be wrong
 var tileColors = [4]uint32{0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000}
 
 func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x int32, y int32) {
@@ -136,8 +137,9 @@ func UpdateDbgWindows() {
 		yDraw += 8 * scale
 		xDraw = 0
 	}
+	pixels := debugScreen.Pixels()
 
-	sdlDebugTexture.Update(nil, debugScreen.Pixels(), int(debugScreen.Pitch))
+	sdlDebugTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(debugScreen.Pitch))
 	sdlDebugRenderer.Clear()
 	sdlDebugRenderer.Copy(sdlDebugTexture, nil, nil)
 
