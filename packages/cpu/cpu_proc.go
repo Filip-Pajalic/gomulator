@@ -48,18 +48,36 @@ func procLd(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
-		var hflag = (CpuRegRead(ctx.currentInst.Reg2)&0x0F)+
-			(ctx.FetchedData&0x0F) >= 0x10
+		//        u8 hflag = (cpu_read_reg(ctx->cur_inst->reg_2) & 0xF) +
+		//            (ctx->fetched_data & 0xF) >= 0x10;
+		//
+		//        u8 cflag = (cpu_read_reg(ctx->cur_inst->reg_2) & 0xFF) +
+		//            (ctx->fetched_data & 0xFF) >= 0x100;
+		//
+		//        cpu_set_flags(ctx, 0, 0, hflag, cflag);
+		//        cpu_set_reg(ctx->cur_inst->reg_1,
+		//            cpu_read_reg(ctx->cur_inst->reg_2) + (int8_t)ctx->fetched_data);
+		//
+		//        return;
 
-		var cflag = (CpuRegRead(ctx.currentInst.Reg2)&0xFF)+
-			(ctx.FetchedData&0xFF) >= 0x100
+		//
+
+		var hflag = ((CpuRegRead(ctx.currentInst.Reg2) & 0x0F) + (ctx.FetchedData & 0x0F)) >= 0x10
+
+		// Calculate cflag
+		var cflag = ((CpuRegRead(ctx.currentInst.Reg2) & 0xFF) + (uint16(ctx.FetchedData) & 0xFF)) >= 0x100
 
 		zflag := false
 		nflag := false
 
+		// Set flags
 		CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-		CpuSetReg(ctx.currentInst.Reg1,
-			CpuRegRead(ctx.currentInst.Reg2)+ctx.FetchedData)
+
+		// Cast fetched data to int8
+		signedFetchedData := int8(ctx.FetchedData)
+
+		// Set register value
+		CpuSetReg(ctx.currentInst.Reg1, CpuRegRead(ctx.currentInst.Reg2)+uint16(signedFetchedData))
 
 		return
 	}
@@ -113,6 +131,7 @@ func procCb(ctx *CpuContext) {
 			// Set carry flag based on carry-out from MSB of regval
 			if (regval & (1 << 7)) != 0 {
 				setC = true
+				result |= 1 // Move the MSB to the LSB
 			}
 
 			// Set zero flag
@@ -187,9 +206,10 @@ func procCb(ctx *CpuContext) {
 				bitCflag = 1
 			}
 
-			// Set carry flag based on carry-out from MSB and carry-in flag
-			cflag := old&1 == 1 && flagC
+			// Set carry flag based on the least significant bit of the old value
+			cflag := old&1 == 1
 
+			// Set the most significant bit of regval based on the carry flag
 			regval |= bitCflag << 7
 
 			// Set zero flag

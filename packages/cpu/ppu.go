@@ -58,33 +58,42 @@ func PpuOamWrite(address uint16, value byte) {
 	if address >= 0xFE00 {
 		address -= 0xFE00
 	}
-	ppuCtx.OamRam[address] = DecodeToOamEntry(EncodeToBytes(oamEntry[address]))
-}
 
-func PpuOamRead(address uint16) byte {
-	if address >= 0xFE00 {
-		address -= 0xFE00
-	}
-	return EncodeToBytes(oamEntry[address])[address]
+	entryIndex := address / 4  // Each OamEntry is 4 bytes for the initial 3 fields
+	fieldOffset := address % 4 // Offset within the OamEntry
 
+	// Encode the OamEntry to bytes
+	entryBytes := EncodeToBytes(ppuCtx.OamRam[entryIndex])
+
+	// Update the specific byte
+	entryBytes[fieldOffset] = value
+
+	// Decode the bytes back to OamEntry
+	ppuCtx.OamRam[entryIndex] = DecodeToOamEntry(entryBytes)
 }
 
 func EncodeToBytes(entry OamEntry) []byte {
 	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.BigEndian, &entry)
+	err := binary.Write(buf, binary.LittleEndian, &entry)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	return buf.Bytes()
 }
 
-func DecodeToOamEntry(bytearray []byte) OamEntry {
-	reader := bytes.NewReader(bytearray)
-
+func DecodeToOamEntry(data []byte) OamEntry {
 	var entry OamEntry
-	err := binary.Read(reader, binary.BigEndian, &entry)
+	reader := bytes.NewReader(data)
+	err := binary.Read(reader, binary.LittleEndian, &entry)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	return entry
+}
+func PpuOamRead(address uint16) byte {
+	if address >= 0xFE00 {
+		address -= 0xFE00
+	}
+	return EncodeToBytes(oamEntry[address])[address]
+
 }

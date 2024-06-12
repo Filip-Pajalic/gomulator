@@ -112,10 +112,10 @@ func TestCpuWithTestData(t *testing.T) {
 func TestCpuWithSpecificFile(t *testing.T) {
 	dirPath := "GameboyCPUTests/v2"
 
-	LoadJsonTestData(dirPath, "cb.json")
+	LoadJsonTestData(dirPath, "f8.json")
 
 	for _, entry := range Testdata {
-		if entry.Name == "cb 18 21" {
+		if entry.Name == "f8 be b7" {
 
 			fmt.Println("Name:", entry.Name)
 			fmt.Println("Initial State PC:", entry.Initial.PC)
