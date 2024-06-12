@@ -11,11 +11,11 @@ const (
 )
 
 func IntHandle(ctx *CpuContext, address uint16) {
-	StackPush16(ctx.Regs.pc)
-	ctx.Regs.pc = address
+	StackPush16(ctx.Regs.Pc)
+	ctx.Regs.Pc = address
 }
 
-//is this correct?
+// is this correct?
 func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
 
 	if (ctx.IntFlags&byte(it)) == 1 && (ctx.IERegister&byte(it) == 1) {

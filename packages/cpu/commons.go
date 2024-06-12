@@ -14,7 +14,7 @@ func BitSet(a byte, n byte, on *bool) byte {
 	return a
 }
 
-//BIT(a, n) ((a & (1 << n)) ? 1 : 0)
+// BIT(a, n) ((a & (1 << n)) ? 1 : 0)
 func Bit(a byte, n byte) bool {
 	//om > 0 om detta ej fungerar
 	if (a & (1 << n)) == (1 << n) {

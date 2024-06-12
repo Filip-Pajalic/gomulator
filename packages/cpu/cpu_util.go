@@ -5,110 +5,110 @@ import (
 )
 
 func CpuFlagZ() bool {
-	return Bit(CpuCtx.Regs.f, 7)
+	return Bit(CpuCtx.Regs.F, 7)
 }
 
 func CpuFlagN() bool {
-	return Bit(CpuCtx.Regs.f, 6)
+	return Bit(CpuCtx.Regs.F, 6)
 }
 
 func CpuFlagH() bool {
-	return Bit(CpuCtx.Regs.f, 5)
+	return Bit(CpuCtx.Regs.F, 5)
 }
 
 func CpuFlagC() bool {
-	return Bit(CpuCtx.Regs.f, 4)
+	return Bit(CpuCtx.Regs.F, 4)
 }
 
-//Broken here
+// Broken here
 func CpuRegRead(regType regTypes) uint16 {
 	switch regType {
 	case RT_A:
-		return uint16(CpuCtx.Regs.a)
+		return uint16(CpuCtx.Regs.A)
 	case RT_F:
-		return uint16(CpuCtx.Regs.f)
+		return uint16(CpuCtx.Regs.F)
 	case RT_B:
-		return uint16(CpuCtx.Regs.b)
+		return uint16(CpuCtx.Regs.B)
 	case RT_C:
-		return uint16(CpuCtx.Regs.c)
+		return uint16(CpuCtx.Regs.C)
 	case RT_D:
-		return uint16(CpuCtx.Regs.d)
+		return uint16(CpuCtx.Regs.D)
 	case RT_E:
-		return uint16(CpuCtx.Regs.e)
+		return uint16(CpuCtx.Regs.E)
 	case RT_H:
-		return uint16(CpuCtx.Regs.h)
+		return uint16(CpuCtx.Regs.H)
 	case RT_L:
-		return uint16(CpuCtx.Regs.l)
+		return uint16(CpuCtx.Regs.L)
 	case RT_AF:
 
-		return Reverse(uint16(CpuCtx.Regs.f)<<8 | uint16(CpuCtx.Regs.a))
+		return Reverse(uint16(CpuCtx.Regs.F)<<8 | uint16(CpuCtx.Regs.A))
 	case RT_BC:
-		return Reverse(uint16(CpuCtx.Regs.c)<<8 | uint16(CpuCtx.Regs.b))
+		return Reverse(uint16(CpuCtx.Regs.C)<<8 | uint16(CpuCtx.Regs.B))
 	case RT_DE:
-		return Reverse(uint16(CpuCtx.Regs.e)<<8 | uint16(CpuCtx.Regs.d))
+		return Reverse(uint16(CpuCtx.Regs.E)<<8 | uint16(CpuCtx.Regs.D))
 	case RT_HL:
-		return Reverse(uint16(CpuCtx.Regs.l)<<8 | uint16(CpuCtx.Regs.h))
+		return Reverse(uint16(CpuCtx.Regs.L)<<8 | uint16(CpuCtx.Regs.H))
 	case RT_PC:
-		return CpuCtx.Regs.pc
+		return CpuCtx.Regs.Pc
 	case RT_SP:
-		return CpuCtx.Regs.sp
+		return CpuCtx.Regs.Sp
 	default:
 		return 0
 	}
 }
 
-//could be problem with cast here
+// could be problem with cast here
 func CpuSetReg(regType regTypes, val uint16) {
 	switch regType {
 	case RT_A:
-		CpuCtx.Regs.a = byte(val & 0xFF)
+		CpuCtx.Regs.A = byte(val & 0xFF)
 		return
 	case RT_F:
-		CpuCtx.Regs.f = byte(val & 0xFF)
+		CpuCtx.Regs.F = byte(val & 0xFF)
 		return
 	case RT_B:
-		CpuCtx.Regs.b = byte(val & 0xFF)
+		CpuCtx.Regs.B = byte(val & 0xFF)
 		return
 	case RT_C:
-		CpuCtx.Regs.c = byte(val & 0xFF)
+		CpuCtx.Regs.C = byte(val & 0xFF)
 		return
 	case RT_D:
-		CpuCtx.Regs.d = byte(val & 0xFF)
+		CpuCtx.Regs.D = byte(val & 0xFF)
 		return
 	case RT_E:
-		CpuCtx.Regs.e = byte(val & 0xFF)
+		CpuCtx.Regs.E = byte(val & 0xFF)
 		return
 	case RT_H:
-		CpuCtx.Regs.h = byte(val & 0xFF)
+		CpuCtx.Regs.H = byte(val & 0xFF)
 		return
 	case RT_L:
-		CpuCtx.Regs.l = byte(val & 0xFF)
+		CpuCtx.Regs.L = byte(val & 0xFF)
 		return
 	case RT_AF:
 		result := Reverse(val)
-		CpuCtx.Regs.f = byte((result >> 8) & 0xFF)
-		CpuCtx.Regs.a = byte((result) & 0xFF)
+		CpuCtx.Regs.F = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.A = byte((result) & 0xFF)
 		return
 	case RT_BC:
 		result := Reverse(val)
-		CpuCtx.Regs.c = byte((result >> 8) & 0xFF)
-		CpuCtx.Regs.b = byte((result) & 0xFF)
+		CpuCtx.Regs.C = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.B = byte((result) & 0xFF)
 		return
 	case RT_DE:
 		result := Reverse(val)
-		CpuCtx.Regs.e = byte((result >> 8) & 0xFF)
-		CpuCtx.Regs.d = byte((result) & 0xFF)
+		CpuCtx.Regs.E = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.D = byte((result) & 0xFF)
 		return
 	case RT_HL:
 		result := Reverse(val)
-		CpuCtx.Regs.l = byte((result >> 8) & 0xFF)
-		CpuCtx.Regs.h = byte((result) & 0xFF)
+		CpuCtx.Regs.L = byte((result >> 8) & 0xFF)
+		CpuCtx.Regs.H = byte((result) & 0xFF)
 		return
 	case RT_PC:
-		CpuCtx.Regs.pc = val
+		CpuCtx.Regs.Pc = val
 		return
 	case RT_SP:
-		CpuCtx.Regs.sp = val
+		CpuCtx.Regs.Sp = val
 		return
 	case RT_NONE:
 		return
@@ -118,21 +118,21 @@ func CpuSetReg(regType regTypes, val uint16) {
 func CpuRegRead8(rt regTypes) byte {
 	switch rt {
 	case RT_A:
-		return CpuCtx.Regs.a
+		return CpuCtx.Regs.A
 	case RT_F:
-		return CpuCtx.Regs.f
+		return CpuCtx.Regs.F
 	case RT_B:
-		return CpuCtx.Regs.b
+		return CpuCtx.Regs.B
 	case RT_C:
-		return CpuCtx.Regs.c
+		return CpuCtx.Regs.C
 	case RT_D:
-		return CpuCtx.Regs.d
+		return CpuCtx.Regs.D
 	case RT_E:
-		return CpuCtx.Regs.e
+		return CpuCtx.Regs.E
 	case RT_H:
-		return CpuCtx.Regs.h
+		return CpuCtx.Regs.H
 	case RT_L:
-		return CpuCtx.Regs.l
+		return CpuCtx.Regs.L
 	case RT_HL:
 		return BusRead(CpuRegRead(RT_HL))
 	default:
@@ -145,28 +145,28 @@ func CpuRegRead8(rt regTypes) byte {
 func CpuSetReg8(rt regTypes, val byte) {
 	switch rt {
 	case RT_A:
-		CpuCtx.Regs.a = val & 0xFF
+		CpuCtx.Regs.A = val & 0xFF
 		return
 	case RT_F:
-		CpuCtx.Regs.f = val & 0xFF
+		CpuCtx.Regs.F = val & 0xFF
 		return
 	case RT_B:
-		CpuCtx.Regs.b = val & 0xFF
+		CpuCtx.Regs.B = val & 0xFF
 		return
 	case RT_C:
-		CpuCtx.Regs.c = val & 0xFF
+		CpuCtx.Regs.C = val & 0xFF
 		return
 	case RT_D:
-		CpuCtx.Regs.d = val & 0xFF
+		CpuCtx.Regs.D = val & 0xFF
 		return
 	case RT_E:
-		CpuCtx.Regs.e = val & 0xFF
+		CpuCtx.Regs.E = val & 0xFF
 		return
 	case RT_H:
-		CpuCtx.Regs.h = val & 0xFF
+		CpuCtx.Regs.H = val & 0xFF
 		return
 	case RT_L:
-		CpuCtx.Regs.l = val & 0xFF
+		CpuCtx.Regs.L = val & 0xFF
 		return
 	case RT_HL:
 		BusWrite(CpuRegRead(RT_HL), val)

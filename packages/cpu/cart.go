@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"unsafe"
 
 	log "pajalic.go.emulator/packages/logger"
@@ -207,6 +208,25 @@ func loadCart(romName string) {
 
 }
 
+// For non cart loading, should abstract this more
+func ProgramLoad(program [][2]uint) {
+	memory := make([]uint8, 0, 65536)
+
+	//byteSlice := make([]byte, len(program))
+	emptyMemory := make([]uint8, cap(memory)-len(memory)) // Make sure that we have a full 64KB of memory
+	cartctx.romData = append(memory, emptyMemory...)
+
+	for _, v := range program {
+		log.Info(strconv.Itoa(int(v[0])))
+		BusWrite(uint16(v[0]), byte(v[1]))
+		//emptyMemory[v[0]] = uint8(v[1])
+
+	}
+
+	//	cartctx.romData = nil // byteSlice
+
+}
+
 func CartLoad(cart string) bool {
 	copy(cartctx.filename[:], fmt.Sprintf("%s", cart))
 	loadCart(cart)
@@ -265,7 +285,7 @@ func CartLoad(cart string) bool {
 
 func CartWrite(address uint16, data byte) {
 
-	//cartctx.romData[address] = data
+	cartctx.romData[address] = data
 
 }
 

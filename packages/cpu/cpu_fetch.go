@@ -34,9 +34,9 @@ func FetchData() {
 		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
 		return
 	case AM_R_D8:
-		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
+		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		CpuCtx.Regs.pc++
+		CpuCtx.Regs.Pc++
 		return
 	case AM_R_D16, AM_D16:
 		/*
@@ -47,15 +47,15 @@ func FetchData() {
 				lo | hi = 000001101010000
 
 		*/
-		var lo = uint16(BusRead(CpuCtx.Regs.pc))
+		var lo = uint16(BusRead(CpuCtx.Regs.Pc))
 
 		EmuCycles(1)
-		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
+		var hi = uint16(BusRead(CpuCtx.Regs.Pc + 1))
 
 		EmuCycles(1)
 		CpuCtx.FetchedData = lo | (hi << 8)
 
-		CpuCtx.Regs.pc += 2
+		CpuCtx.Regs.Pc += 2
 		return
 
 	/*
@@ -79,6 +79,7 @@ func FetchData() {
 
 	case AM_R_MR:
 		addr := CpuRegRead(CpuCtx.currentInst.Reg2)
+
 		if CpuCtx.currentInst.Reg2 == RT_C {
 			addr |= 0xFF00
 		}
@@ -113,45 +114,45 @@ func FetchData() {
 		return
 
 	case AM_R_A8:
-		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
+		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		CpuCtx.Regs.pc++
+		CpuCtx.Regs.Pc++
 		return
 
 	case AM_A8_R:
-		CpuCtx.MemDest = uint16(BusRead(CpuCtx.Regs.pc)) | 0xFF00
+		CpuCtx.MemDest = uint16(BusRead(CpuCtx.Regs.Pc)) | 0xFF00
 		CpuCtx.DestIsMem = true
 		EmuCycles(1)
-		CpuCtx.Regs.pc++
+		CpuCtx.Regs.Pc++
 		return
 
 	case AM_HL_SPR:
-		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
+		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		CpuCtx.Regs.pc++
+		CpuCtx.Regs.Pc++
 		return
 
 	case AM_D8:
-		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
+		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		CpuCtx.Regs.pc++
+		CpuCtx.Regs.Pc++
 		return
 
 	case AM_A16_R, AM_D16_R:
-		var lo = uint16(BusRead(CpuCtx.Regs.pc))
+		var lo = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
+		var hi = uint16(BusRead(CpuCtx.Regs.Pc + 1))
 		EmuCycles(1)
 		CpuCtx.MemDest = lo | (hi << 8)
 		CpuCtx.DestIsMem = true
-		CpuCtx.Regs.pc += 2
+		CpuCtx.Regs.Pc += 2
 		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
 		return
 
 	case AM_MR_D8:
-		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.pc))
+		CpuCtx.FetchedData = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		CpuCtx.Regs.pc++
+		CpuCtx.Regs.Pc++
 		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
 		CpuCtx.DestIsMem = true
 		return
@@ -164,12 +165,12 @@ func FetchData() {
 		return
 
 	case AM_R_A16:
-		var lo = uint16(BusRead(CpuCtx.Regs.pc))
+		var lo = uint16(BusRead(CpuCtx.Regs.Pc))
 		EmuCycles(1)
-		var hi = uint16(BusRead(CpuCtx.Regs.pc + 1))
+		var hi = uint16(BusRead(CpuCtx.Regs.Pc + 1))
 		EmuCycles(1)
 		var addr = lo | (hi << 8)
-		CpuCtx.Regs.pc += 2
+		CpuCtx.Regs.Pc += 2
 		CpuCtx.FetchedData = uint16(BusRead(addr))
 		EmuCycles(1)
 		return

@@ -1,8 +1,8 @@
 package cpu
 
 func StackPush(data byte) {
-	CpuGetRegs().sp--
-	BusWrite(CpuGetRegs().sp, data)
+	CpuGetRegs().Sp--
+	BusWrite(CpuGetRegs().Sp, data)
 
 }
 
@@ -14,8 +14,8 @@ func StackPush16(data uint16) {
 }
 
 func StackPop() byte {
-	result := BusRead(CpuGetRegs().sp)
-	CpuGetRegs().sp++
+	result := BusRead(CpuGetRegs().Sp)
+	CpuGetRegs().Sp++
 	return result
 }
 

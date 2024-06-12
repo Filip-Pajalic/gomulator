@@ -5,13 +5,14 @@ import (
 	"log"
 )
 
-/* Different instructionmodes needed
+/*
+	Different instructionmodes needed
+
 D8  means immediate 8 bit data
 D16 means immediate 16 bit data
 A8  means 8 bit unsigned data, which are added to $FF00 in certain instructions (replacement for missing IN and OUT instructions)
 A16 means 16 bit address
 R8  means 8 bit signed data, which are added to program counter
-
 */
 type addrMode byte
 
@@ -276,7 +277,7 @@ func InitInstructions() {
 	inst[0x3C].addInst(InstPointer{Type: in(IN_INC), Mode: ad(AM_R), Reg1: re(RT_A)})
 	inst[0x3D].addInst(InstPointer{Type: in(IN_DEC), Mode: ad(AM_R), Reg1: re(RT_A)})
 	inst[0x3E].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_D8), Reg1: re(RT_A)})
-	inst[0x27].addInst(InstPointer{Type: in(IN_CCF)})
+	inst[0x3F].addInst(InstPointer{Type: in(IN_CCF)})
 
 	//0x4X
 	inst[0x40].addInst(InstPointer{Type: in(IN_LD), Mode: ad(AM_R_R), Reg1: re(RT_B), Reg2: re(RT_B)})
@@ -611,7 +612,7 @@ func instToStr(ctx *CpuContext, s *string) {
 
 	case AM_A8_R:
 		*s = fmt.Sprintf("%s $%02X,%s", instName(inst.Type),
-			BusRead(ctx.Regs.pc-1), rtLookupString[inst.Reg2])
+			BusRead(ctx.Regs.Pc-1), rtLookupString[inst.Reg2])
 		return
 
 	case AM_HL_SPR:

@@ -3,7 +3,6 @@ package cpu
 import (
 	"bytes"
 	"encoding/binary"
-
 	log "pajalic.go.emulator/packages/logger"
 )
 
@@ -15,26 +14,7 @@ func PpuTick() {
 
 }
 
-type OamEntry struct {
-	y    byte
-	x    byte
-	tile byte
-
-	fCgbPn       int32
-	fCgbVramBank int32
-	fPn          int32
-	fXFlip       int32
-	fYFlip       int32
-	fBgp         int32
-}
-
 var oamEntry [40]OamEntry
-
-func initOamEntry() {
-	for i := range oamEntry {
-		oamEntry[i] = OamEntry{fCgbPn: 3, fCgbVramBank: 1, fPn: 1, fYFlip: 1, fXFlip: 1, fBgp: 1}
-	}
-}
 
 //{f_cgb_pn: 3, f_cgb_vram_bank: 1, f_pn: 1, f_y_flip: 1,f_x_flip: 1,f_bgp: 1}
 
@@ -54,23 +34,6 @@ type PpuContext struct {
 
 var ppuCtx = PpuContext{OamRam: oamEntry}
 
-func PpuOamWrite(address uint16, value byte) {
-	if address >= 0xFE00 {
-		address -= 0xFE00
-	}
-	p := EncodeToBytes()
-	p[address] = value
-	DecodeToOamEntry(p)
-}
-
-func PpuOamRead(address uint16) byte {
-	if address >= 0xFE00 {
-		address -= 0xFE00
-	}
-	p := EncodeToBytes()
-	return p[address]
-}
-
 func PpuWramWrite(address uint16, value byte) {
 	ppuCtx.Vram[address-0x8000] = value
 }
@@ -79,20 +42,49 @@ func PpuWramRead(address uint16) byte {
 	return ppuCtx.Vram[address-0x8000]
 }
 
-func EncodeToBytes() []byte {
+type OamEntry struct {
+	Y            byte
+	X            byte
+	Tile         byte
+	FCgbPn       int32
+	FCgbVramBank int32
+	FPn          int32
+	FXFlip       int32
+	FYFlip       int32
+	FBgp         int32
+}
+
+func PpuOamWrite(address uint16, value byte) {
+	if address >= 0xFE00 {
+		address -= 0xFE00
+	}
+	ppuCtx.OamRam[address] = DecodeToOamEntry(EncodeToBytes(oamEntry[address]))
+}
+
+func PpuOamRead(address uint16) byte {
+	if address >= 0xFE00 {
+		address -= 0xFE00
+	}
+	return EncodeToBytes(oamEntry[address])[address]
+
+}
+
+func EncodeToBytes(entry OamEntry) []byte {
 	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.BigEndian, &oamEntry)
+	err := binary.Write(buf, binary.BigEndian, &entry)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	return buf.Bytes()
 }
 
-func DecodeToOamEntry(bytearray []byte) {
+func DecodeToOamEntry(bytearray []byte) OamEntry {
 	reader := bytes.NewReader(bytearray)
 
-	err := binary.Read(reader, binary.BigEndian, &oamEntry)
+	var entry OamEntry
+	err := binary.Read(reader, binary.BigEndian, &entry)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	return entry
 }

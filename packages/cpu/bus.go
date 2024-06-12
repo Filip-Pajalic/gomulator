@@ -81,6 +81,7 @@ func BusWrite(address uint16, data byte) {
 		//WRAM
 		ram.WramWrite(address, data)
 	} else if address < 0xFE00 {
+
 		//reserved echo ram
 	} else if address < 0xFEA0 {
 		//OAM
