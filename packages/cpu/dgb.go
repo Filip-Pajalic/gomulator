@@ -23,6 +23,7 @@ func DbgUpdate() {
 func DbgPrint() bool {
 	if dbgMsg[0] != 0 {
 		log.Info("DBG: %s\n", dbgMsg)
+
 	}
 	debugmsg := string(dbgMsg[:])
 	if strings.Contains(debugmsg, "F") {

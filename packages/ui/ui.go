@@ -82,7 +82,7 @@ func delay(ms uint32) {
 var tileColors = [4]uint32{0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000}
 
 func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x int32, y int32) {
-	var rc = sdl.Rect{}
+	var rc sdl.Rect
 
 	for tileY := int32(0); tileY < 16; tileY += 2 {
 		var b1 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY))
@@ -91,10 +91,10 @@ func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x i
 		for bit := int32(7); bit >= 0; bit-- {
 			var b1bit byte = 0
 			var b2bit byte = 0
-			if b1&(1<<bit) == 1 {
+			if b1&(1<<bit) != 0 {
 				b1bit = 1
 			}
-			if b2&(1<<bit) == 1 {
+			if b2&(1<<bit) != 0 {
 				b2bit = 1
 			}
 
@@ -113,20 +113,21 @@ func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x i
 }
 
 func UpdateDbgWindows() {
+	var tileNum uint16 = 0
 	var xDraw int32 = 0
 	var yDraw int32 = 0
-	var tileNum uint16 = 0
-
-	var rc = sdl.Rect{}
+	var rc sdl.Rect
 	rc.X = 0
 	rc.Y = 0
 	rc.W = debugScreen.W
 	rc.H = debugScreen.H
-	debugScreen.FillRect(&rc, 0xFF111111)
+	err := debugScreen.FillRect(&rc, 0xFF111111)
+	if err != nil {
+		log.Error(err.Error())
+	}
 
 	var addr uint16 = 0x8000
 
-	//384 tiles, 24 x 16
 	for y := int32(0); y < 24; y++ {
 		for x := int32(0); x < 16; x++ {
 			displayTile(debugScreen, addr, tileNum, xDraw+(x*scale), yDraw+(y*scale))
@@ -137,11 +138,21 @@ func UpdateDbgWindows() {
 		yDraw += 8 * scale
 		xDraw = 0
 	}
+
 	pixels := debugScreen.Pixels()
 
-	sdlDebugTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(debugScreen.Pitch))
-	sdlDebugRenderer.Clear()
-	sdlDebugRenderer.Copy(sdlDebugTexture, nil, nil)
+	err = sdlDebugTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(debugScreen.Pitch))
+	if err != nil {
+		log.Error(err.Error())
+	}
+	err = sdlDebugRenderer.Clear()
+	if err != nil {
+		log.Error(err.Error())
+	}
+	err = sdlDebugRenderer.Copy(sdlDebugTexture, nil, nil)
+	if err != nil {
+		log.Error(err.Error())
+	}
 
 	sdlDebugRenderer.Present()
 }

@@ -48,19 +48,6 @@ func procLd(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
-		//        u8 hflag = (cpu_read_reg(ctx->cur_inst->reg_2) & 0xF) +
-		//            (ctx->fetched_data & 0xF) >= 0x10;
-		//
-		//        u8 cflag = (cpu_read_reg(ctx->cur_inst->reg_2) & 0xFF) +
-		//            (ctx->fetched_data & 0xFF) >= 0x100;
-		//
-		//        cpu_set_flags(ctx, 0, 0, hflag, cflag);
-		//        cpu_set_reg(ctx->cur_inst->reg_1,
-		//            cpu_read_reg(ctx->cur_inst->reg_2) + (int8_t)ctx->fetched_data);
-		//
-		//        return;
-
-		//
 
 		var hflag = ((CpuRegRead(ctx.currentInst.Reg2) & 0x0F) + (ctx.FetchedData & 0x0F)) >= 0x10
 
@@ -300,13 +287,7 @@ func procAnd(ctx *CpuContext) {
 
 func procRlca(ctx *CpuContext) {
 
-	//    u8 u = ctx->regs.a;
-	//    bool c = (u >> 7) & 1;
-	//    u = (u << 1) | c;
-	//    ctx->regs.a = u;
-	//
-	//    cpu_set_flags(ctx, 0, 0, 0, c);
-	var u uint8 = ctx.Regs.A
+	var u = ctx.Regs.A
 
 	z := false
 	n := false
@@ -463,7 +444,6 @@ func procCall(ctx *CpuContext) {
 	goToAddr(ctx, ctx.FetchedData, true)
 }
 
-// 0000002D problem here with fetched data, why stack push wrong
 func procRet(ctx *CpuContext) {
 	if ctx.currentInst.Condition != CT_NONE {
 		EmuCycles(1)
@@ -553,14 +533,6 @@ func procDec(ctx *CpuContext) {
 
 func procSub(ctx *CpuContext) {
 
-	//    u16 val = cpu_read_reg(ctx->cur_inst->reg_1) - ctx->fetched_data;
-	//
-	//    int z = val == 0;
-	//    int h = ((int)cpu_read_reg(ctx->cur_inst->reg_1) & 0xF) - ((int)ctx->fetched_data & 0xF) < 0;
-	//    int c = ((int)cpu_read_reg(ctx->cur_inst->reg_1)) - ((int)ctx->fetched_data) < 0;
-	//
-	//    cpu_set_reg(ctx->cur_inst->reg_1, val);
-	//    cpu_set_flags(ctx, z, 1, h, c);
 	var val = CpuRegRead(ctx.currentInst.Reg1) - ctx.FetchedData
 
 	var z = val == 0
@@ -595,15 +567,6 @@ func procSbc(ctx *CpuContext) {
 
 func procAdc(ctx *CpuContext) {
 
-	//    u16 u = ctx->fetched_data;
-	//    u16 a = ctx->regs.a;
-	//    u16 c = CPU_FLAG_C;
-	//
-	//    ctx->regs.a = (a + u + c) & 0xFF;
-	//
-	//    cpu_set_flags(ctx, ctx->regs.a == 0, 0,
-	//        (a & 0xF) + (u & 0xF) + c > 0xF,
-	//        a + u + c > 0xFF);
 	var u = ctx.FetchedData
 	var a = uint16(ctx.Regs.A)
 	var c uint16 = 0
@@ -642,29 +605,12 @@ func procAdd(ctx *CpuContext) {
 	c := (int)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int)(ctx.FetchedData&0xFF) >= 0x100
 	n := false
 
-	//    if (is_16bit) {
-	//        z = -1;
-	//        h = (cpu_read_reg(ctx->cur_inst->reg_1) & 0xFFF) + (ctx->fetched_data & 0xFFF) >= 0x1000;
-	//        u32 n = ((u32)cpu_read_reg(ctx->cur_inst->reg_1)) + ((u32)ctx->fetched_data);
-	//        c = n >= 0x10000;
-	//    }
-
 	if is16bit {
 		h = (CpuRegRead(ctx.currentInst.Reg1)&0xFFF)+(ctx.FetchedData&0xFFF) >= 0x1000
 		c = (uint32(CpuRegRead(ctx.currentInst.Reg1)))+uint32(ctx.FetchedData) >= 0x10000
 
 	}
 
-	//    if (ctx->cur_inst->reg_1 == RT_SP) {
-	//        z = 0;
-	//        h = (cpu_read_reg(ctx->cur_inst->reg_1) & 0xF) + (ctx->fetched_data & 0xF) >= 0x10;
-	//        c = (int)(cpu_read_reg(ctx->cur_inst->reg_1) & 0xFF) + (int)(ctx->fetched_data & 0xFF) >= 0x100;
-	//    }
-	//
-	//    cpu_set_reg(ctx->cur_inst->reg_1, val & 0xFFFF);
-	//    cpu_set_flags(ctx, z, 0, h, c);
-
-	//  u32 val = cpu_read_reg(ctx->cur_inst->reg_1) + ctx->fetched_data;
 	if ctx.currentInst.Reg1 == RT_SP {
 		z = false
 		h = (CpuRegRead(ctx.currentInst.Reg1)&0xF)+(ctx.FetchedData&0xF) >= 0x10
