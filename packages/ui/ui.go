@@ -8,65 +8,85 @@ import (
 	"unsafe"
 )
 
-var SCREEN_WIDTH int32 = 1024
+const (
+	SCREEN_WIDTH  = 640
+	SCREEN_HEIGHT = 480
+	scale         = 4
+)
 
-var SCREEN_HEIGHT int32 = 768
-
-var sdlWindow *sdl.Window
-
-var sdlRenderer *sdl.Renderer
-
-var sdlTexture *sdl.Texture
-
-var screen *sdl.Surface
-
-var sdlDebugWindow *sdl.Window
-
-var sdlDebugRenderer *sdl.Renderer
-
-var sdlDebugTexture *sdl.Texture
-
-var debugScreen *sdl.Surface
-
-var scale int32 = 4
+var (
+	sdlWindow        *sdl.Window
+	sdlRenderer      *sdl.Renderer
+	sdlTexture       *sdl.Texture
+	screen           *sdl.Surface
+	sdlDebugWindow   *sdl.Window
+	sdlDebugRenderer *sdl.Renderer
+	sdlDebugTexture  *sdl.Texture
+	debugScreen      *sdl.Surface
+)
 
 func UiInit() {
-
 	log.Info("Cart loaded..")
-	sdl.Init(sdl.INIT_VIDEO)
+	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
+		log.Fatal("SDL init failed:", err)
+	}
 	log.Info("SDL INIT")
-	ttf.Init()
+
+	if err := ttf.Init(); err != nil {
+		log.Fatal("TTF init failed:", err)
+	}
 	log.Info("TTF INIT")
+
 	var err error
 	sdlWindow, sdlRenderer, err = sdl.CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_RESIZABLE)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("Failed to create window and renderer:", err)
 	}
 
 	sdlDebugWindow, sdlDebugRenderer, err = sdl.CreateWindowAndRenderer(16*8*scale, 32*8*scale, 0)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("Failed to create debug window and renderer:", err)
 	}
 
-	debugScreen, _ = sdl.CreateRGBSurface(0, (16*8*scale)+(16*scale),
+	debugScreen, err = sdl.CreateRGBSurface(0, (16*8*scale)+(16*scale),
 		(32*8*scale)+(64*scale), 32,
 		0x00FF0000,
 		0x0000FF00,
 		0x000000FF,
 		0xFF000000)
+	if err != nil {
+		log.Fatal("Failed to create debug screen surface:", err)
+	}
 
-	sdlDebugTexture, _ = sdlDebugRenderer.CreateTexture(
+	sdlDebugTexture, err = sdlDebugRenderer.CreateTexture(
 		sdl.PIXELFORMAT_ABGR8888,
 		sdl.TEXTUREACCESS_STREAMING,
 		(16*8*scale)+(16*scale),
 		(32*8*scale)+(64*scale))
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("Failed to create debug texture:", err)
+	}
+
+	sdlTexture, err = sdlRenderer.CreateTexture(
+		sdl.PIXELFORMAT_ARGB8888,
+		sdl.TEXTUREACCESS_STREAMING,
+		SCREEN_WIDTH,
+		SCREEN_HEIGHT)
+	if err != nil {
+		log.Fatal("Failed to create SDL texture:", err)
+	}
+
+	screen, err = sdl.CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32,
+		0x00FF0000,
+		0x0000FF00,
+		0x000000FF,
+		0xFF000000)
+	if err != nil {
+		log.Fatal("Failed to create screen surface:", err)
 	}
 
 	x, y := sdlWindow.GetPosition()
 	sdlDebugWindow.SetPosition(x+SCREEN_WIDTH+10, y)
-
 }
 
 func DestroyWindow() {
@@ -82,6 +102,12 @@ func delay(ms uint32) {
 var tileColors = [4]uint32{0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000}
 
 func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x int32, y int32) {
+	// Ensure surface is valid
+	if surface == nil {
+		log.Error("Invalid SDL surface provided.")
+		return
+	}
+
 	var rc sdl.Rect
 
 	for tileY := int32(0); tileY < 16; tileY += 2 {
@@ -158,22 +184,85 @@ func UpdateDbgWindows() {
 }
 
 func UiUpdate() {
+	// Ensure sdlRenderer and sdlTexture are valid
+	if sdlRenderer == nil || sdlTexture == nil {
+		log.Error("Invalid SDL renderer or texture.")
+		return
+	}
+
+	var rc sdl.Rect
+	rc.X = 0
+	rc.Y = 0
+	rc.W = 2048
+	rc.H = 2048
+
+	videoBuffer := emu.PpuCtx.VideoBuffer
+
+	for lineNum := 0; lineNum < emu.YRES; lineNum++ {
+		for x := 0; x < emu.XRES; x++ {
+			rc.X = int32(x * scale)
+			rc.Y = int32(lineNum * scale)
+			rc.W = int32(scale)
+			rc.H = int32(scale)
+
+			screen.FillRect(&rc, videoBuffer[x+(lineNum*emu.XRES)])
+		}
+	}
+
+	// Update SDL texture with updated screen pixels
+	pixels := screen.Pixels()
+	if err := sdlTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(screen.Pitch)); err != nil {
+		log.Error("Failed to update SDL texture:", err)
+		return
+	}
+
+	// Render SDL texture
+	sdlRenderer.Clear()
+	sdlRenderer.Copy(sdlTexture, nil, nil)
+	sdlRenderer.Present()
+
+	// Update debug windows
 	UpdateDbgWindows()
 }
 
 func UiHandleEvents() {
-	//Quit both windows
-	for e := sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-		//TODO SDL_UpdateWindowSurface(sdlWindow);
-		//TODO SDL_UpdateWindowSurface(sdlTraceWindow);
-		//TODO SDL_UpdateWindowSurface(sdlDebugWindow);
+	var e sdl.Event
 
-		switch e.(type) {
-		case *sdl.QuitEvent:
-			println("Quit")
-			emu.GetEmuContext().Die = true
+	for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
+		switch t := e.(type) {
+		case *sdl.KeyboardEvent:
+			if t.Type == sdl.KEYDOWN {
+				uiOnKey(true, t.Keysym.Sym)
+			} else if t.Type == sdl.KEYUP {
+				uiOnKey(false, t.Keysym.Sym)
+			}
+		case *sdl.WindowEvent:
+			if t.Event == sdl.WINDOWEVENT_CLOSE {
+				//emu.GetEmuContext().Die = true
+			}
 		}
-
 	}
 
+}
+
+func uiOnKey(down bool, keyCode sdl.Keycode) {
+	state := emu.GamePadGetState()
+	switch keyCode {
+	case sdl.K_z:
+		state.B = down
+	case sdl.K_x:
+		state.A = down
+	case sdl.K_RETURN:
+		state.Start = down
+	case sdl.K_TAB:
+		state.Select = down
+	case sdl.K_UP:
+		state.Up = down
+	case sdl.K_DOWN:
+		state.Down = down
+	case sdl.K_LEFT:
+		state.Left = down
+	case sdl.K_RIGHT:
+		state.Right = down
+	}
 }

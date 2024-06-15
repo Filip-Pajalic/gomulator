@@ -6,7 +6,33 @@ import (
 	log "pajalic.go.emulator/packages/logger"
 )
 
+const (
+	LINES_PER_FRAME = 154
+	TICKS_PER_LINE  = 456
+	YRES            = 144
+	XRES            = 160
+)
+
 func PpuInit() {
+	PpuCtx.CurrentFrame = 0
+	PpuCtx.LineTicks = 0
+
+	PpuCtx.Pfc.LineX = 0
+	PpuCtx.Pfc.PushedX = 0
+	PpuCtx.Pfc.FetchX = 0
+	PpuCtx.Pfc.PixelFifo.size = 0
+	PpuCtx.Pfc.PixelFifo.head = nil
+	PpuCtx.Pfc.PixelFifo.tail = nil
+	PpuCtx.Pfc.CurFetchState = FS_TILE
+
+	LcdInit()
+	LCDSModeSet(ModeOam)
+
+	for i := range PpuCtx.OamRam {
+		PpuCtx.OamRam[i] = OamEntry{} // This initializes each OamEntry struct with zero values
+	}
+
+	PpuCtx.VideoBuffer = make([]uint32, YRES*XRES)
 
 }
 
@@ -30,16 +56,32 @@ var oamEntry [40]OamEntry
 type PpuContext struct {
 	OamRam [40]OamEntry
 	Vram   [0x2000]byte
+
+	LineSpriteCount   uint
+	Pfc               PixelFifoContext
+	LineSprites       *OamLineEntry
+	LineEntryArray    [10]OamLineEntry
+	FetchedEntryCount byte
+	FetchedEntries    [3]OamEntry
+	WindowLine        byte
+	CurrentFrame      uint32
+	LineTicks         uint32
+	VideoBuffer       []uint32
 }
 
-var ppuCtx = PpuContext{OamRam: oamEntry}
+var PpuCtx = PpuContext{OamRam: oamEntry}
 
 func PpuWramWrite(address uint16, value byte) {
-	ppuCtx.Vram[address-0x8000] = value
+	PpuCtx.Vram[address-0x8000] = value
 }
 
 func PpuWramRead(address uint16) byte {
-	return ppuCtx.Vram[address-0x8000]
+	return PpuCtx.Vram[address-0x8000]
+}
+
+type OamLineEntry struct {
+	Entry OamEntry
+	Next  *OamLineEntry
 }
 
 type OamEntry struct {
@@ -54,6 +96,42 @@ type OamEntry struct {
 	FBgp         int32
 }
 
+type PixelFifoContext struct {
+	CurFetchState FetchState
+	PixelFifo     Fifo
+
+	LineX   uint8
+	PushedX uint8
+	FetchX  uint8
+
+	BgwFetchData   [3]uint8
+	FetchEntryData [6]uint8
+	MapX           uint8
+	MapY           byte
+	TileY          byte
+	FifoX          byte
+}
+
+type FetchState int
+
+const (
+	FS_TILE FetchState = iota
+	FS_DATA0
+	FS_DATA1
+	FS_IDLE
+	FS_PUSH
+)
+
+type FifoEntry struct {
+	Next  *FifoEntry
+	Value uint32 // 32-bit color value
+}
+type Fifo struct {
+	head *FifoEntry
+	tail *FifoEntry
+	size uint32
+}
+
 func PpuOamWrite(address uint16, value byte) {
 	if address >= 0xFE00 {
 		address -= 0xFE00
@@ -63,13 +141,13 @@ func PpuOamWrite(address uint16, value byte) {
 	fieldOffset := address % 4 // Offset within the OamEntry
 
 	// Encode the OamEntry to bytes
-	entryBytes := EncodeToBytes(ppuCtx.OamRam[entryIndex])
+	entryBytes := EncodeToBytes(PpuCtx.OamRam[entryIndex])
 
 	// Update the specific byte
 	entryBytes[fieldOffset] = value
 
 	// Decode the bytes back to OamEntry
-	ppuCtx.OamRam[entryIndex] = DecodeToOamEntry(entryBytes)
+	PpuCtx.OamRam[entryIndex] = DecodeToOamEntry(entryBytes)
 }
 
 func EncodeToBytes(entry OamEntry) []byte {

@@ -14,6 +14,8 @@ func CpuRun() {
 	cpu.TimerInit()
 	cpu.InitInstructions()
 	cpu.PpuInit()
+	cpu.GamePadInit()
+	cpu.PpuInit()
 
 	cpu.GetEmuContext().Running = true
 	cpu.GetEmuContext().Paused = false
@@ -43,15 +45,21 @@ func Run(argc int, argv []string) int {
 
 	}
 
-	ui.UiInit()
 	cpu.GetEmuContext().Die = false
 	go CpuRun()
 
+	//previousFrame := cpu.PpuCtx.CurrentFrame
+	ui.UiInit()
+
 	for !cpu.GetEmuContext().Die {
+
 		//same as usleep?
 		time.Sleep(1000)
 		ui.UiHandleEvents()
+		//if previousFrame != cpu.PpuCtx.CurrentFrame {
 		ui.UiUpdate()
+		//}
+		//	previousFrame = cpu.PpuCtx.CurrentFrame
 	}
 	ui.DestroyWindow()
 
