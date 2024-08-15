@@ -3,8 +3,10 @@ package ui
 import (
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
-	emu "pajalic.go.emulator/packages/cpu"
+	"pajalic.go.emulator/packages/input"
 	log "pajalic.go.emulator/packages/logger"
+	emu "pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/ppu"
 	"unsafe"
 )
 
@@ -196,16 +198,16 @@ func UiUpdate() {
 	rc.W = 2048
 	rc.H = 2048
 
-	videoBuffer := emu.PpuCtx.VideoBuffer
+	videoBuffer := ppu.PpuCtx.VideoBuffer
 
-	for lineNum := 0; lineNum < emu.YRES; lineNum++ {
-		for x := 0; x < emu.XRES; x++ {
+	for lineNum := 0; lineNum < ppu.YRES; lineNum++ {
+		for x := 0; x < ppu.XRES; x++ {
 			rc.X = int32(x * scale)
 			rc.Y = int32(lineNum * scale)
 			rc.W = int32(scale)
 			rc.H = int32(scale)
 
-			screen.FillRect(&rc, videoBuffer[x+(lineNum*emu.XRES)])
+			screen.FillRect(&rc, videoBuffer[x+(lineNum*ppu.XRES)])
 		}
 	}
 
@@ -246,7 +248,7 @@ func UiHandleEvents() {
 }
 
 func uiOnKey(down bool, keyCode sdl.Keycode) {
-	state := emu.GamePadGetState()
+	state := input.GamePadGetState()
 	switch keyCode {
 	case sdl.K_z:
 		state.B = down

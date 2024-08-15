@@ -1,9 +1,10 @@
-package cpu
+package ppu
 
 import (
 	"bytes"
 	"encoding/binary"
 	log "pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/ui"
 )
 
 const (
@@ -25,8 +26,8 @@ func PpuInit() {
 	PpuCtx.Pfc.PixelFifo.tail = nil
 	PpuCtx.Pfc.CurFetchState = FS_TILE
 
-	LcdInit()
-	LCDSModeSet(ModeOam)
+	ui.LcdInit()
+	ui.LCDSModeSet(ui.ModeOam)
 
 	for i := range PpuCtx.OamRam {
 		PpuCtx.OamRam[i] = OamEntry{} // This initializes each OamEntry struct with zero values

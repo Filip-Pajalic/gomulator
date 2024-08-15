@@ -35,7 +35,7 @@ func IoWrite(address uint16, value byte) {
 	case 0xFF0F:
 		CpuSetIntFlags(value)
 	case 0xFF46:
-		DmaStart(value)
+		RestartDMAContext(value)
 		log.Info("DMA START!\n")
 	default:
 		if Between16(address, 0xFF04, 0xFF07) {

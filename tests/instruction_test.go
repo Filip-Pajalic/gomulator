@@ -5,6 +5,9 @@ import (
 	"log"
 	"os"
 	gameboypackage "pajalic.go.emulator/packages/cpu"
+	"pajalic.go.emulator/packages/emulator"
+	"pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/ppu"
 	"testing"
 )
 
@@ -61,15 +64,15 @@ func TestCpuWithTestData(t *testing.T) {
 				}
 
 				gameboypackage.NewCpu(context)
-				gameboypackage.PpuInit()
+				ppu.PpuInit()
 				gameboypackage.TimerInit()
 				gameboypackage.InitInstructions()
 
-				gameboypackage.GetEmuContext().Running = true
-				gameboypackage.GetEmuContext().Paused = false
-				gameboypackage.GetEmuContext().Ticks = 0
+				emulator.GetEmuContext().Running = true
+				emulator.GetEmuContext().Paused = false
+				emulator.GetEmuContext().Ticks = 0
 
-				gameboypackage.ProgramLoad(initialState.Ram)
+				memory.ProgramLoad(initialState.Ram)
 				//for i, _ := range entry.Cycles {
 
 				gameboypackage.CpuStep()
@@ -149,15 +152,15 @@ func TestCpuWithSpecificFile(t *testing.T) {
 			}
 
 			gameboypackage.NewCpu(context)
-			gameboypackage.PpuInit()
+			ppu.PpuInit()
 			gameboypackage.TimerInit()
 			gameboypackage.InitInstructions()
 
-			gameboypackage.GetEmuContext().Running = true
-			gameboypackage.GetEmuContext().Paused = false
-			gameboypackage.GetEmuContext().Ticks = 0
+			emulator.GetEmuContext().Running = true
+			emulator.GetEmuContext().Paused = false
+			emulator.GetEmuContext().Ticks = 0
 
-			gameboypackage.ProgramLoad(initialState.Ram)
+			memory.ProgramLoad(initialState.Ram)
 			//for i, _ := range entry.Cycles {
 
 			gameboypackage.CpuStep()

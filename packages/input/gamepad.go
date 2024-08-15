@@ -1,4 +1,4 @@
-package cpu
+package input
 
 type GamePadState struct {
 	Start  bool

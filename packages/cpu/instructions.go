@@ -3,6 +3,7 @@ package cpu
 import (
 	"fmt"
 	"log"
+	"pajalic.go.emulator/packages/memory"
 )
 
 /*
@@ -612,7 +613,7 @@ func instToStr(ctx *CpuContext, s *string) {
 
 	case AM_A8_R:
 		*s = fmt.Sprintf("%s $%02X,%s", instName(inst.Type),
-			BusRead(ctx.Regs.Pc-1), rtLookupString[inst.Reg2])
+			memory.BusRead(ctx.Regs.Pc-1), rtLookupString[inst.Reg2])
 		return
 
 	case AM_HL_SPR:

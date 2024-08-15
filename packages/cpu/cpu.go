@@ -2,6 +2,8 @@ package cpu
 
 import (
 	"os"
+	"pajalic.go.emulator/packages/emulator"
+	"pajalic.go.emulator/packages/memory"
 
 	log "pajalic.go.emulator/packages/logger"
 )
@@ -100,7 +102,7 @@ func NewCpu(cpu CpuContext) {
 }
 
 func fetchInstruction() {
-	CpuCtx.CurOpCode = BusRead(CpuCtx.Regs.Pc)
+	CpuCtx.CurOpCode = memory.BusRead(CpuCtx.Regs.Pc)
 	CpuCtx.Regs.Pc++
 	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
 }
@@ -118,7 +120,7 @@ func CpuStep() bool {
 	if !CpuCtx.Halted {
 		pc := CpuCtx.Regs.Pc
 		fetchInstruction()
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		FetchData()
 
 		var z = "-"
@@ -143,11 +145,11 @@ func CpuStep() bool {
 
 		var inst string
 		instToStr(&CpuCtx, &inst)
-		temp := GetEmuContext().Ticks
+		temp := emulator.GetEmuContext().Ticks
 		log.Info("%08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
 			temp,
 			pc, inst, CpuCtx.CurOpCode,
-			BusRead(pc+1), BusRead(pc+2), CpuCtx.Regs.A, z, n, h, c, CpuCtx.Regs.B, CpuCtx.Regs.C,
+			memory.BusRead(pc+1), memory.BusRead(pc+2), CpuCtx.Regs.A, z, n, h, c, CpuCtx.Regs.B, CpuCtx.Regs.C,
 			CpuCtx.Regs.D, CpuCtx.Regs.E, CpuCtx.Regs.H, CpuCtx.Regs.L)
 
 		if CpuCtx.currentInst == nil {
@@ -161,7 +163,7 @@ func CpuStep() bool {
 		}
 		Execute()
 	} else {
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 
 		if CpuCtx.IntFlags == 1 {
 			CpuCtx.Halted = false

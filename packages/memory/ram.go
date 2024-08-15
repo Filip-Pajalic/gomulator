@@ -1,4 +1,4 @@
-package ram
+package memory
 
 import (
 	log "pajalic.go.emulator/packages/logger"

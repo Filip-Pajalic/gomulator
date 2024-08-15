@@ -1,31 +1,33 @@
-package cpu
+package ppu
 
 import (
 	"fmt"
+	"pajalic.go.emulator/packages/cpu"
+	"pajalic.go.emulator/packages/ui"
 	"time"
 )
 
 // IncrementLY increments the LY register and checks for LY compare interrupt
 func IncrementLY() {
-	lcdCtx := LcdGetContext()
+	lcdCtx := ui.LcdGetContext()
 	lcdCtx.Ly++
 
 	if lcdCtx.Ly == lcdCtx.LyCompare {
-		LCDSLycSet(true)
+		ui.LCDSLycSet(true)
 
-		if LCDSStatInt(SSLyc) {
-			CpuRequestInterrupt(IT_LCD_STAT)
+		if ui.LCDSStatInt(ui.SSLyc) {
+			cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
 		}
 	} else {
-		LCDSLycSet(false)
+		ui.LCDSLycSet(false)
 	}
 }
 
 // LoadLineSprites loads the sprites for the current line
 func LoadLineSprites() {
 
-	curY := LcdCtx.Ly
-	spriteHeight := LCDCObjHeight()
+	curY := ui.LcdCtx.Ly
+	spriteHeight := ui.LCDCObjHeight()
 	//This is probably bad
 	PpuCtx.LineEntryArray = [10]OamLineEntry(make([]OamLineEntry, 40))
 	PpuCtx.LineSpriteCount = 0
@@ -85,7 +87,7 @@ func PPUModeOam() {
 	ppuCtx := PpuCtx
 
 	if ppuCtx.LineTicks >= 80 {
-		LCDSModeSet(ModeXfer)
+		ui.LCDSModeSet(ui.ModeXfer)
 		ppuCtx.Pfc.CurFetchState = FS_TILE
 		ppuCtx.Pfc.LineX = 0
 		ppuCtx.Pfc.FetchX = 0
@@ -107,10 +109,10 @@ func PPUModeXfer() {
 
 	if PpuCtx.Pfc.PushedX >= XRES {
 		PipelineFifoReset()
-		LCDSModeSet(ModeHBlank)
+		ui.LCDSModeSet(ui.ModeHBlank)
 
-		if LCDSStatInt(SSHBlank) {
-			CpuRequestInterrupt(IT_LCD_STAT)
+		if ui.LCDSStatInt(ui.SSHBlank) {
+			cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
 		}
 	}
 }
@@ -121,9 +123,9 @@ func PPUModeVblank() {
 	if PpuCtx.LineTicks >= TICKS_PER_LINE {
 		IncrementLY()
 
-		if LcdCtx.Ly >= LINES_PER_FRAME {
-			LCDSModeSet(ModeOam)
-			LcdCtx.Ly = 0
+		if ui.LcdCtx.Ly >= LINES_PER_FRAME {
+			ui.LCDSModeSet(ui.ModeOam)
+			ui.LcdCtx.Ly = 0
 		}
 
 		PpuCtx.LineTicks = 0
@@ -143,13 +145,13 @@ func PPUModeHblank() {
 	if PpuCtx.LineTicks >= TICKS_PER_LINE {
 		IncrementLY()
 
-		if LcdCtx.Ly >= YRES {
-			LCDSModeSet(ModeVBlank)
+		if ui.LcdCtx.Ly >= YRES {
+			ui.LCDSModeSet(ui.ModeVBlank)
 
-			CpuRequestInterrupt(IT_VBLANK)
+			cpu.CpuRequestInterrupt(cpu.IT_VBLANK)
 
-			if LCDSStatInt(SSVBlank) {
-				CpuRequestInterrupt(IT_LCD_STAT)
+			if ui.LCDSStatInt(ui.SSVBlank) {
+				cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
 			}
 
 			PpuCtx.CurrentFrame++
@@ -173,7 +175,7 @@ func PPUModeHblank() {
 			frameCount++
 			prevFrameTime = time.Now().UnixMilli()
 		} else {
-			LCDSModeSet(ModeOam)
+			ui.LCDSModeSet(ui.ModeOam)
 		}
 
 		PpuCtx.LineTicks = 0

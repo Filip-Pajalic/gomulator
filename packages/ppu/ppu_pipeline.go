@@ -1,16 +1,18 @@
-package cpu
+package ppu
 
 import (
 	"fmt"
+	"pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/ui"
 )
 
 // Assume necessary imports for bus, lcd packages
 
 func WindowVisible() bool {
 	//Always true, soemthing fishLy
-	return LCDCWinEnable() && LcdCtx.WinX >= 0 &&
-		LcdCtx.WinX <= 166 && LcdCtx.WinY >= 0 &&
-		LcdCtx.WinY < YRES
+	return ui.LCDCWinEnable() && ui.LcdCtx.WinX >= 0 &&
+		ui.LcdCtx.WinX <= 166 && ui.LcdCtx.WinY >= 0 &&
+		ui.LcdCtx.WinY < YRES
 }
 
 func PixelFifoPush(value uint32) {
@@ -48,7 +50,7 @@ func PixelFifoPop() uint32 {
 func FetchSpritePixels(bit int, color uint32, bgColor uint8) uint32 {
 	for i := 0; i < int(PpuCtx.FetchedEntryCount); i++ {
 		spX := (PpuCtx.FetchedEntries[i].X - 8) +
-			(LcdCtx.ScrollX % 8)
+			(ui.LcdCtx.ScrollX % 8)
 
 		if spX+8 < PpuCtx.Pfc.FifoX {
 			continue
@@ -77,9 +79,9 @@ func FetchSpritePixels(bit int, color uint32, bgColor uint8) uint32 {
 		//is this wrong
 		if bgPriority != 0 || bgColor == 0 {
 			if PpuCtx.FetchedEntries[i].FPn > 0 {
-				color = LcdCtx.Sp2Colors[hi|lo]
+				color = ui.LcdCtx.Sp2Colors[hi|lo]
 			} else {
-				color = LcdCtx.Sp1Colors[hi|lo]
+				color = ui.LcdCtx.Sp1Colors[hi|lo]
 			}
 
 			if hi|lo != 0 {
@@ -96,19 +98,19 @@ func PipelineFifoAdd() bool {
 		return false
 	}
 
-	x := PpuCtx.Pfc.FetchX - (8 - (LcdCtx.ScrollX % 8))
+	x := PpuCtx.Pfc.FetchX - (8 - (ui.LcdCtx.ScrollX % 8))
 
 	for i := 0; i < 8; i++ {
 		bit := 7 - i
 		hi := (PpuCtx.Pfc.BgwFetchData[1] & (1 << bit)) >> bit
 		lo := (PpuCtx.Pfc.BgwFetchData[2] & (1 << bit)) << 1
-		color := LcdCtx.BgColors[hi|lo]
+		color := ui.LcdCtx.BgColors[hi|lo]
 
-		if !LCDCBGWEnable() {
-			color = LcdCtx.BgColors[0]
+		if !ui.LCDCBGWEnable() {
+			color = ui.LcdCtx.BgColors[0]
 		}
 
-		if LCDCObjEnable() {
+		if ui.LCDCObjEnable() {
 			color = FetchSpritePixels(bit, color, hi|lo)
 		}
 
@@ -125,7 +127,7 @@ func PipelineLoadSpriteTile() {
 	le := PpuCtx.LineSprites
 
 	for le != nil {
-		spX := (le.Entry.X - 8) + (LcdCtx.ScrollX % 8)
+		spX := (le.Entry.X - 8) + (ui.LcdCtx.ScrollX % 8)
 
 		if (spX >= PpuCtx.Pfc.FetchX && spX < PpuCtx.Pfc.FetchX+8) ||
 			((spX+8) >= PpuCtx.Pfc.FetchX && (spX+8) < PpuCtx.Pfc.FetchX+8) {
@@ -142,8 +144,8 @@ func PipelineLoadSpriteTile() {
 }
 
 func PipelineLoadSpriteData(offset uint8) {
-	curY := LcdCtx.Ly
-	spriteHeight := LCDCObjHeight()
+	curY := ui.LcdCtx.Ly
+	spriteHeight := ui.LCDCObjHeight()
 
 	for i := 0; i < int(PpuCtx.FetchedEntryCount); i++ {
 		ty := ((curY + 16) - PpuCtx.FetchedEntries[i].Y) * 2
@@ -159,7 +161,7 @@ func PipelineLoadSpriteData(offset uint8) {
 		}
 
 		PpuCtx.Pfc.FetchEntryData[byte((i*2))+offset] =
-			BusRead(0x8000 + (uint16(tileIndex) * 16) + uint16(ty) + uint16(offset))
+			memory.BusRead(0x8000 + (uint16(tileIndex) * 16) + uint16(ty) + uint16(offset))
 	}
 }
 
@@ -168,27 +170,27 @@ func PipelineLoadWindowTile() {
 		return
 	}
 
-	windowY := LcdCtx.WinY
+	windowY := ui.LcdCtx.WinY
 
-	if PpuCtx.Pfc.FetchX+7 >= LcdCtx.WinX &&
-		PpuCtx.Pfc.FetchX+7 < LcdCtx.WinX+YRES+14 {
-		if LcdCtx.Ly >= windowY && LcdCtx.Ly < windowY+XRES {
+	if PpuCtx.Pfc.FetchX+7 >= ui.LcdCtx.WinX &&
+		PpuCtx.Pfc.FetchX+7 < ui.LcdCtx.WinX+YRES+14 {
+		if ui.LcdCtx.Ly >= windowY && ui.LcdCtx.Ly < windowY+XRES {
 			wTileY := PpuCtx.WindowLine / 8
 
 			var addr uint16
-			if LCDCWinMapArea() == 0x9800 {
-				addr = LCDCWinMapArea() + uint16((PpuCtx.Pfc.FetchX+7-LcdCtx.WinX)/8) + uint16(wTileY*32)
+			if ui.LCDCWinMapArea() == 0x9800 {
+				addr = ui.LCDCWinMapArea() + uint16((PpuCtx.Pfc.FetchX+7-ui.LcdCtx.WinX)/8) + uint16(wTileY*32)
 			} else {
-				addr = LCDCWinMapArea() + uint16((PpuCtx.Pfc.FetchX+7-LcdCtx.WinX)/8) + uint16(wTileY*32)
+				addr = ui.LCDCWinMapArea() + uint16((PpuCtx.Pfc.FetchX+7-ui.LcdCtx.WinX)/8) + uint16(wTileY*32)
 			}
 
-			PpuCtx.Pfc.BgwFetchData[0] = BusRead(addr)
+			PpuCtx.Pfc.BgwFetchData[0] = memory.BusRead(addr)
 
 			/*		PpuCtx.Pfc.BgwFetchData[0] = BusRead(LCDCWinMapArea() +
 					((PpuCtx.Pfc.FetchX + 7 - LcdCtx.WinX) / 8) +
 					(uint16(wTileY) * 32))*/
 
-			if LCDCBgMapArea() == 0x8800 {
+			if ui.LCDCBgMapArea() == 0x8800 {
 				PpuCtx.Pfc.BgwFetchData[0] += 128
 			}
 		}

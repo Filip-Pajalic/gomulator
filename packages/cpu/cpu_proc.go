@@ -2,6 +2,8 @@ package cpu
 
 import (
 	"log"
+	"pajalic.go.emulator/packages/emulator"
+	"pajalic.go.emulator/packages/memory"
 )
 
 func procNone(ctx *CpuContext) {
@@ -38,12 +40,12 @@ func procLd(ctx *CpuContext) {
 
 		if is16bit(ctx.currentInst.Reg2) {
 			//if 16 bit register...
-			EmuCycles(1)
-			BusWrite16(ctx.MemDest, ctx.FetchedData)
+			emulator.EmuCycles(1)
+			memory.BusWrite16(ctx.MemDest, ctx.FetchedData)
 		} else {
-			BusWrite(ctx.MemDest, byte(ctx.FetchedData))
+			memory.BusWrite(ctx.MemDest, byte(ctx.FetchedData))
 		}
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 		return
 	}
 
@@ -91,10 +93,10 @@ func procCb(ctx *CpuContext) {
 	var bit = (op >> 3) & 0b111
 	var bit_op = (op >> 6) & 0b11
 	var regval = CpuRegRead8(reg)
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 
 	if reg == RT_HL {
-		EmuCycles(2)
+		emulator.EmuCycles(2)
 	}
 
 	switch bit_op {
@@ -416,9 +418,9 @@ func procEi(ctx *CpuContext) {
 
 func procPop(ctx *CpuContext) {
 	var lo = uint16(StackPop())
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	var hi = uint16(StackPop())
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	var n = (hi << 8) | lo
 	CpuSetReg(ctx.currentInst.Reg1, n)
 
@@ -429,22 +431,22 @@ func procPop(ctx *CpuContext) {
 
 func procPush(ctx *CpuContext) {
 	var hi = (CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	StackPush(byte(hi))
 	var lo = (CpuRegRead(ctx.currentInst.Reg1)) & 0xFF
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 	StackPush(byte(lo))
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 }
 
 func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 	if CheckCondition(ctx) {
 		if pushpc {
-			EmuCycles(2)
+			emulator.EmuCycles(2)
 			StackPush16(ctx.Regs.Pc)
 		}
 		ctx.Regs.Pc = addr
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 }
 
@@ -466,20 +468,20 @@ func procCall(ctx *CpuContext) {
 // 0000002D problem here with fetched data, why stack push wrong
 func procRet(ctx *CpuContext) {
 	if ctx.currentInst.Condition != CT_NONE {
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 
 	if CheckCondition(ctx) {
 		var lo = uint16(StackPop())
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 
 		var hi = uint16(StackPop())
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 
 		var n = (hi << 8) | lo
 		ctx.Regs.Pc = n
 
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 }
 
@@ -495,24 +497,24 @@ func procReti(ctx *CpuContext) {
 func procLdh(ctx *CpuContext) {
 	//is CpuSetReg correct here
 	if ctx.currentInst.Reg1 == RT_A {
-		CpuSetReg(ctx.currentInst.Reg1, uint16(BusRead(0xFF00|ctx.FetchedData)))
+		CpuSetReg(ctx.currentInst.Reg1, uint16(memory.BusRead(0xFF00|ctx.FetchedData)))
 	} else {
-		BusWrite(ctx.MemDest, ctx.Regs.A)
+		memory.BusWrite(ctx.MemDest, ctx.Regs.A)
 	}
-	EmuCycles(1)
+	emulator.EmuCycles(1)
 }
 
 func procInc(ctx *CpuContext) {
 	var val = CpuRegRead(ctx.currentInst.Reg1) + 1
 
 	if is16bit(ctx.currentInst.Reg1) {
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 
 	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
-		val = uint16(BusRead(CpuRegRead(RT_HL))) + 1
+		val = uint16(memory.BusRead(CpuRegRead(RT_HL))) + 1
 		val &= 0xFF
-		BusWrite(CpuRegRead(RT_HL), byte(val))
+		memory.BusWrite(CpuRegRead(RT_HL), byte(val))
 	} else {
 		CpuSetReg(ctx.currentInst.Reg1, val)
 		val = CpuRegRead(ctx.currentInst.Reg1)
@@ -531,12 +533,12 @@ func procDec(ctx *CpuContext) {
 	var val = CpuRegRead(ctx.currentInst.Reg1) - 1
 
 	if is16bit(ctx.currentInst.Reg1) {
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 
 	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
-		val = uint16(BusRead(CpuRegRead(RT_HL)) - 1)
-		BusWrite(CpuRegRead(RT_HL), byte(val))
+		val = uint16(memory.BusRead(CpuRegRead(RT_HL)) - 1)
+		memory.BusWrite(CpuRegRead(RT_HL), byte(val))
 	} else {
 		CpuSetReg(ctx.currentInst.Reg1, val)
 		val = CpuRegRead(ctx.currentInst.Reg1)
@@ -629,7 +631,7 @@ func procAdd(ctx *CpuContext) {
 	var is16bit = is16bit(ctx.currentInst.Reg1)
 
 	if is16bit {
-		EmuCycles(1)
+		emulator.EmuCycles(1)
 	}
 
 	if ctx.currentInst.Reg1 == RT_SP {

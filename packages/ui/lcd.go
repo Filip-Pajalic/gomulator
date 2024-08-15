@@ -1,4 +1,6 @@
-package cpu
+package ui
+
+import "pajalic.go.emulator/packages/cpu"
 
 // LcdContext represents the LCD context with all its registers and color palettes.
 type LcdContext struct {
@@ -145,7 +147,7 @@ func LcdWrite(address uint16, value uint8) {
 
 	if offset == 6 {
 		// 0xFF46 = DMA
-		DmaStart(value)
+		cpu.RestartDMAContext(value)
 	}
 
 	switch address {

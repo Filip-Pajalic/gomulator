@@ -1,7 +1,8 @@
-package cpu
+package memory
 
 import (
-	"pajalic.go.emulator/packages/ram"
+	"pajalic.go.emulator/packages/cpu"
+	"pajalic.go.emulator/packages/ppu"
 )
 
 /*
@@ -30,35 +31,35 @@ func BusRead(address uint16) byte {
 		return CartRead(address)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		return PpuWramRead(address)
+		return ppu.PpuWramRead(address)
 	} else if address < 0xC000 {
 		//Cartridge ram //not working
 		return CartRead(address)
 	} else if address < 0xE000 {
 		//WRAM Working ram
-		return ram.WramRead(address)
+		return WramRead(address)
 	} else if address < 0xFE00 {
 		// Reserved eco ram, not used
 		return 0
 	} else if address < 0xFEA0 {
 		//Object attribute memory (OAM)
-		if DmaTransferring() {
+		if cpu.DmaTransferring() {
 			return 0xFF
 		}
-		return PpuOamRead(address)
+		return ppu.PpuOamRead(address)
 
 	} else if address < 0xFF00 {
 		// Reserved not used
 		return 0
 	} else if address < 0xFF80 {
 		//Io registers
-		return IoRead(address)
+		return cpu.IoRead(address)
 	} else if address == 0xFFFF {
 		//CPU interupt enable register
-		return CpuGetIERegister()
+		return cpu.CpuGetIERegister()
 	}
 
-	return ram.HramRead(address)
+	return HramRead(address)
 }
 
 /*
@@ -73,32 +74,32 @@ func BusWrite(address uint16, data byte) {
 		CartWrite(address, data)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		PpuWramWrite(address, data)
+		ppu.PpuWramWrite(address, data)
 	} else if address < 0xC000 {
 		//EXT-RAM
 		CartWrite(address, data)
 	} else if address < 0xE000 {
 		//WRAM
-		ram.WramWrite(address, data)
+		WramWrite(address, data)
 	} else if address < 0xFE00 {
 
 		//reserved echo ram
 	} else if address < 0xFEA0 {
 		//OAM
-		if DmaTransferring() {
+		if cpu.DmaTransferring() {
 			return
 		}
-		PpuOamWrite(address, data)
+		ppu.PpuOamWrite(address, data)
 	} else if address < 0xFF00 {
 		//unusable reserved
 	} else if address < 0xFF80 {
 		//IO Registers
-		IoWrite(address, data)
+		cpu.IoWrite(address, data)
 	} else if address == 0xFFFF {
 		//CPU SET ENABLE REGISTER
-		CpuSetIERegister(data)
+		cpu.CpuSetIERegister(data)
 	} else {
-		ram.HramWrite(address, data)
+		HramWrite(address, data)
 	}
 
 }
