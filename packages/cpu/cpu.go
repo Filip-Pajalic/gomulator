@@ -2,10 +2,8 @@ package cpu
 
 import (
 	"os"
-	"pajalic.go.emulator/packages/emulator"
-	"pajalic.go.emulator/packages/memory"
-
 	log "pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/memory"
 )
 
 /*
@@ -36,6 +34,14 @@ instead of specifying an address in an operation you can use HL as the destinati
 
 */
 
+type CPU interface {
+	Fetch()
+	Step() bool
+	Execute()
+	setIERegister(b byte)
+	getIERegister() byte
+	requestInterrupt(t InterruptType)
+}
 type CpuRegisters struct {
 	A  byte
 	F  byte
@@ -64,96 +70,105 @@ type CpuContext struct {
 
 	IntMasterEnabled bool
 	enablingIme      bool
-	IERegister       byte
+	iERegister       byte
 	IntFlags         byte
 }
 
-var CpuCtx CpuContext
+var cpuInstance *CpuContext
 
-func CpuInit() {
-	CpuCtx.Regs.Pc = 0x100
-	CpuCtx.Halted = false
-
-	CpuCtx.Regs.Sp = 0xFFFE
-	CpuCtx.Regs.F = 0xB0
-	CpuCtx.Regs.A = 0x01
-	CpuCtx.Regs.C = 0x13
-	CpuCtx.Regs.B = 0x00
-	CpuCtx.Regs.E = 0xD8
-	CpuCtx.Regs.D = 0x00
-	CpuCtx.Regs.L = 0x4D
-	CpuCtx.Regs.H = 0x01
-	CpuCtx.IERegister = 0
-	CpuCtx.IntFlags = 0
-	CpuCtx.IntMasterEnabled = false
-	CpuCtx.enablingIme = false
+func NewCpuContext() *CpuContext {
 
 	GetTimerContext().div = 0xABCC
 
 	InitProcessors()
+	return &CpuContext{
+		Regs: CpuRegisters{
+			A:  0x01,
+			F:  0xB0,
+			B:  0x00,
+			C:  0x13,
+			D:  0x00,
+			E:  0xD8,
+			H:  0x01,
+			L:  0x4D,
+			Pc: 0x100,
+			Sp: 0xFFFE,
+		},
+		FetchedData:      0,
+		MemDest:          0,
+		DestIsMem:        false,
+		CurOpCode:        0,
+		currentInst:      nil,
+		Halted:           false,
+		Stepping:         false,
+		IntMasterEnabled: false,
+		enablingIme:      false,
+		iERegister:       0,
+		IntFlags:         0,
+	}
 }
 
-func NewCpu(cpu CpuContext) {
-	CpuCtx = cpu
-
-	GetTimerContext().div = 0xABCC
-
-	InitProcessors()
+func GetCpuContext() *CpuContext {
+	if cpuInstance == nil {
+		cpuInstance = NewCpuContext()
+	}
+	return cpuInstance
 }
 
-func fetchInstruction() {
-	CpuCtx.CurOpCode = memory.BusRead(CpuCtx.Regs.Pc)
-	CpuCtx.Regs.Pc++
-	CpuCtx.currentInst = instructionByOpcode(CpuCtx.CurOpCode)
+func (c *CpuContext) Fetch() {
+	c.CurOpCode = memory.BusRead(c.Regs.Pc)
+	c.Regs.Pc++
+	c.currentInst = instructionByOpcode(c.CurOpCode)
 }
 
-func Execute() {
-	var proc = InstGetProccessor(CpuCtx.currentInst.Type)
+func (c *CpuContext) Execute() {
+	var proc = InstGetProccessor(c.currentInst.Type)
 	if proc == nil {
 		log.Warn("No processor for this execution!")
 		return
 	}
-	proc(&CpuCtx)
+	proc(c)
 }
 
-func CpuStep() bool {
-	if !CpuCtx.Halted {
-		pc := CpuCtx.Regs.Pc
-		fetchInstruction()
-		emulator.EmuCycles(1)
+// This should probably not call the emulator
+func (c *CpuContext) Step() bool {
+
+	if !c.Halted {
+		pc := c.Regs.Pc
+		c.Fetch()
+		Cm.IncreaseCycle(1)
 		FetchData()
 
-		var z = "-"
-		var n = "-"
-		var h = "-"
-		var c = "-"
-		if (CpuCtx.Regs.F & (1 << 7)) >= 1 {
-			z = "Z"
+		var zf = "-"
+		var nf = "-"
+		var hf = "-"
+		var cf = "-"
+		if (c.Regs.F & (1 << 7)) >= 1 {
+			zf = "Z"
 		}
 
-		if CpuCtx.Regs.F&(1<<6) >= 1 {
-			n = "N"
+		if c.Regs.F&(1<<6) >= 1 {
+			nf = "N"
 		}
 
-		if CpuCtx.Regs.F&(1<<5) >= 1 {
-			h = "H"
+		if c.Regs.F&(1<<5) >= 1 {
+			cf = "H"
 		}
 
-		if CpuCtx.Regs.F&(1<<4) >= 1 {
-			c = "C"
+		if c.Regs.F&(1<<4) >= 1 {
+			cf = "C"
 		}
 
 		var inst string
-		instToStr(&CpuCtx, &inst)
-		temp := emulator.GetEmuContext().Ticks
+		instToStr(c, &inst)
 		log.Info("%08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
-			temp,
-			pc, inst, CpuCtx.CurOpCode,
-			memory.BusRead(pc+1), memory.BusRead(pc+2), CpuCtx.Regs.A, z, n, h, c, CpuCtx.Regs.B, CpuCtx.Regs.C,
-			CpuCtx.Regs.D, CpuCtx.Regs.E, CpuCtx.Regs.H, CpuCtx.Regs.L)
+			Cm.GetCycleTicks(),
+			pc, inst, c.CurOpCode,
+			memory.BusRead(pc+1), memory.BusRead(pc+2), c.Regs.A, zf, nf, hf, cf, c.Regs.B, c.Regs.C,
+			c.Regs.D, c.Regs.E, c.Regs.H, c.Regs.L)
 
-		if CpuCtx.currentInst == nil {
-			log.Warn("Unknown instruction! %02X\n", CpuCtx.CurOpCode)
+		if c.currentInst == nil {
+			log.Warn("Unknown instruction! %02X\n", c.CurOpCode)
 			os.Exit(1)
 		}
 
@@ -161,35 +176,35 @@ func CpuStep() bool {
 		if !DbgPrint() {
 			return false
 		}
-		Execute()
+		c.Execute()
 	} else {
-		emulator.EmuCycles(1)
+		Cm.IncreaseCycle(1)
 
-		if CpuCtx.IntFlags == 1 {
-			CpuCtx.Halted = false
+		if c.IntFlags == 1 {
+			c.Halted = false
 		}
 
 	}
-	if CpuCtx.IntMasterEnabled {
-		CpuHandleInterrupts(&CpuCtx)
-		CpuCtx.enablingIme = false
+	if c.IntMasterEnabled {
+		CpuHandleInterrupts(c)
+		c.enablingIme = false
 	}
-	if CpuCtx.enablingIme {
-		CpuCtx.IntMasterEnabled = true
+	if c.enablingIme {
+		c.IntMasterEnabled = true
 	}
 
 	return true
 }
 
-func CpuGetIERegister() byte {
-	return CpuCtx.IERegister
+func (c *CpuContext) getIERegister() byte {
+	return c.iERegister
 }
 
 // Interupt enable register
-func CpuSetIERegister(n byte) {
-	CpuCtx.IERegister = n
+func (c *CpuContext) setIERegister(n byte) {
+	c.iERegister = n
 }
 
-func CpuRequestInterrupt(t InterruptType) {
-	CpuCtx.IntFlags |= byte(t)
+func (c *CpuContext) requestInterrupt(t InterruptType) {
+	c.IntFlags |= byte(t)
 }

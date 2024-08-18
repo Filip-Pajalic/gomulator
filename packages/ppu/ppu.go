@@ -14,49 +14,29 @@ const (
 	XRES            = 160
 )
 
-func PpuInit() {
-	PpuCtx.CurrentFrame = 0
-	PpuCtx.LineTicks = 0
-
-	PpuCtx.Pfc.LineX = 0
-	PpuCtx.Pfc.PushedX = 0
-	PpuCtx.Pfc.FetchX = 0
-	PpuCtx.Pfc.PixelFifo.size = 0
-	PpuCtx.Pfc.PixelFifo.head = nil
-	PpuCtx.Pfc.PixelFifo.tail = nil
-	PpuCtx.Pfc.CurFetchState = FS_TILE
-
-	ui.LcdInit()
-	ui.LCDSModeSet(ui.ModeOam)
-
-	for i := range PpuCtx.OamRam {
-		PpuCtx.OamRam[i] = OamEntry{} // This initializes each OamEntry struct with zero values
-	}
-
-	PpuCtx.VideoBuffer = make([]uint32, YRES*XRES)
-
-}
-
 func PpuTick() {
 
 }
 
-var oamEntry [40]OamEntry
-
 //{f_cgb_pn: 3, f_cgb_vram_bank: 1, f_pn: 1, f_y_flip: 1,f_x_flip: 1,f_bgp: 1}
 
 /*
- Bit7   BG and Window over OBJ (0=No, 1=BG and Window colors 1-3 over the OBJ)
- Bit6   Y flip          (0=Normal, 1=Vertically mirrored)
- Bit5   X flip          (0=Normal, 1=Horizontally mirrored)
- Bit4   Palette number  **Non CGB Mode Only** (0=OBP0, 1=OBP1)
- Bit3   Tile VRAM-Bank  **CGB Mode Only**     (0=Bank 0, 1=Bank 1)
- Bit2-0 Palette number  **CGB Mode Only**     (OBP0-7)
+Bit7   BG and Window over OBJ (0=No, 1=BG and Window colors 1-3 over the OBJ)
+Bit6   Y flip          (0=Normal, 1=Vertically mirrored)
+Bit5   X flip          (0=Normal, 1=Horizontally mirrored)
+Bit4   Palette number  **Non CGB Mode Only** (0=OBP0, 1=OBP1)
+Bit3   Tile VRAM-Bank  **CGB Mode Only**     (0=Bank 0, 1=Bank 1)
+Bit2-0 Palette number  **CGB Mode Only**     (OBP0-7)
 */
-
+type PPU interface {
+	VramWrite(address uint16, value byte)
+	VramRead(address uint16) byte
+	OamWrite(address uint16, value byte)
+	OamRead(address uint16) byte
+}
 type PpuContext struct {
 	OamRam [40]OamEntry
-	Vram   [0x2000]byte
+	Vram   [8192]byte
 
 	LineSpriteCount   uint
 	Pfc               PixelFifoContext
@@ -70,15 +50,7 @@ type PpuContext struct {
 	VideoBuffer       []uint32
 }
 
-var PpuCtx = PpuContext{OamRam: oamEntry}
-
-func PpuWramWrite(address uint16, value byte) {
-	PpuCtx.Vram[address-0x8000] = value
-}
-
-func PpuWramRead(address uint16) byte {
-	return PpuCtx.Vram[address-0x8000]
-}
+var ppuInstance *PpuContext
 
 type OamLineEntry struct {
 	Entry OamEntry
@@ -133,7 +105,41 @@ type Fifo struct {
 	size uint32
 }
 
-func PpuOamWrite(address uint16, value byte) {
+func NewPpuContext() *PpuContext {
+	return &PpuContext{
+		VideoBuffer: make([]uint32, YRES*XRES),
+
+		Pfc: PixelFifoContext{
+			CurFetchState: FS_TILE,
+		},
+	}
+
+	/*	for i := range ppuContext.OamRam {
+		ppuContext.OamRam[i] = OamEntry{} // This initializes each OamEntry struct with zero values
+	}*/
+
+}
+
+func GetPPUContext() *PpuContext {
+	if ppuInstance == nil {
+
+		ui.LcdInit()
+		ui.LCDSModeSet(ui.ModeOam)
+		ppuInstance = NewPpuContext()
+	}
+	return ppuInstance
+}
+
+func (p *PpuContext) VramWrite(address uint16, value byte) {
+	p.Vram[address-0x8000] = value
+
+}
+
+func (p *PpuContext) VramRead(address uint16) byte {
+	return p.Vram[address-0x8000]
+}
+
+func (p *PpuContext) OamWrite(address uint16, value byte) {
 	if address >= 0xFE00 {
 		address -= 0xFE00
 	}
@@ -142,13 +148,20 @@ func PpuOamWrite(address uint16, value byte) {
 	fieldOffset := address % 4 // Offset within the OamEntry
 
 	// Encode the OamEntry to bytes
-	entryBytes := EncodeToBytes(PpuCtx.OamRam[entryIndex])
+	entryBytes := EncodeToBytes(p.OamRam[entryIndex])
 
 	// Update the specific byte
 	entryBytes[fieldOffset] = value
 
 	// Decode the bytes back to OamEntry
-	PpuCtx.OamRam[entryIndex] = DecodeToOamEntry(entryBytes)
+	p.OamRam[entryIndex] = DecodeToOamEntry(entryBytes)
+}
+func (p *PpuContext) OamRead(address uint16) byte {
+	if address >= 0xFE00 {
+		address -= 0xFE00
+	}
+	return EncodeToBytes(p.OamRam[address])[address]
+
 }
 
 func EncodeToBytes(entry OamEntry) []byte {
@@ -168,11 +181,4 @@ func DecodeToOamEntry(data []byte) OamEntry {
 		log.Fatal(err.Error())
 	}
 	return entry
-}
-func PpuOamRead(address uint16) byte {
-	if address >= 0xFE00 {
-		address -= 0xFE00
-	}
-	return EncodeToBytes(oamEntry[address])[address]
-
 }

@@ -1,8 +1,6 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/memory"
-	"pajalic.go.emulator/packages/ppu"
 	"time"
 
 	log "pajalic.go.emulator/packages/logger"
@@ -61,7 +59,9 @@ func (d *DMAContext) DMATick() {
 		return
 	}
 	//might be wrong
-	ppu.PpuOamWrite(uint16(d.byte), memory.BusRead((uint16(d.value)*0x100)+(uint16(d.byte))))
+
+	// NOTE FIX THIS TODO, PLEASE IMPL
+	//ppu.GetPPUContext().OamWrite(uint16(d.byte), memory.BusRead((uint16(d.value)*0x100)+(uint16(d.byte))))
 
 	d.byte++
 

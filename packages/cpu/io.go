@@ -19,7 +19,7 @@ func IoRead(address uint16) byte {
 		return ly
 	default:
 		if Between16(address, 0xFF04, 0xFF07) {
-			return TimerRead(address)
+			return timerInstance.TimerRead(address)
 		}
 		log.Warn("UNSUPPORTED bus_read(%04X)\n", address)
 		return 0
@@ -39,7 +39,7 @@ func IoWrite(address uint16, value byte) {
 		log.Info("DMA START!\n")
 	default:
 		if Between16(address, 0xFF04, 0xFF07) {
-			TimerWrite(address, value)
+			timerInstance.TimerWrite(address, value)
 		} else {
 			log.Warn("UNSUPPORTED bus_write(%04X)\n", address)
 		}

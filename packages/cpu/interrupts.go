@@ -16,7 +16,7 @@ func IntHandle(ctx *CpuContext, address uint16) {
 }
 
 func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
-	if (ctx.IntFlags&byte(it)) != 0 && (ctx.IERegister&byte(it)) != 0 {
+	if (ctx.IntFlags&byte(it)) != 0 && (ctx.iERegister&byte(it)) != 0 {
 		IntHandle(ctx, address)
 		ctx.IntFlags &= ^byte(it) // Clear the interrupt flag
 		ctx.Halted = false

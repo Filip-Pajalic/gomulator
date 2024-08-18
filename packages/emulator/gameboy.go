@@ -1,19 +1,13 @@
 package emulator
 
 import (
-	"pajalic.go.emulator/packages/input"
-	"pajalic.go.emulator/packages/memory"
-	"pajalic.go.emulator/packages/ppu"
-	"time"
-
 	"github.com/veandco/go-sdl2/sdl"
-	"pajalic.go.emulator/packages/cpu"
-	log "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/ui"
+	"pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/memory"
 )
 
-func CpuRun() {
-	cpu.CpuInit()
+/*func CpuRun() {
+	cpu.getcpucontext().cpuinit()
 	cpu.TimerInit()
 	cpu.InitInstructions()
 	ppu.PpuInit()
@@ -68,8 +62,20 @@ func Run(argc int, argv []string) int {
 
 	return 0
 
-}
+}*/
 
 func Delay(ms uint32) {
 	sdl.Delay(ms)
+}
+
+func LoadROM(romFile string) bool {
+	if !memory.CartLoad(romFile) {
+		logger.Error("Failed to load ROM file:", romFile)
+		return false
+	}
+	return true
+}
+
+func StartEmulator() {
+	GetEmulatorContext().Start()
 }

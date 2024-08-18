@@ -1,8 +1,7 @@
 package memory
 
 import (
-	"pajalic.go.emulator/packages/cpu"
-	"pajalic.go.emulator/packages/ppu"
+	"pajalic.go.emulator/packages/pubsub"
 )
 
 /*
@@ -26,40 +25,81 @@ Reads data from the cartridge, memory locations above represent what the differe
 @return byte with value read from memory
 */
 
-func BusRead(address uint16) byte {
+type Bus struct {
+	psManager *pubsub.Manager
+}
+
+func NewBus(psManager *pubsub.Manager) *Bus {
+	return &Bus{
+		psManager: psManager,
+	}
+}
+
+func (m *Bus) BusRead(address uint16) byte {
+	BusRead(address)
+
+	// Publish a memory read event
+	m.psManager.Publish(pubsub.Event{
+		Type: pubsub.MemoryReadEvent,
+		Data: address,
+	})
+
+	// Continue with existing logic
+	return 0 // Replace with actual return value
+}
+
+func (m *Bus) BusWrite(address uint16, data byte) {
+	BusWrite(address, data)
+
+	// Publish a memory write event
+	m.psManager.Publish(pubsub.Event{
+		Type: pubsub.MemoryWriteEvent,
+		Data: struct {
+			Address uint16
+			Data    byte
+		}{address, data},
+	})
+
+	// Continue with existing logic
+}
+
+func BusRead(address uint16) pubsub.EventType {
 	if address < 0x8000 {
-		return CartRead(address)
+		return pubsub.MemoryReadEvent
+		//return CartRead(address)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		return ppu.PpuWramRead(address)
+		return pubsub.PPUWramReadEvent
 	} else if address < 0xC000 {
 		//Cartridge ram //not working
-		return CartRead(address)
+		return pubsub.MemoryReadEvent
 	} else if address < 0xE000 {
 		//WRAM Working ram
-		return WramRead(address)
+		return pubsub.WramReadEvent
 	} else if address < 0xFE00 {
 		// Reserved eco ram, not used
 		return 0
 	} else if address < 0xFEA0 {
 		//Object attribute memory (OAM)
-		if cpu.DmaTransferring() {
-			return 0xFF
-		}
-		return ppu.PpuOamRead(address)
+		//TODO
+		/*		if cpu.GetDMAContext().DMATransferring() {
+				return 0xFF
+			}*/
+		return pubsub.PPUOamReadEvent
 
 	} else if address < 0xFF00 {
 		// Reserved not used
 		return 0
 	} else if address < 0xFF80 {
 		//Io registers
-		return cpu.IoRead(address)
+		return pubsub.IoReadEvent
 	} else if address == 0xFFFF {
+		//TODO
 		//CPU interupt enable register
-		return cpu.CpuGetIERegister()
+		//return CpuGetIERegister()
 	}
 
-	return HramRead(address)
+	return pubsub.HramReadEvent
 }
 
 /*
@@ -68,39 +108,49 @@ Writes data from the cartridge, memory locations above represent what the differ
 @Param byte - what to write
 */
 
-func BusWrite(address uint16, data byte) {
+func BusWrite(address uint16, data byte) pubsub.EventType {
 
 	if address < 0x8000 {
 		CartWrite(address, data)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		ppu.PpuWramWrite(address, data)
+		return pubsub.PPUWramWriteEvent
+		//ppu.PpuWramWrite(address, data)
 	} else if address < 0xC000 {
 		//EXT-RAM
-		CartWrite(address, data)
+		return pubsub.MemoryWriteEvent
+		//CartWrite(address, data)
 	} else if address < 0xE000 {
 		//WRAM
-		WramWrite(address, data)
+		return pubsub.WramWriteEvent
+		//WramWrite(address, data)
 	} else if address < 0xFE00 {
 
 		//reserved echo ram
 	} else if address < 0xFEA0 {
 		//OAM
-		if cpu.DmaTransferring() {
-			return
-		}
-		ppu.PpuOamWrite(address, data)
+		return pubsub.PPUOamWriteEvent
+		//TODO
+		/*if cpu.GetDMAContext().DMATransferring() {
+			//return
+		}*/
+		//	ppu.PpuOamWrite(address, data)
 	} else if address < 0xFF00 {
 		//unusable reserved
 	} else if address < 0xFF80 {
 		//IO Registers
-		cpu.IoWrite(address, data)
+		return pubsub.IoWriteEvent
+		//cpu.IoWrite(address, data)
 	} else if address == 0xFFFF {
 		//CPU SET ENABLE REGISTER
-		cpu.CpuSetIERegister(data)
+		//TODO
+		//CpuSetIERegister(data)
 	} else {
-		HramWrite(address, data)
+		return pubsub.HramWriteEvent
+		//HramWrite(address, data)
 	}
+	//TODO
+	return 0
 
 }
 

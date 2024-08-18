@@ -6,7 +6,6 @@ import (
 	"pajalic.go.emulator/packages/input"
 	log "pajalic.go.emulator/packages/logger"
 	emu "pajalic.go.emulator/packages/memory"
-	"pajalic.go.emulator/packages/ppu"
 	"unsafe"
 )
 
@@ -197,19 +196,19 @@ func UiUpdate() {
 	rc.Y = 0
 	rc.W = 2048
 	rc.H = 2048
+	//TODO temporary to compile
+	//videoBuffer := ppu.PpuCtx.VideoBuffer
 
-	videoBuffer := ppu.PpuCtx.VideoBuffer
-
-	for lineNum := 0; lineNum < ppu.YRES; lineNum++ {
+	/*	for lineNum := 0; lineNum < ppu.YRES; lineNum++ {
 		for x := 0; x < ppu.XRES; x++ {
 			rc.X = int32(x * scale)
 			rc.Y = int32(lineNum * scale)
 			rc.W = int32(scale)
 			rc.H = int32(scale)
-
-			screen.FillRect(&rc, videoBuffer[x+(lineNum*ppu.XRES)])
+			//TODO
+			//screen.FillRect(&rc, videoBuffer[x+(lineNum*ppu.XRES)])
 		}
-	}
+	}*/
 
 	// Update SDL texture with updated screen pixels
 	pixels := screen.Pixels()

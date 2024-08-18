@@ -1,7 +1,6 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/emulator"
 	log "pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/memory"
 )
@@ -18,27 +17,27 @@ R8	- means 8-bit signed data, which are added to program counter
 */
 
 func FetchData() {
-	CpuCtx.MemDest = 0
-	CpuCtx.DestIsMem = false
+	cpuInstance.MemDest = 0
+	cpuInstance.DestIsMem = false
 
-	if CpuCtx.currentInst == nil {
+	if cpuInstance.currentInst == nil {
 		return
 	}
 
-	switch CpuCtx.currentInst.Mode {
+	switch cpuInstance.currentInst.Mode {
 	case AM_IMP:
 		return
 	case AM_R:
-		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg1)
+		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg1)
 		return
 	//Problem on 2D , fetched data is 57339 instead of 2
 	case AM_R_R:
-		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
+		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2)
 		return
 	case AM_R_D8:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		CpuCtx.Regs.Pc++
+		cpuInstance.FetchedData = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		cpuInstance.Regs.Pc++
 		return
 	case AM_R_D16, AM_D16:
 		/*
@@ -49,15 +48,15 @@ func FetchData() {
 				lo | hi = 000001101010000
 
 		*/
-		var lo = uint16(memory.BusRead(CpuCtx.Regs.Pc))
+		var lo = uint16(memory.BusRead(cpuInstance.Regs.Pc))
 
-		emulator.EmuCycles(1)
-		var hi = uint16(memory.BusRead(CpuCtx.Regs.Pc + 1))
+		Cm.IncreaseCycle(1)
+		var hi = uint16(memory.BusRead(cpuInstance.Regs.Pc + 1))
 
-		emulator.EmuCycles(1)
-		CpuCtx.FetchedData = lo | (hi << 8)
+		Cm.IncreaseCycle(1)
+		cpuInstance.FetchedData = lo | (hi << 8)
 
-		CpuCtx.Regs.Pc += 2
+		cpuInstance.Regs.Pc += 2
 		return
 
 	/*
@@ -65,119 +64,119 @@ func FetchData() {
 		LD  REG1 REG2
 	*/
 	case AM_MR_R:
-		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
-		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
-		CpuCtx.DestIsMem = true
+		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2)
+		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
+		cpuInstance.DestIsMem = true
 		/*
 			opcode = read(PC++)
 			if opcode == 0xE2: //RT_C?
 			write(unsigned_16(lsb=C, msb=0xFF), A)
 		*/
-		if CpuCtx.currentInst.Reg1 == RT_C {
-			CpuCtx.MemDest |= 0xFF00
+		if cpuInstance.currentInst.Reg1 == RT_C {
+			cpuInstance.MemDest |= 0xFF00
 		}
 
 		return
 
 	case AM_R_MR:
-		addr := CpuRegRead(CpuCtx.currentInst.Reg2)
+		addr := CpuRegRead(cpuInstance.currentInst.Reg2)
 
-		if CpuCtx.currentInst.Reg2 == RT_C {
+		if cpuInstance.currentInst.Reg2 == RT_C {
 			addr |= 0xFF00
 		}
 
-		CpuCtx.FetchedData = uint16(memory.BusRead(addr))
-		emulator.EmuCycles(1)
+		cpuInstance.FetchedData = uint16(memory.BusRead(addr))
+		Cm.IncreaseCycle(1)
 		return
 	case AM_R_HLI:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuRegRead(CpuCtx.currentInst.Reg2)))
-		emulator.EmuCycles(1)
+		cpuInstance.FetchedData = uint16(memory.BusRead(CpuRegRead(cpuInstance.currentInst.Reg2)))
+		Cm.IncreaseCycle(1)
 		CpuSetReg(RT_HL, CpuRegRead(RT_HL)+1)
 		return
 
 	case AM_R_HLD:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuRegRead(CpuCtx.currentInst.Reg2)))
-		emulator.EmuCycles(1)
+		cpuInstance.FetchedData = uint16(memory.BusRead(CpuRegRead(cpuInstance.currentInst.Reg2)))
+		Cm.IncreaseCycle(1)
 		CpuSetReg(RT_HL, CpuRegRead(RT_HL)-1)
 		return
 
 	case AM_HLI_R:
-		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
-		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
-		CpuCtx.DestIsMem = true
+		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2)
+		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
+		cpuInstance.DestIsMem = true
 		CpuSetReg(RT_HL, CpuRegRead(RT_HL)+1)
 		return
 
 	case AM_HLD_R:
-		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
-		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
-		CpuCtx.DestIsMem = true
+		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2)
+		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
+		cpuInstance.DestIsMem = true
 		CpuSetReg(RT_HL, CpuRegRead(RT_HL)-1)
 		return
 
 	case AM_R_A8:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		CpuCtx.Regs.Pc++
+		cpuInstance.FetchedData = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		cpuInstance.Regs.Pc++
 		return
 
 	case AM_A8_R:
-		CpuCtx.MemDest = uint16(memory.BusRead(CpuCtx.Regs.Pc)) | 0xFF00
-		CpuCtx.DestIsMem = true
-		emulator.EmuCycles(1)
-		CpuCtx.Regs.Pc++
+		cpuInstance.MemDest = uint16(memory.BusRead(cpuInstance.Regs.Pc)) | 0xFF00
+		cpuInstance.DestIsMem = true
+		Cm.IncreaseCycle(1)
+		cpuInstance.Regs.Pc++
 		return
 
 	case AM_HL_SPR:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		CpuCtx.Regs.Pc++
+		cpuInstance.FetchedData = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		cpuInstance.Regs.Pc++
 		return
 
 	case AM_D8:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		CpuCtx.Regs.Pc++
+		cpuInstance.FetchedData = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		cpuInstance.Regs.Pc++
 		return
 
 	case AM_A16_R, AM_D16_R:
-		var lo = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		var hi = uint16(memory.BusRead(CpuCtx.Regs.Pc + 1))
-		emulator.EmuCycles(1)
-		CpuCtx.MemDest = lo | (hi << 8)
-		CpuCtx.DestIsMem = true
-		CpuCtx.Regs.Pc += 2
-		CpuCtx.FetchedData = CpuRegRead(CpuCtx.currentInst.Reg2)
+		var lo = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		var hi = uint16(memory.BusRead(cpuInstance.Regs.Pc + 1))
+		Cm.IncreaseCycle(1)
+		cpuInstance.MemDest = lo | (hi << 8)
+		cpuInstance.DestIsMem = true
+		cpuInstance.Regs.Pc += 2
+		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2)
 		return
 
 	case AM_MR_D8:
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		CpuCtx.Regs.Pc++
-		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
-		CpuCtx.DestIsMem = true
+		cpuInstance.FetchedData = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		cpuInstance.Regs.Pc++
+		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
+		cpuInstance.DestIsMem = true
 		return
 
 	case AM_MR:
-		CpuCtx.MemDest = CpuRegRead(CpuCtx.currentInst.Reg1)
-		CpuCtx.DestIsMem = true
-		CpuCtx.FetchedData = uint16(memory.BusRead(CpuRegRead(CpuCtx.currentInst.Reg1)))
-		emulator.EmuCycles(1)
+		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
+		cpuInstance.DestIsMem = true
+		cpuInstance.FetchedData = uint16(memory.BusRead(CpuRegRead(cpuInstance.currentInst.Reg1)))
+		Cm.IncreaseCycle(1)
 		return
 
 	case AM_R_A16:
-		var lo = uint16(memory.BusRead(CpuCtx.Regs.Pc))
-		emulator.EmuCycles(1)
-		var hi = uint16(memory.BusRead(CpuCtx.Regs.Pc + 1))
-		emulator.EmuCycles(1)
+		var lo = uint16(memory.BusRead(cpuInstance.Regs.Pc))
+		Cm.IncreaseCycle(1)
+		var hi = uint16(memory.BusRead(cpuInstance.Regs.Pc + 1))
+		Cm.IncreaseCycle(1)
 		var addr = lo | (hi << 8)
-		CpuCtx.Regs.Pc += 2
-		CpuCtx.FetchedData = uint16(memory.BusRead(addr))
-		emulator.EmuCycles(1)
+		cpuInstance.Regs.Pc += 2
+		cpuInstance.FetchedData = uint16(memory.BusRead(addr))
+		Cm.IncreaseCycle(1)
 		return
 	default:
-		log.Warn("Unknown Addressing Mode! %d (%02X)\n", CpuCtx.currentInst.Mode, CpuCtx.CurOpCode)
+		log.Warn("Unknown Addressing Mode! %d (%02X)\n", cpuInstance.currentInst.Mode, cpuInstance.CurOpCode)
 		//os.Exit(1)
 		return
 	}
