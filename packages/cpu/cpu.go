@@ -116,6 +116,7 @@ func GetCpuContext() *CpuContext {
 }
 
 func (c *CpuContext) Fetch() {
+	pubsub
 	c.CurOpCode = memory.BusRead(c.Regs.Pc)
 	c.Regs.Pc++
 	c.currentInst = instructionByOpcode(c.CurOpCode)

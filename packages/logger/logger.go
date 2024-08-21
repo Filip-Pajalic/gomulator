@@ -1,41 +1,37 @@
 package logger
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
-	log *logrus.Logger
+	log *slog.Logger
 )
 
 func init() {
-
-	log = logrus.New()
-
-	log.Out = os.Stdout
-	log.Formatter = &logrus.TextFormatter{
-		DisableTimestamp: true,
+	opts := &slog.HandlerOptions{
+		Level: slog.LevelDebug,
 	}
-	log.Level = logrus.DebugLevel
+	handler := slog.NewTextHandler(os.Stdout, opts)
+	log = slog.New(handler)
+
 }
 
-// Info ...
 func Info(format string, v ...interface{}) {
-	log.Infof(format, v...)
+	log.Info(fmt.Sprintf(format, v...))
 }
 
-// Warn ...
 func Warn(format string, v ...interface{}) {
-	log.Warnf(format, v...)
+	log.Warn(fmt.Sprintf(format, v...))
 }
 
-// Error ...
 func Error(format string, v ...interface{}) {
-	log.Errorf(format, v...)
+	log.Error(fmt.Sprintf(format, v...))
 }
 
 func Fatal(format string, v ...interface{}) {
-	log.Fatalf(format, v...)
+	log.Error(fmt.Sprintf(format, v...))
+	os.Exit(1)
 }
