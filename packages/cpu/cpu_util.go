@@ -2,7 +2,7 @@ package cpu
 
 import (
 	log "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/pubsub"
 )
 
 func CpuFlagZ() bool {
@@ -135,7 +135,7 @@ func CpuRegRead8(rt regTypes) byte {
 	case RT_L:
 		return cpuInstance.Regs.L
 	case RT_HL:
-		return memory.BusRead(CpuRegRead(RT_HL))
+		return pubsub.BusCtx().BusRead(CpuRegRead(RT_HL))
 	default:
 		log.Fatal("**ERR INVALID REG8: %d\n", rt)
 
@@ -170,7 +170,7 @@ func CpuSetReg8(rt regTypes, val byte) {
 		cpuInstance.Regs.L = val & 0xFF
 		return
 	case RT_HL:
-		memory.BusWrite(CpuRegRead(RT_HL), val)
+		pubsub.BusCtx().BusWrite(CpuRegRead(RT_HL), val)
 		return
 	default:
 		log.Fatal("**ERR INVALID REG8: %d\n", rt)

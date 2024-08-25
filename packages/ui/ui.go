@@ -5,7 +5,6 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 	"pajalic.go.emulator/packages/input"
 	log "pajalic.go.emulator/packages/logger"
-	emu "pajalic.go.emulator/packages/memory"
 	"unsafe"
 )
 
@@ -112,8 +111,10 @@ func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x i
 	var rc sdl.Rect
 
 	for tileY := int32(0); tileY < 16; tileY += 2 {
-		var b1 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY))
-		var b2 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY) + 1)
+		//var b1 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY))
+		//var b2 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY) + 1)
+
+		b1, b2 := 0, 0
 
 		for bit := int32(7); bit >= 0; bit-- {
 			var b1bit byte = 0

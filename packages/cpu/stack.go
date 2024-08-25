@@ -1,10 +1,12 @@
 package cpu
 
-import "pajalic.go.emulator/packages/memory"
+import (
+	"pajalic.go.emulator/packages/pubsub"
+)
 
 func StackPush(data byte) {
 	CpuGetRegs().Sp--
-	memory.BusWrite(CpuGetRegs().Sp, data)
+	pubsub.BusCtx().BusWrite(CpuGetRegs().Sp, data)
 
 }
 
@@ -16,7 +18,7 @@ func StackPush16(data uint16) {
 }
 
 func StackPop() byte {
-	result := memory.BusRead(CpuGetRegs().Sp)
+	result := pubsub.BusCtx().BusRead(CpuGetRegs().Sp)
 	CpuGetRegs().Sp++
 	return result
 }

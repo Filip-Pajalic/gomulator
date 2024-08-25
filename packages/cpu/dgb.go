@@ -1,7 +1,7 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/pubsub"
 	"strings"
 
 	log "pajalic.go.emulator/packages/logger"
@@ -11,13 +11,13 @@ var dbgMsg [1024]byte
 var msgSize = 0
 
 func DbgUpdate() {
-	if memory.BusRead(0xFF02) == 0x81 {
-		var c = memory.BusRead(0xFF01)
+	if pubsub.BusCtx().BusRead(0xFF02) == 0x81 {
+		var c = pubsub.BusCtx().BusRead(0xFF01)
 
 		dbgMsg[msgSize] = c
 		msgSize++
 
-		memory.BusWrite(0xFF02, 0)
+		pubsub.BusCtx().BusWrite(0xFF02, 0)
 	}
 }
 

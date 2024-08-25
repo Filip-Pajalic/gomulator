@@ -3,7 +3,7 @@ package cpu
 import (
 	"os"
 	log "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/pubsub"
 )
 
 /*
@@ -40,8 +40,12 @@ type CPU interface {
 	Execute()
 	setIERegister(b byte)
 	getIERegister() byte
-	requestInterrupt(t InterruptType)
 }
+
+type ExternalPins interface {
+	RequestInterrupt(t InterruptType)
+}
+
 type CpuRegisters struct {
 	A  byte
 	F  byte
@@ -78,7 +82,7 @@ var cpuInstance *CpuContext
 
 func NewCpuContext() *CpuContext {
 
-	GetTimerContext().div = 0xABCC
+	//GetTimerContext().div = 0xABCC TODO
 
 	InitProcessors()
 	return &CpuContext{
@@ -108,7 +112,7 @@ func NewCpuContext() *CpuContext {
 	}
 }
 
-func GetCpuContext() *CpuContext {
+func CpuCtx() *CpuContext {
 	if cpuInstance == nil {
 		cpuInstance = NewCpuContext()
 	}
@@ -116,8 +120,8 @@ func GetCpuContext() *CpuContext {
 }
 
 func (c *CpuContext) Fetch() {
-	pubsub
-	c.CurOpCode = memory.BusRead(c.Regs.Pc)
+	//pubsub.GetPubSubManager().Subscribe(pubsub.PPUWramReadEvent)
+	c.CurOpCode = pubsub.BusCtx().BusRead(c.Regs.Pc)
 	c.Regs.Pc++
 	c.currentInst = instructionByOpcode(c.CurOpCode)
 }
@@ -133,7 +137,7 @@ func (c *CpuContext) Execute() {
 
 // This should probably not call the emulator
 func (c *CpuContext) Step() bool {
-
+	log.Info("HERE")
 	if !c.Halted {
 		pc := c.Regs.Pc
 		c.Fetch()
@@ -165,7 +169,7 @@ func (c *CpuContext) Step() bool {
 		log.Info("%08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
 			Cm.GetCycleTicks(),
 			pc, inst, c.CurOpCode,
-			memory.BusRead(pc+1), memory.BusRead(pc+2), c.Regs.A, zf, nf, hf, cf, c.Regs.B, c.Regs.C,
+			pubsub.BusCtx().BusRead(pc+1), pubsub.BusCtx().BusRead(pc+2), c.Regs.A, zf, nf, hf, cf, c.Regs.B, c.Regs.C,
 			c.Regs.D, c.Regs.E, c.Regs.H, c.Regs.L)
 
 		if c.currentInst == nil {
@@ -173,11 +177,11 @@ func (c *CpuContext) Step() bool {
 			os.Exit(1)
 		}
 
-		DbgUpdate()
-		if !DbgPrint() {
-			return false
-		}
-		c.Execute()
+		//DbgUpdate()
+		/*	if !DbgPrint() {
+				return false
+			}
+		*/c.Execute()
 	} else {
 		Cm.IncreaseCycle(1)
 
@@ -206,6 +210,6 @@ func (c *CpuContext) setIERegister(n byte) {
 	c.iERegister = n
 }
 
-func (c *CpuContext) requestInterrupt(t InterruptType) {
+func (c *CpuContext) RequestInterrupt(t InterruptType) {
 	c.IntFlags |= byte(t)
 }

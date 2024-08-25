@@ -1,8 +1,10 @@
 package emulator
 
 import (
+	"github.com/veandco/go-sdl2/sdl"
 	"pajalic.go.emulator/packages/cpu"
 	"pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/memory"
 	"pajalic.go.emulator/packages/ppu"
 	"time"
 )
@@ -24,11 +26,13 @@ type EmuContext struct {
 	cpuCtx  cpu.CPU
 	ppuCtx  ppu.PPU
 	dmaCtx  cpu.DMA
+	cartCtx memory.Cartridge
 }
 
-var instance *EmuContext
+var emuInstance *EmuContext
 
-func NewEmuContext(cpuCtx cpu.CPU, ppuCtx ppu.PPU, dmaCtx cpu.DMA) *EmuContext {
+func newEmuContext(cpuCtx cpu.CPU, ppuCtx ppu.PPU, dmaCtx cpu.DMA, cartCtx memory.Cartridge) *EmuContext {
+
 	return &EmuContext{
 		Paused:  false,
 		Running: false,
@@ -37,39 +41,23 @@ func NewEmuContext(cpuCtx cpu.CPU, ppuCtx ppu.PPU, dmaCtx cpu.DMA) *EmuContext {
 		cpuCtx:  cpuCtx,
 		ppuCtx:  ppuCtx,
 		dmaCtx:  dmaCtx,
+		cartCtx: cartCtx,
 	}
-}
-
-func GetEmulatorContext() *EmuContext {
-	if instance == nil {
-		cpuContext := cpu.GetCpuContext()
-		ppuContext := ppu.GetPPUContext()
-		dmaContext := cpu.GetDMAContext()
-		instance = NewEmuContext(cpuContext, ppuContext, dmaContext)
-	}
-	return instance
-}
-
-func (e *EmuContext) Initialize() {
-	//e.cpu.InitializeTimer()
-	//e.cpu.LoadInstructions()
-	//e.ppu.Initialize()
-	//input.InitializeGamePad()
 }
 
 func (e *EmuContext) Start() {
-	e.Initialize()
-
 	e.Running = true
+
 	e.Paused = false
 	e.Ticks = 0
 
-	go e.runCPULoop()
+	e.runCPULoop()
 	//e.runUI()
 }
 
 func (e *EmuContext) runCPULoop() {
 	for e.Running {
+
 		if e.Paused {
 			DelayExecution(10)
 			continue
@@ -105,4 +93,29 @@ func (e *EmuContext) runui() {
 
 func DelayExecution(ms uint32) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)
+}
+
+func Delay(ms uint32) {
+	sdl.Delay(ms)
+}
+
+func (e *EmuContext) LoadROM(romFile string) bool {
+
+	if !e.cartCtx.CartLoad(romFile) {
+		logger.Error("Failed to load ROM file:", romFile)
+		return false
+	}
+	return true
+}
+
+func StartEmulator(romFile string) {
+	cpuContext := cpu.CpuCtx()
+	ppuContext := ppu.PpuCtx()
+	dmaContext := cpu.GetDMAContext()
+	cartContext := memory.CartCtx()
+	emuInstance = newEmuContext(cpuContext, ppuContext, dmaContext, cartContext)
+	emuInstance.LoadROM(romFile)
+	memory.SubscribeLoop()
+	emuInstance.Start()
+
 }

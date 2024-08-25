@@ -6,13 +6,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"pajalic.go.emulator/packages/pubsub"
 	"strconv"
 	"unsafe"
 
 	log "pajalic.go.emulator/packages/logger"
 )
 
-type cartContext struct {
+type Cartridge interface {
+	CartRead(address uint16) byte
+	CartWrite(address uint16, data byte)
+	CartLoad(cart string) bool
+}
+
+type CartContext struct {
 	filename [1024]byte
 	romSize  uint32
 	romData  []byte
@@ -137,30 +144,37 @@ var LIC_CODE = map[int][]byte{
 	0xA4: []byte("Konami (Yu-Gi-Oh!)"),
 }
 
-var cartctx cartContext
+var cartInstance *CartContext
+
+func CartCtx() *CartContext {
+	if cartInstance == nil {
+		cartInstance = &CartContext{}
+	}
+	return cartInstance
+}
 
 const headerOffset = 0x100
 
-func cartLicName() []byte {
+func (c *CartContext) cartLicName() []byte {
 
-	if cartctx.header.CartType <= 0xA4 {
-		return LIC_CODE[int(cartctx.header.LicCode)]
+	if c.header.CartType <= 0xA4 {
+		return LIC_CODE[int(c.header.LicCode)]
 	}
 
 	return nil
 }
 
-func cartTypeName() []byte {
-	if cartctx.header.CartType <= 0x22 {
-		return ROM_TYPES[cartctx.header.CartType]
+func (c *CartContext) cartTypeName() []byte {
+	if c.header.CartType <= 0x22 {
+		return ROM_TYPES[c.header.CartType]
 	}
 	return nil
 }
 
-func checkSumChecker(checksum byte) string {
+func (c *CartContext) checkSumChecker(checksum byte) string {
 	var x uint16 = 0
 	for i := uint16(0x134); i <= 0x14C; i++ {
-		x = x - uint16(cartctx.romData[i]) - 1
+		x = x - uint16(c.romData[i]) - 1
 	}
 	var result string
 
@@ -173,7 +187,7 @@ func checkSumChecker(checksum byte) string {
 	return result
 }
 
-func readNextBytes(file *os.File, number int, offset int64) []byte {
+func (c *CartContext) readNextBytes(file *os.File, number int, offset int64) []byte {
 	bbytes := make([]byte, number)
 
 	_, err := file.ReadAt(bbytes, offset)
@@ -183,7 +197,7 @@ func readNextBytes(file *os.File, number int, offset int64) []byte {
 	return bbytes
 }
 
-func loadCart(romName string) {
+func (c *CartContext) loadCart(romName string) {
 
 	fi, err := os.Open(romName)
 	if err != nil {
@@ -204,21 +218,21 @@ func loadCart(romName string) {
 	}
 
 	emptyMemory := make([]uint8, cap(memory)-len(memory)) // Make sure that we have a full 64KB of memory
-	cartctx.romData = append(memory, emptyMemory...)
+	c.romData = append(memory, emptyMemory...)
 
 }
 
 // For non cart loading, should abstract this more
-func ProgramLoad(program [][2]uint) {
+func (c *CartContext) ProgramLoad(program [][2]uint) {
 	memory := make([]uint8, 0, 65536)
 
 	//byteSlice := make([]byte, len(program))
 	emptyMemory := make([]uint8, cap(memory)-len(memory)) // Make sure that we have a full 64KB of memory
-	cartctx.romData = append(memory, emptyMemory...)
+	c.romData = append(memory, emptyMemory...)
 
 	for _, v := range program {
 		log.Info(strconv.Itoa(int(v[0])))
-		BusWrite(uint16(v[0]), byte(v[1]))
+		pubsub.BusCtx().BusWrite(uint16(v[0]), byte(v[1]))
 		//emptyMemory[v[0]] = uint8(v[1])
 
 	}
@@ -227,23 +241,23 @@ func ProgramLoad(program [][2]uint) {
 
 }
 
-func CartLoad(cart string) bool {
-	copy(cartctx.filename[:], fmt.Sprintf("%s", cart))
-	loadCart(cart)
+func (c *CartContext) CartLoad(cart string) bool {
+	copy(c.filename[:], fmt.Sprintf("%s", cart))
+	c.loadCart(cart)
 	file, err := os.Open(cart)
 	if err != nil {
 		log.Fatal("Error while opening file", err)
 	}
 	defer file.Close()
-	log.Info("Opened: %s\n", cartctx.filename)
+	log.Info("Opened: %s\n", c.filename)
 
 	fi, err := file.Stat()
 	if err != nil {
 		log.Error(err.Error())
 	}
-	cartctx.romSize = uint32(fi.Size())
+	c.romSize = uint32(fi.Size())
 
-	romData := make([]uint8, 0, cartctx.romSize)
+	romData := make([]uint8, 0, c.romSize)
 	buf := make([]byte, 1024)
 	currentData, e := file.Read(buf)
 	for e != io.EOF {
@@ -253,42 +267,103 @@ func CartLoad(cart string) bool {
 	}
 
 	emptyMemory := make([]uint8, cap(romData)-len(romData))
-	cartctx.romData = append(romData, emptyMemory...)
+	c.romData = append(romData, emptyMemory...)
 
 	rh := romHeader{}
 
-	data := readNextBytes(file, int(unsafe.Sizeof(rh)), headerOffset)
+	data := c.readNextBytes(file, int(unsafe.Sizeof(rh)), headerOffset)
 
 	buffer := bytes.NewBuffer(data)
 	err = binary.Read(buffer, binary.LittleEndian, &rh)
 	if err != nil {
 		log.Fatal("binary.Read failed", err)
 	}
-	cartctx.header = &rh
-	cartctx.header.Title[15] = 0
+	c.header = &rh
+	c.header.Title[15] = 0
 	log.Info("Cartridge Loaded:")
-	log.Info("Title    : %s", string(cartctx.header.Title[:]))
-	log.Info("Type     : %2.2X (%s)", cartctx.header.CartType, cartTypeName())
-	log.Info("ROM Size : %d KB", 32<<cartctx.header.RomSize)
-	log.Info("RAM Size : %2.2X", cartctx.header.RamSize)
-	log.Info("LIC Code : %2.2X (%s)", cartctx.header.LicCode, cartLicName())
-	log.Info("ROM Vers : %2.2X", cartctx.header.Version)
+	log.Info("Title    : %s", string(c.header.Title[:]))
+	log.Info("Type     : %2.2X (%s)", c.header.CartType, c.cartTypeName())
+	log.Info("ROM Size : %d KB", 32<<c.header.RomSize)
+	log.Info("RAM Size : %2.2X", c.header.RamSize)
+	log.Info("LIC Code : %2.2X (%s)", c.header.LicCode, c.cartLicName())
+	log.Info("ROM Vers : %2.2X", c.header.Version)
 
 	log.Info(
 		"Checksum : %2.2X (%s)",
-		cartctx.header.Checksum,
-		checkSumChecker(cartctx.header.Checksum),
+		c.header.Checksum,
+		c.checkSumChecker(c.header.Checksum),
 	)
-	loadCart(cart)
+	c.loadCart(cart)
 	return true
 }
 
-func CartWrite(address uint16, data byte) {
+func SubscribeLoop() {
+	manager := pubsub.GetPubSubManager()
 
-	cartctx.romData[address] = data
+	// Subscribe to CartReadEvent and CartWriteEvent
+	readCh := manager.Subscribe(pubsub.Event{
+		Type:         pubsub.MemoryReadEvent,
+		ExchangeType: pubsub.Request,
+	})
+	//writeCh := manager.Subscribe(pubsub.MemoryWriteEvent)
+
+	// Start a goroutine to listen for events
+	go func() {
+		for {
+			select {
+			case readEvent := <-readCh:
+				// Handle the CartRead event
+				eventdata := readEvent.Data
+				log.Info("data", eventdata)
+				//Try to cast here otherwise cast 16BIt
+				address := readEvent.Data().(pubsub.Read8BitData).Address
+				data := CartCtx().CartRead(address)
+				readData := pubsub.Read8BitData{Address: address, Data: data}
+				//I think I want some abstraction for this to not export everything
+				responseEvent := pubsub.ReadEvent[pubsub.Read8BitData]{EventType: pubsub.Event{
+					Type:         pubsub.MemoryReadEvent,
+					ExchangeType: pubsub.Response,
+				}, EventData: readData}
+
+				manager.Publish(responseEvent)
+				/*eventData := eventdata.(struct {
+					Address uint16
+				})
+				address := eventData.Address
+				data := CartCtx().CartRead(address)
+
+				// Publish the read data back
+				manager.Publish(pubsub.EventChannel{
+					Type: pubsub.MemoryReadEvent,
+					Data: data,
+				})*/
+				//case writeEvent := <-writeCh:
+				//log.Info(writeEvent.Event().Type)
+				// Handle the CartWrite event
+				/*eventdata := writeEvent.Data
+				log.Info("data write %x", eventdata)
+				eventData := eventdata.(struct {
+					Address uint16
+					Data    byte
+				})
+				CartCtx().CartWrite(eventData.Address, eventData.Data)
+
+				// Optionally publish an acknowledgment or result of the write operation
+				manager.Publish(pubsub.EventChannel{
+					Type: pubsub.MemoryWriteEvent,
+					Data: nil, // No specific data to return, but could return success/failure
+				})*/
+			}
+		}
+	}()
+}
+
+func (c *CartContext) CartWrite(address uint16, data byte) {
+
+	c.romData[address] = data
 
 }
 
-func CartRead(address uint16) byte {
-	return cartctx.romData[address]
+func (c *CartContext) CartRead(address uint16) byte {
+	return c.romData[address]
 }

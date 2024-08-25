@@ -61,7 +61,7 @@ func (d *DMAContext) DMATick() {
 	//might be wrong
 
 	// NOTE FIX THIS TODO, PLEASE IMPL
-	//ppu.GetPPUContext().OamWrite(uint16(d.byte), memory.BusRead((uint16(d.value)*0x100)+(uint16(d.byte))))
+	//ppu.GetPPUContext().OamWrite(uint16(d.byte), memory.BusCtx().BusRead((uint16(d.value)*0x100)+(uint16(d.byte))))
 
 	d.byte++
 

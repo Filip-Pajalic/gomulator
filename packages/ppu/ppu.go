@@ -3,6 +3,7 @@ package ppu
 import (
 	"bytes"
 	"encoding/binary"
+	"pajalic.go.emulator/packages/cpu"
 	log "pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/ui"
 )
@@ -48,6 +49,7 @@ type PpuContext struct {
 	CurrentFrame      uint32
 	LineTicks         uint32
 	VideoBuffer       []uint32
+	externalPins      cpu.ExternalPins
 }
 
 var ppuInstance *PpuContext
@@ -105,9 +107,10 @@ type Fifo struct {
 	size uint32
 }
 
-func NewPpuContext() *PpuContext {
+func NewPpuContext(externalPins cpu.ExternalPins) *PpuContext {
 	return &PpuContext{
-		VideoBuffer: make([]uint32, YRES*XRES),
+		VideoBuffer:  make([]uint32, YRES*XRES),
+		externalPins: externalPins,
 
 		Pfc: PixelFifoContext{
 			CurFetchState: FS_TILE,
@@ -120,12 +123,12 @@ func NewPpuContext() *PpuContext {
 
 }
 
-func GetPPUContext() *PpuContext {
+func PpuCtx() *PpuContext {
 	if ppuInstance == nil {
 
 		ui.LcdInit()
 		ui.LCDSModeSet(ui.ModeOam)
-		ppuInstance = NewPpuContext()
+		ppuInstance = NewPpuContext(cpu.CpuCtx())
 	}
 	return ppuInstance
 }

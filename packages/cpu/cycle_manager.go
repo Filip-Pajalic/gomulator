@@ -4,7 +4,7 @@ type CycleManager struct {
 	ticks int32
 }
 
-var Cm *CycleManager
+var Cm = &CycleManager{}
 
 func (c *CycleManager) IncreaseCycle(tickAmount int32) {
 	c.ticks += tickAmount

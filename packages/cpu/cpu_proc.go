@@ -2,7 +2,7 @@ package cpu
 
 import (
 	"log"
-	"pajalic.go.emulator/packages/memory"
+	"pajalic.go.emulator/packages/pubsub"
 )
 
 func procNone(ctx *CpuContext) {
@@ -40,9 +40,9 @@ func procLd(ctx *CpuContext) {
 		if is16bit(ctx.currentInst.Reg2) {
 			//if 16 bit register...
 			Cm.IncreaseCycle(1)
-			memory.BusWrite16(ctx.MemDest, ctx.FetchedData)
+			pubsub.BusCtx().BusWrite16(ctx.MemDest, ctx.FetchedData)
 		} else {
-			memory.BusWrite(ctx.MemDest, byte(ctx.FetchedData))
+			pubsub.BusCtx().BusWrite(ctx.MemDest, byte(ctx.FetchedData))
 		}
 		Cm.IncreaseCycle(1)
 		return
@@ -496,9 +496,9 @@ func procReti(ctx *CpuContext) {
 func procLdh(ctx *CpuContext) {
 	//is CpuSetReg correct here
 	if ctx.currentInst.Reg1 == RT_A {
-		CpuSetReg(ctx.currentInst.Reg1, uint16(memory.BusRead(0xFF00|ctx.FetchedData)))
+		CpuSetReg(ctx.currentInst.Reg1, uint16(pubsub.BusCtx().BusRead(0xFF00|ctx.FetchedData)))
 	} else {
-		memory.BusWrite(ctx.MemDest, ctx.Regs.A)
+		pubsub.BusCtx().BusWrite(ctx.MemDest, ctx.Regs.A)
 	}
 	Cm.IncreaseCycle(1)
 }
@@ -511,9 +511,9 @@ func procInc(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
-		val = uint16(memory.BusRead(CpuRegRead(RT_HL))) + 1
+		val = uint16(pubsub.BusCtx().BusRead(CpuRegRead(RT_HL))) + 1
 		val &= 0xFF
-		memory.BusWrite(CpuRegRead(RT_HL), byte(val))
+		pubsub.BusCtx().BusWrite(CpuRegRead(RT_HL), byte(val))
 	} else {
 		CpuSetReg(ctx.currentInst.Reg1, val)
 		val = CpuRegRead(ctx.currentInst.Reg1)
@@ -536,8 +536,8 @@ func procDec(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
-		val = uint16(memory.BusRead(CpuRegRead(RT_HL)) - 1)
-		memory.BusWrite(CpuRegRead(RT_HL), byte(val))
+		val = uint16(pubsub.BusCtx().BusRead(CpuRegRead(RT_HL)) - 1)
+		pubsub.BusCtx().BusWrite(CpuRegRead(RT_HL), byte(val))
 	} else {
 		CpuSetReg(ctx.currentInst.Reg1, val)
 		val = CpuRegRead(ctx.currentInst.Reg1)

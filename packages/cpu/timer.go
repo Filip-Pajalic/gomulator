@@ -45,7 +45,7 @@ func (t *TimerContext) Tick() {
 		t.tima++
 		if t.tima == 0 {
 			t.tima = t.tma
-			//CpuRequestInterrupt(IT_TIMER)
+			CpuCtx().RequestInterrupt(IT_TIMER)
 		}
 	}
 }

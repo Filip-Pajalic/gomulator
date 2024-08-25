@@ -1,34 +1,10 @@
 package emulator
 
-import (
-	"github.com/veandco/go-sdl2/sdl"
-	"pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
-)
-
 /*func CpuRun() {
-	cpu.getcpucontext().cpuinit()
-	cpu.TimerInit()
-	cpu.InitInstructions()
-	ppu.PpuInit()
-	input.GamePadInit()
-	ppu.PpuInit()
 
-	GetEmuContext().Running = true
-	GetEmuContext().Paused = false
-	GetEmuContext().Ticks = 0
 
-	for GetEmuContext().Running {
-		if GetEmuContext().Paused {
-			Delay(10)
-			continue
-		}
 
-		if !cpu.CpuStep() {
-			GetEmuContext().Die = true
-			log.Fatal("CPU Stopped")
-		}
-	}
+
 }
 
 func Run(argc int, argv []string) int {
@@ -63,19 +39,3 @@ func Run(argc int, argv []string) int {
 	return 0
 
 }*/
-
-func Delay(ms uint32) {
-	sdl.Delay(ms)
-}
-
-func LoadROM(romFile string) bool {
-	if !memory.CartLoad(romFile) {
-		logger.Error("Failed to load ROM file:", romFile)
-		return false
-	}
-	return true
-}
-
-func StartEmulator() {
-	GetEmulatorContext().Start()
-}
