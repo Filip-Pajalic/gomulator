@@ -148,19 +148,19 @@ func (c *CpuContext) Step() bool {
 		var nf = "-"
 		var hf = "-"
 		var cf = "-"
-		if (c.Regs.F & (1 << 7)) >= 1 {
+		if (c.Regs.F & (1 << 7)) != 0 {
 			zf = "Z"
 		}
 
-		if c.Regs.F&(1<<6) >= 1 {
+		if c.Regs.F&(1<<6) != 0 {
 			nf = "N"
 		}
 
-		if c.Regs.F&(1<<5) >= 1 {
+		if c.Regs.F&(1<<5) != 0 {
 			cf = "H"
 		}
 
-		if c.Regs.F&(1<<4) >= 1 {
+		if c.Regs.F&(1<<4) != 0 {
 			cf = "C"
 		}
 
@@ -185,7 +185,7 @@ func (c *CpuContext) Step() bool {
 	} else {
 		Cm.IncreaseCycle(1)
 
-		if c.IntFlags == 1 {
+		if c.IntFlags != 0 {
 			c.Halted = false
 		}
 

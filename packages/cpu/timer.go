@@ -1,7 +1,7 @@
 package cpu
 
 type Timer interface {
-	Tick(address uint16, value byte)
+	Tick()
 	Write(address uint16, value byte)
 	Read(address uint16) byte
 }
@@ -16,7 +16,7 @@ type TimerContext struct {
 var timerInstance *TimerContext
 
 func GetTimerContext() *TimerContext {
-	if timerInstance != nil {
+	if timerInstance == nil {
 		timerInstance = &TimerContext{
 			div: 0xAC00,
 		}
@@ -25,32 +25,37 @@ func GetTimerContext() *TimerContext {
 }
 
 func (t *TimerContext) Tick() {
-	prev_div := t.div
+	prevDiv := t.div
 	t.div++
 
-	var timer_update bool
+	if t.tac&(1<<2) != 0 { // Timer enabled
+		var timerUpdate bool
+		switch t.tac & 0x03 {
+		case 0x00:
+			// 4096 Hz (Bit 9)
+			timerUpdate = (prevDiv&(1<<9) != 0) && (t.div&(1<<9) == 0)
+		case 0x01:
+			// 262144 Hz (Bit 3)
+			timerUpdate = (prevDiv&(1<<3) != 0) && (t.div&(1<<3) == 0)
+		case 0x02:
+			// 65536 Hz (Bit 5)
+			timerUpdate = (prevDiv&(1<<5) != 0) && (t.div&(1<<5) == 0)
+		case 0x03:
+			// 16384 Hz (Bit 7)
+			timerUpdate = (prevDiv&(1<<7) != 0) && (t.div&(1<<7) == 0)
+		}
 
-	switch t.tac & 0b11 {
-	case 0b00:
-		timer_update = (prev_div&(1<<9) != 0) && (t.div&(1<<9) == 0)
-	case 0b01:
-		timer_update = (prev_div&(1<<3) != 0) && (t.div&(1<<3) == 0)
-	case 0b10:
-		timer_update = (prev_div&(1<<5) != 0) && (t.div&(1<<5) == 0)
-	case 0b11:
-		timer_update = (prev_div&(1<<7) != 0) && (t.div&(1<<7) == 0)
-	}
-
-	if timer_update && (t.tac&(1<<2) != 0) {
-		t.tima++
-		if t.tima == 0 {
-			t.tima = t.tma
-			CpuCtx().RequestInterrupt(IT_TIMER)
+		if timerUpdate {
+			t.tima++
+			if t.tima == 0 {
+				t.tima = t.tma
+				CpuCtx().RequestInterrupt(IT_TIMER)
+			}
 		}
 	}
 }
 
-func (t *TimerContext) TimerWrite(address uint16, value byte) {
+func (t *TimerContext) Write(address uint16, value byte) {
 	switch address {
 	case 0xFF04:
 		// DIV
@@ -63,11 +68,11 @@ func (t *TimerContext) TimerWrite(address uint16, value byte) {
 		t.tma = value
 	case 0xFF07:
 		// TAC
-		t.tac = value
+		t.tac = value & 0x07 // Only the lower 3 bits are used
 	}
 }
 
-func (t *TimerContext) TimerRead(address uint16) byte {
+func (t *TimerContext) Read(address uint16) byte {
 	switch address {
 	case 0xFF04:
 		return byte(t.div >> 8)
@@ -78,5 +83,5 @@ func (t *TimerContext) TimerRead(address uint16) byte {
 	case 0xFF07:
 		return t.tac
 	}
-	return 0
+	return 0xFF
 }

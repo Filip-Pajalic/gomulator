@@ -67,158 +67,52 @@ func procLd(ctx *CpuContext) {
 }
 
 func procCb(ctx *CpuContext) {
-	var op = byte(ctx.FetchedData)
-	var reg = decodeReg(op & 0b111)
-	var bit = (op >> 3) & 0b111
-	var bit_op = (op >> 6) & 0b11
-	var regval = CpuRegRead8(reg)
+	op := byte(ctx.FetchedData)
+	reg := decodeReg(op & 0b111)
+	bit := (op >> 3) & 0b111
+	bitOp := (op >> 6) & 0b11
+	regval := CpuRegRead8(reg)
 	Cm.IncreaseCycle(1)
 
 	if reg == RT_HL {
 		Cm.IncreaseCycle(2)
 	}
 
-	switch bit_op {
-	case 1:
-		zflag := (regval & (1 << bit)) == 0
-		nflag := false
-		hflag := true
-		//BIT , is this correct, should it be equals to zero
-		CpuSetFlags(ctx, &zflag, &nflag, &hflag, nil)
-		return
-
-	case 2:
-		//RST
-		//Does ^ equal ~ in c
-		regval &= ^(1 << bit)
-		CpuSetReg8(reg, regval)
-		return
-
-	case 3:
-		//SET
-		regval |= 1 << bit
-		CpuSetReg8(reg, regval)
-		return
-	}
-	flagC := CpuFlagC()
-
-	switch bit {
+	switch bitOp {
 	case 0:
-
-		result := (regval << 1) | (regval >> 7)
-		zflag := result == 0
-		nflag := false
-		hflag := false
-		cflag := (regval & 0x80) != 0
-
-		CpuSetReg8(reg, result)
-		CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-		return
-		//RLC
-		//var setC = false
-		//var result = (regval << 1) & 0xFF
-		//
-		//// Set carry flag based on carry-out from MSB of regval
-		//if (regval & (1 << 7)) != 0 {
-		//	setC = true
-		//	result |= 1 // Move the MSB to the LSB
-		//}
-		//
-		//// Set zero flag
-		//zflag := result == 0
-		//
-		//// Negative and half carry flags are not set in this operation
-		//nflag := false
-		//hflag := false
-		//
-		//CpuSetReg8(reg, result)
-		//CpuSetFlags(ctx, &zflag, &nflag, &hflag, &setC)
-		//return
-
-	case 1:
-		{
-			//RRC
-			var old = regval
-			regval >>= 1
-			regval |= old << 7
-
-			zflag := regval == 0
+		// Rotate and Shift Operations
+		switch bit {
+		case 0:
+			// RLC r
+			result := (regval << 1) | (regval >> 7)
+			zflag := result == 0
 			nflag := false
 			hflag := false
-			cflag := old&1 == 1
+			cflag := (regval & 0x80) != 0
 
-			CpuSetReg8(reg, regval)
+			CpuSetReg8(reg, result)
 			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 			return
-		}
 
-	case 2:
-		{
-			//RL
-			var old = regval
-			regval <<= 1
-			// byte to bool
-			var bitCflag byte = 0
+		case 1:
+			// RRC r
+			result := (regval >> 1) | (regval << 7)
+			zflag := result == 0
+			nflag := false
+			hflag := false
+			cflag := (regval & 0x01) != 0
 
-			if flagC {
-				bitCflag = 1
+			CpuSetReg8(reg, result)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+
+		case 2:
+			// RL r
+			old := regval
+			regval = regval << 1
+			if CpuFlagC() {
+				regval |= 1
 			}
-			regval |= bitCflag
-
-			zflag := regval == 0
-			nflag := false
-			hflag := false
-			cflag := (old & 0x80) != 0
-
-			CpuSetReg8(reg, regval)
-			// Clamp old between 0 and 1
-			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-			return
-		}
-
-	case 3:
-		{
-			//RR
-			//            u8 old = reg_val;
-			//            reg_val >>= 1;
-			//
-			//            reg_val |= (flagC << 7);
-			//
-			//            cpu_set_reg8(reg, reg_val);
-			//            cpu_set_flags(ctx, !reg_val, false, false, old & 1);
-
-			var old = regval
-			regval >>= 1
-
-			var bitCflag byte = 0
-			if flagC {
-				bitCflag = 1
-			}
-
-			// Set carry flag based on the least significant bit of the old value
-			cflag := old&1 == 1
-
-			// Set the most significant bit of regval based on the carry flag
-			regval |= bitCflag << 7
-
-			// Set zero flag
-			zflag := regval == 0
-
-			// Negative and half carry flags are not set in this operation
-			nflag := false
-			hflag := false
-
-			CpuSetReg8(reg, regval)
-			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-			return
-		}
-
-	case 4:
-		{
-			//SLA
-			var old = regval
-			regval <<= 1
-
 			zflag := regval == 0
 			nflag := false
 			hflag := false
@@ -227,27 +121,53 @@ func procCb(ctx *CpuContext) {
 			CpuSetReg8(reg, regval)
 			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 			return
-		}
 
-	case 5:
-		{
-			//SRA
-			// what is int8_t MSB should not change, is this true
-			var u = byte(int8(regval) >> 1)
-
-			zflag := u == 0
+		case 3:
+			// RR r
+			old := regval
+			regval = regval >> 1
+			if CpuFlagC() {
+				regval |= 0x80
+			}
+			zflag := regval == 0
 			nflag := false
 			hflag := false
-			cflag := regval&1 == 1
-			CpuSetReg8(reg, u)
+			cflag := (old & 0x01) != 0
+
+			CpuSetReg8(reg, regval)
 			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 			return
-		}
 
-	case 6:
-		{
-			//SWAP
-			regval = ((regval & 0xF0) >> 4) | ((regval & 0xF) << 4)
+		case 4:
+			// SLA r
+			old := regval
+			regval <<= 1
+			zflag := regval == 0
+			nflag := false
+			hflag := false
+			cflag := (old & 0x80) != 0
+
+			CpuSetReg8(reg, regval)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+
+		case 5:
+			// SRA r
+			old := regval
+			msb := regval & 0x80
+			regval = (regval >> 1) | msb
+			zflag := regval == 0
+			nflag := false
+			hflag := false
+			cflag := (old & 0x01) != 0
+
+			CpuSetReg8(reg, regval)
+			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+			return
+
+		case 6:
+			// SWAP r
+			regval = ((regval & 0xF0) >> 4) | ((regval & 0x0F) << 4)
 			zflag := regval == 0
 			nflag := false
 			hflag := false
@@ -256,24 +176,44 @@ func procCb(ctx *CpuContext) {
 			CpuSetReg8(reg, regval)
 			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 			return
-		}
 
-	case 7:
-		{
-			//SRL
-			var u = regval >> 1
-			zflag := u == 0
+		case 7:
+			// SRL r
+			old := regval
+			regval >>= 1
+			zflag := regval == 0
 			nflag := false
 			hflag := false
-			cflag := regval&1 == 1
+			cflag := (old & 0x01) != 0
 
-			CpuSetReg8(reg, u)
+			CpuSetReg8(reg, regval)
 			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 			return
 		}
-	}
-	log.Fatal("ERROR: INVALID CB: %02X", op)
 
+	case 1:
+		// BIT b, r
+		zflag := (regval & (1 << bit)) == 0
+		nflag := false
+		hflag := true
+		CpuSetFlags(ctx, &zflag, &nflag, &hflag, nil)
+		return
+
+	case 2:
+		// RES b, r
+		regval &^= (1 << bit)
+		CpuSetReg8(reg, regval)
+		return
+
+	case 3:
+		// SET b, r
+		regval |= 1 << bit
+		CpuSetReg8(reg, regval)
+		return
+
+	default:
+		log.Fatalf("ERROR: INVALID CB: %02X", op)
+	}
 }
 
 // Could be a problem with casting here
@@ -288,92 +228,80 @@ func procAnd(ctx *CpuContext) {
 }
 
 func procRlca(ctx *CpuContext) {
+	u := ctx.Regs.A
+	c := (u & 0x80) != 0
 
-	//    u8 u = ctx->regs.a;
-	//    bool c = (u >> 7) & 1;
-	//    u = (u << 1) | c;
-	//    ctx->regs.a = u;
-	//
-	//    cpu_set_flags(ctx, 0, 0, 0, c);
-	var u = ctx.Regs.A
-
-	z := false
-	n := false
-	h := false
-	c := (u>>7)&1 == 1
-	u = (u << 1)
+	u = u << 1
 	if c {
-		u |= 1
+		u |= 0x01
 	}
 
 	ctx.Regs.A = u
+	z := false
+	n := false
+	h := false
 
 	CpuSetFlags(ctx, &z, &n, &h, &c)
-
 }
 
 func procRrca(ctx *CpuContext) {
-	var b = ctx.Regs.A & 1
+	b := ctx.Regs.A & 0x01
 	ctx.Regs.A >>= 1
 	ctx.Regs.A |= b << 7
-	var zflag = false
-	var nflag = false
-	var hflag = false
-	var cflag = b == 1
+
+	zflag := false
+	nflag := false
+	hflag := false
+	cflag := b == 1
 
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-
 }
 
 func procRla(ctx *CpuContext) {
-	var u = ctx.Regs.A
+	u := ctx.Regs.A
+	cflag := (u & 0x80) != 0
 
-	var zflag = false
-	var nflag = false
-	var hflag = false
-	var cflag = (u>>7)&1 == 1
-
-	var cf byte = 0
+	ctx.Regs.A <<= 1
 	if CpuFlagC() {
-		cf = 1
+		ctx.Regs.A |= 0x01
 	}
 
-	ctx.Regs.A = (u << 1) | cf
+	zflag := false
+	nflag := false
+	hflag := false
 
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-
 }
-func procRra(ctx *CpuContext) {
-	var new_c = ctx.Regs.A & 1
-	var zflag = false
-	var nflag = false
-	var hflag = false
-	var cflag = new_c == 1
 
+func procRra(ctx *CpuContext) {
+	bit0 := ctx.Regs.A & 0x01
 	ctx.Regs.A >>= 1
-	var carry byte = 0
 	if CpuFlagC() {
-		carry = 1
+		ctx.Regs.A |= 0x80
 	}
-	ctx.Regs.A |= carry << 7
+
+	zflag := false
+	nflag := false
+	hflag := false
+	cflag := bit0 == 1
 
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-
 }
 
 func procXor(ctx *CpuContext) {
 	ctx.Regs.A ^= byte(ctx.FetchedData & 0xFF)
-	var zflag = ctx.Regs.A == 0
-	var nflag = false
-	var hflag = false
-	var cflag = false
+
+	zflag := ctx.Regs.A == 0
+	nflag := false
+	hflag := false
+	cflag := false
 
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
-
 }
 
 func procOr(ctx *CpuContext) {
 	ctx.Regs.A |= byte(ctx.FetchedData & 0xFF)
+
 	zflag := ctx.Regs.A == 0
 	nflag := false
 	hflag := false
@@ -383,14 +311,13 @@ func procOr(ctx *CpuContext) {
 }
 
 func procCp(ctx *CpuContext) {
+	a := ctx.Regs.A
+	operand := byte(ctx.FetchedData & 0xFF)
 
-	//ctx reg a wrong is 1 too much how
-	n := int(ctx.Regs.A) - int(ctx.FetchedData)
-
-	zflag := n == 0
+	zflag := a == operand
 	nflag := true
-	hflag := (((int)(ctx.Regs.A) & 0x0F) - ((int)(ctx.FetchedData) & 0x0F)) < 0
-	cflag := n < 0
+	hflag := (a & 0x0F) < (operand & 0x0F)
+	cflag := a < operand
 
 	CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
 }
@@ -404,11 +331,11 @@ func procEi(ctx *CpuContext) {
 }
 
 func procPop(ctx *CpuContext) {
-	var lo = uint16(StackPop())
+	lo := uint16(StackPop())
 	Cm.IncreaseCycle(1)
-	var hi = uint16(StackPop())
+	hi := uint16(StackPop())
 	Cm.IncreaseCycle(1)
-	var n = (hi << 8) | lo
+	n := (hi << 8) | lo
 	CpuSetReg(ctx.currentInst.Reg1, n)
 
 	if ctx.currentInst.Reg1 == RT_AF {
@@ -417,12 +344,12 @@ func procPop(ctx *CpuContext) {
 }
 
 func procPush(ctx *CpuContext) {
-	var hi = (CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF
+	hi := byte((CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF)
 	Cm.IncreaseCycle(1)
-	StackPush(byte(hi))
-	var lo = (CpuRegRead(ctx.currentInst.Reg1)) & 0xFF
+	StackPush(hi)
+	lo := byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
 	Cm.IncreaseCycle(1)
-	StackPush(byte(lo))
+	StackPush(lo)
 	Cm.IncreaseCycle(1)
 }
 
@@ -443,8 +370,8 @@ func procJp(ctx *CpuContext) {
 
 // Jump relative
 func procJr(ctx *CpuContext) {
-	var rel = int8(ctx.FetchedData & 0xFF) //casting cause it might be negative
-	var addr = ctx.Regs.Pc + uint16(rel)
+	rel := int8(ctx.FetchedData & 0xFF)
+	addr := ctx.Regs.Pc + uint16(rel)
 	goToAddr(ctx, addr, false)
 }
 
@@ -459,15 +386,12 @@ func procRet(ctx *CpuContext) {
 	}
 
 	if CheckCondition(ctx) {
-		var lo = uint16(StackPop())
+		lo := uint16(StackPop())
 		Cm.IncreaseCycle(1)
-
-		var hi = uint16(StackPop())
+		hi := uint16(StackPop())
 		Cm.IncreaseCycle(1)
-
-		var n = (hi << 8) | lo
+		n := (hi << 8) | lo
 		ctx.Regs.Pc = n
-
 		Cm.IncreaseCycle(1)
 	}
 }
@@ -477,200 +401,169 @@ func procRst(ctx *CpuContext) {
 }
 
 func procReti(ctx *CpuContext) {
-	ctx.IntMasterEnabled = true
 	procRet(ctx)
+	ctx.IntMasterEnabled = true
 }
 
 func procLdh(ctx *CpuContext) {
-	//is CpuSetReg correct here
 	if ctx.currentInst.Reg1 == RT_A {
-		CpuSetReg(ctx.currentInst.Reg1, uint16(pubsub.BusCtx().BusRead(0xFF00|ctx.FetchedData)))
+		value := pubsub.BusCtx().BusRead(0xFF00 | ctx.FetchedData)
+		ctx.Regs.A = value
 	} else {
-		pubsub.BusCtx().BusWrite(ctx.MemDest, ctx.Regs.A)
+		pubsub.BusCtx().BusWrite(0xFF00|ctx.FetchedData, ctx.Regs.A)
 	}
 	Cm.IncreaseCycle(1)
 }
 
 func procInc(ctx *CpuContext) {
-	var val = CpuRegRead(ctx.currentInst.Reg1) + 1
-
 	if is16bit(ctx.currentInst.Reg1) {
+		value := CpuRegRead(ctx.currentInst.Reg1) + 1
+		CpuSetReg(ctx.currentInst.Reg1, value)
 		Cm.IncreaseCycle(1)
-	}
-
-	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
-		val = uint16(pubsub.BusCtx().BusRead(CpuRegRead(RT_HL))) + 1
-		val &= 0xFF
-		pubsub.BusCtx().BusWrite(CpuRegRead(RT_HL), byte(val))
-	} else {
-		CpuSetReg(ctx.currentInst.Reg1, val)
-		val = CpuRegRead(ctx.currentInst.Reg1)
-	}
-
-	if (ctx.CurOpCode & 0x03) == 0x03 {
 		return
 	}
-	z := val == 0
+
+	var value uint16
+	if ctx.currentInst.Mode == AM_MR {
+		addr := CpuRegRead(RT_HL)
+		data := pubsub.BusCtx().BusRead(addr)
+		value = uint16(data) + 1
+		pubsub.BusCtx().BusWrite(addr, byte(value&0xFF))
+		Cm.IncreaseCycle(1)
+	} else {
+		value = CpuRegRead(ctx.currentInst.Reg1) + 1
+		CpuSetReg(ctx.currentInst.Reg1, value)
+	}
+
+	z := (value & 0xFF) == 0
 	n := false
-	h := (val & 0x0F) == 0
+	h := ((value-1)&0x0F)+1 > 0x0F
+
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
 
 func procDec(ctx *CpuContext) {
-	var val = CpuRegRead(ctx.currentInst.Reg1) - 1
-
 	if is16bit(ctx.currentInst.Reg1) {
+		value := CpuRegRead(ctx.currentInst.Reg1) - 1
+		CpuSetReg(ctx.currentInst.Reg1, value)
 		Cm.IncreaseCycle(1)
-	}
-
-	if ctx.currentInst.Reg1 == RT_HL && ctx.currentInst.Mode == AM_MR {
-		val = uint16(pubsub.BusCtx().BusRead(CpuRegRead(RT_HL)) - 1)
-		pubsub.BusCtx().BusWrite(CpuRegRead(RT_HL), byte(val))
-	} else {
-		CpuSetReg(ctx.currentInst.Reg1, val)
-		val = CpuRegRead(ctx.currentInst.Reg1)
-	}
-
-	if (ctx.CurOpCode & 0x0B) == 0x0B {
 		return
 	}
+
+	var value uint16
+	if ctx.currentInst.Mode == AM_MR {
+		addr := CpuRegRead(RT_HL)
+		data := pubsub.BusCtx().BusRead(addr)
+		value = uint16(data) - 1
+		pubsub.BusCtx().BusWrite(addr, byte(value&0xFF))
+		Cm.IncreaseCycle(1)
+	} else {
+		value = CpuRegRead(ctx.currentInst.Reg1) - 1
+		CpuSetReg(ctx.currentInst.Reg1, value)
+	}
+
+	z := (value & 0xFF) == 0
 	n := true
-	z := val == 0
-	h := (val & 0x0F) == 0x0F
+	h := ((value + 1) & 0x0F) == 0x00
+
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
 
 func procSub(ctx *CpuContext) {
+	a := ctx.Regs.A
+	operand := byte(ctx.FetchedData & 0xFF)
+	result := uint16(a) - uint16(operand)
+	ctx.Regs.A = byte(result & 0xFF)
 
-	//    u16 val = cpu_read_reg(ctx->cur_inst->reg_1) - ctx->fetched_data;
-	//
-	//    int z = val == 0;
-	//    int h = ((int)cpu_read_reg(ctx->cur_inst->reg_1) & 0xF) - ((int)ctx->fetched_data & 0xF) < 0;
-	//    int c = ((int)cpu_read_reg(ctx->cur_inst->reg_1)) - ((int)ctx->fetched_data) < 0;
-	//
-	//    cpu_set_reg(ctx->cur_inst->reg_1, val);
-	//    cpu_set_flags(ctx, z, 1, h, c);
-	var val = CpuRegRead(ctx.currentInst.Reg1) - ctx.FetchedData
-
-	var z = val == 0
-	var h = (int32(CpuRegRead(ctx.currentInst.Reg1)&0xF) - int32(ctx.FetchedData&0xF)) < 0
-	var c = (int32(CpuRegRead(ctx.currentInst.Reg1)) - int32(ctx.FetchedData)) < 0
-
-	CpuSetReg(ctx.currentInst.Reg1, val)
-
+	z := ctx.Regs.A == 0
 	n := true
+	h := (int(a&0x0F) - int(operand&0x0F)) < 0
+	c := a < operand
+
 	CpuSetFlags(ctx, &z, &n, &h, &c)
 }
 
 func procSbc(ctx *CpuContext) {
-	var c uint16 = 0
-	CpuFlagC()
+	a := ctx.Regs.A
+	operand := byte(ctx.FetchedData & 0xFF)
+	carry := byte(0)
 	if CpuFlagC() {
-		c = 1
+		carry = 1
 	}
-	var val = byte(ctx.FetchedData + c)
+	result := uint16(a) - uint16(operand) - uint16(carry)
+	ctx.Regs.A = byte(result & 0xFF)
 
-	var z = CpuRegRead(ctx.currentInst.Reg1)-uint16(val) == 0
-
-	var h = (int32(CpuRegRead(ctx.currentInst.Reg1)&0xF) - int32(ctx.FetchedData&0xF) - int32(c)) < 0
-
-	var cf = (int32(CpuRegRead(ctx.currentInst.Reg1)) - int32(ctx.FetchedData) - int32(c)) < 0
-
-	CpuSetReg(ctx.currentInst.Reg1, CpuRegRead(ctx.currentInst.Reg1)-uint16(val))
-
+	z := ctx.Regs.A == 0
 	n := true
-	CpuSetFlags(ctx, &z, &n, &h, &cf)
+	h := (int(a&0x0F) - int(operand&0x0F) - int(carry)) < 0
+	c := int(a)-int(operand)-int(carry) < 0
+
+	CpuSetFlags(ctx, &z, &n, &h, &c)
 }
 
 func procAdc(ctx *CpuContext) {
-
-	//    u16 u = ctx->fetched_data;
-	//    u16 a = ctx->regs.a;
-	//    u16 c = CPU_FLAG_C;
-	//
-	//    ctx->regs.a = (a + u + c) & 0xFF;
-	//
-	//    cpu_set_flags(ctx, ctx->regs.a == 0, 0,
-	//        (a & 0xF) + (u & 0xF) + c > 0xF,
-	//        a + u + c > 0xFF);
-	var u = ctx.FetchedData
-	var a = uint16(ctx.Regs.A)
-	var c uint16 = 0
+	a := ctx.Regs.A
+	operand := byte(ctx.FetchedData & 0xFF)
+	carry := byte(0)
 	if CpuFlagC() {
-		c = 1
+		carry = 1
 	}
-
-	ctx.Regs.A = byte((a + u + c) & 0xFF)
+	result := uint16(a) + uint16(operand) + uint16(carry)
+	ctx.Regs.A = byte(result & 0xFF)
 
 	z := ctx.Regs.A == 0
 	n := false
-	h := (a&0xF)+(u&0xF)+c > 0xF
-	cb := a+u+c > 0xFF
+	h := ((a & 0x0F) + (operand & 0x0F) + carry) > 0x0F
+	c := result > 0xFF
 
-	CpuSetFlags(ctx, &z, &n, &h, &cb)
+	CpuSetFlags(ctx, &z, &n, &h, &c)
 }
 
 // Bool to Int problematik som sker i C men ej i GOlang
 func procAdd(ctx *CpuContext) {
+	if ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Mode == AM_D8 {
+		value := int8(ctx.FetchedData)
+		sp := CpuRegRead(RT_SP)
+		result := uint16(int32(sp) + int32(value))
 
-	var val = uint32(CpuRegRead(ctx.currentInst.Reg1) + ctx.FetchedData)
+		h := ((sp & 0x0F) + (uint16(value) & 0x0F)) > 0x0F
+		c := ((sp & 0xFF) + (uint16(value) & 0xFF)) > 0xFF
 
-	var is16bit = is16bit(ctx.currentInst.Reg1)
+		z := false
+		n := false
 
-	if is16bit {
-		Cm.IncreaseCycle(1)
-	}
-
-	if ctx.currentInst.Reg1 == RT_SP {
-		val = uint32(CpuRegRead(ctx.currentInst.Reg1) + uint16(byte(ctx.FetchedData)))
-	}
-
-	z := (val & 0xFF) == 0
-
-	h := (CpuRegRead(ctx.currentInst.Reg1)&0xF)+(ctx.FetchedData&0xF) >= 0x10
-	c := (int)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int)(ctx.FetchedData&0xFF) >= 0x100
-	n := false
-
-	//    if (is_16bit) {
-	//        z = -1;
-	//        h = (cpu_read_reg(ctx->cur_inst->reg_1) & 0xFFF) + (ctx->fetched_data & 0xFFF) >= 0x1000;
-	//        u32 n = ((u32)cpu_read_reg(ctx->cur_inst->reg_1)) + ((u32)ctx->fetched_data);
-	//        c = n >= 0x10000;
-	//    }
-
-	if is16bit {
-		h = (CpuRegRead(ctx.currentInst.Reg1)&0xFFF)+(ctx.FetchedData&0xFFF) >= 0x1000
-		c = (uint32(CpuRegRead(ctx.currentInst.Reg1)))+uint32(ctx.FetchedData) >= 0x10000
-
-	}
-
-	//    if (ctx->cur_inst->reg_1 == RT_SP) {
-	//        z = 0;
-	//        h = (cpu_read_reg(ctx->cur_inst->reg_1) & 0xF) + (ctx->fetched_data & 0xF) >= 0x10;
-	//        c = (int)(cpu_read_reg(ctx->cur_inst->reg_1) & 0xFF) + (int)(ctx->fetched_data & 0xFF) >= 0x100;
-	//    }
-	//
-	//    cpu_set_reg(ctx->cur_inst->reg_1, val & 0xFFFF);
-	//    cpu_set_flags(ctx, z, 0, h, c);
-
-	//  u32 val = cpu_read_reg(ctx->cur_inst->reg_1) + ctx->fetched_data;
-	if ctx.currentInst.Reg1 == RT_SP {
-		z = false
-		h = (CpuRegRead(ctx.currentInst.Reg1)&0xF)+(ctx.FetchedData&0xF) >= 0x10
-		c = (int32)(CpuRegRead(ctx.currentInst.Reg1)&0xFF)+(int32)(ctx.FetchedData&0xFF) >= 0x100
-
-		CpuSetReg(ctx.currentInst.Reg1, uint16(val&0xFFFF))
+		CpuSetReg(RT_SP, result)
 		CpuSetFlags(ctx, &z, &n, &h, &c)
+		Cm.IncreaseCycle(2)
 		return
 	}
 
-	if is16bit {
-		CpuSetReg(ctx.currentInst.Reg1, uint16(val&0xFFFF))
+	if is16bit(ctx.currentInst.Reg1) {
+		val1 := CpuRegRead(ctx.currentInst.Reg1)
+		val2 := CpuRegRead(ctx.currentInst.Reg2)
+		result := val1 + val2
+
+		h := ((val1 & 0x0FFF) + (val2 & 0x0FFF)) > 0x0FFF
+		c := result > 0xFFFF
+
+		n := false
+
+		CpuSetReg(ctx.currentInst.Reg1, result&0xFFFF)
 		CpuSetFlags(ctx, nil, &n, &h, &c)
+		Cm.IncreaseCycle(1)
 		return
 	}
 
-	CpuSetReg(ctx.currentInst.Reg1, uint16(val&0xFFFF))
+	a := ctx.Regs.A
+	operand := byte(ctx.FetchedData & 0xFF)
+	result := uint16(a) + uint16(operand)
+	ctx.Regs.A = byte(result & 0xFF)
+
+	z := ctx.Regs.A == 0
+	n := false
+	h := ((a & 0x0F) + (operand & 0x0F)) > 0x0F
+	c := result > 0xFF
+
 	CpuSetFlags(ctx, &z, &n, &h, &c)
 }
 
@@ -679,74 +572,58 @@ func procStop(ctx *CpuContext) {
 }
 
 func procDaa(ctx *CpuContext) {
-	var u byte = 0
-	var fc = 0
-	//   if (CPU_FLAG_H || (!CPU_FLAG_N && (ctx->regs.a & 0xF) > 9)) {
-	//        u = 6;
-	//    }
-	if CpuFlagH() || (!CpuFlagN() && (ctx.Regs.A&0xF) > 9) {
-		u = 6
-	}
-	//    if (CPU_FLAG_C || (!CPU_FLAG_N && ctx->regs.a > 0x99)) {
-	//        u |= 0x60;
-	//        fc = 1;
-	//    }
-	if CpuFlagC() || (!CpuFlagN() && ctx.Regs.A > 0x99) {
-		u |= 0x60
-		fc = 1
-	}
+	var adjust byte = 0
+	a := ctx.Regs.A
+	c := CpuFlagC()
 
-	//ctx->regs.a += CPU_FLAG_N ? -u : u;
-	if CpuFlagN() {
-		ctx.Regs.A += -u
+	if !CpuFlagN() {
+		if CpuFlagH() || (a&0x0F) > 0x09 {
+			adjust |= 0x06
+		}
+		if c || a > 0x99 {
+			adjust |= 0x60
+			c = true
+		}
+		a += adjust
 	} else {
-		ctx.Regs.A += u
+		if CpuFlagH() {
+			adjust |= 0x06
+		}
+		if c {
+			adjust |= 0x60
+		}
+		a -= adjust
 	}
 
-	//cpu_set_flags(ctx, ctx->regs.a == 0, -1, 0, fc);
-
-	z := ctx.Regs.A == 0
+	a &= 0xFF
+	z := a == 0
 	h := false
-	c := fc == 1
 
-	if ctx.Regs.A == 0 {
-		z = true
-	}
-
+	ctx.Regs.A = a
 	CpuSetFlags(ctx, &z, nil, &h, &c)
-
 }
 
 func procCpl(ctx *CpuContext) {
 	ctx.Regs.A = ^ctx.Regs.A
-	var nflag = true
-	var hflag = true
+	nflag := true
+	hflag := true
 
 	CpuSetFlags(ctx, nil, &nflag, &hflag, nil)
 }
 
 func procScf(ctx *CpuContext) {
-	var nflag = false
-	var hflag = false
-	var cflag = true
+	nflag := false
+	hflag := false
+	cflag := true
 
 	CpuSetFlags(ctx, nil, &nflag, &hflag, &cflag)
 }
-
 func procCcf(ctx *CpuContext) {
+	cflag := !CpuFlagC()
+	nflag := false
+	hflag := false
 
-	var nflag = false
-	var hflag = false
-	var cflag = false
-	var cpuflagbit byte = 0
-	if CpuFlagC() {
-		cpuflagbit = 1
-	}
-	if (cpuflagbit ^ 1) == 1 {
-		cflag = true
-	}
 	CpuSetFlags(ctx, nil, &nflag, &hflag, &cflag)
-
 }
 
 func procHalt(ctx *CpuContext) {
@@ -829,18 +706,18 @@ func InstGetProccessor(intype InType) InProc {
 
 func CpuSetFlags(ctx *CpuContext, z *bool, n *bool, h *bool, c *bool) {
 	if z != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 7, z)
+		ctx.Regs.F = BitSet(ctx.Regs.F, 7, *z)
 	}
 
 	if n != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 6, n)
+		ctx.Regs.F = BitSet(ctx.Regs.F, 6, *n)
 	}
 
 	if h != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 5, h)
+		ctx.Regs.F = BitSet(ctx.Regs.F, 5, *h)
 	}
 
 	if c != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 4, c)
+		ctx.Regs.F = BitSet(ctx.Regs.F, 4, *c)
 	}
 }

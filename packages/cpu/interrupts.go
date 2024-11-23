@@ -3,11 +3,11 @@ package cpu
 type InterruptType byte
 
 const (
-	IT_VBLANK   InterruptType = 1
-	IT_LCD_STAT               = 2
-	IT_TIMER                  = 4
-	IT_SERIAL                 = 8
-	IT_JOYPAD                 = 16
+	IT_VBLANK   InterruptType = 1 << iota // 0x01
+	IT_LCD_STAT                           // 0x02
+	IT_TIMER                              // 0x04
+	IT_SERIAL                             // 0x08
+	IT_JOYPAD                             // 0x10
 )
 
 func IntHandle(ctx *CpuContext, address uint16) {
@@ -21,10 +21,8 @@ func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
 		ctx.IntFlags &= ^byte(it) // Clear the interrupt flag
 		ctx.Halted = false
 		ctx.IntMasterEnabled = false
-
 		return true
 	}
-
 	return false
 }
 

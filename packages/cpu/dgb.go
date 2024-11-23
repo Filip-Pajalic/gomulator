@@ -14,22 +14,28 @@ func DbgUpdate() {
 	if pubsub.BusCtx().BusRead(0xFF02) == 0x81 {
 		var c = pubsub.BusCtx().BusRead(0xFF01)
 
-		dbgMsg[msgSize] = c
-		msgSize++
+		if msgSize < len(dbgMsg) {
+			dbgMsg[msgSize] = c
+			msgSize++
+		} else {
+			log.Warn("dbgMsg buffer overflow")
+			msgSize = 0 // Reset to avoid further errors
+		}
 
 		pubsub.BusCtx().BusWrite(0xFF02, 0)
 	}
 }
 
 func DbgPrint() bool {
-	if dbgMsg[0] != 0 {
-		log.Info("DBG: %s\n", dbgMsg)
+	if msgSize > 0 {
+		debugmsg := string(dbgMsg[:msgSize])
+		log.Info("DBG: %s", debugmsg)
 
-	}
-	debugmsg := string(dbgMsg[:])
-	if strings.Contains(debugmsg, "F") {
-		return false
+		msgSize = 0 // Reset msgSize after printing
+
+		if strings.Contains(debugmsg, "F") {
+			return false
+		}
 	}
 	return true
-
 }

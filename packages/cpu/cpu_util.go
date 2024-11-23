@@ -27,7 +27,7 @@ func CpuRegRead(regType regTypes) uint16 {
 	case RT_A:
 		return uint16(cpuInstance.Regs.A)
 	case RT_F:
-		return uint16(cpuInstance.Regs.F)
+		return uint16(cpuInstance.Regs.F & 0xF0)
 	case RT_B:
 		return uint16(cpuInstance.Regs.B)
 	case RT_C:
@@ -41,14 +41,13 @@ func CpuRegRead(regType regTypes) uint16 {
 	case RT_L:
 		return uint16(cpuInstance.Regs.L)
 	case RT_AF:
-
-		return Reverse(uint16(cpuInstance.Regs.F)<<8 | uint16(cpuInstance.Regs.A))
+		return uint16(cpuInstance.Regs.A)<<8 | uint16(cpuInstance.Regs.F&0xF0)
 	case RT_BC:
-		return Reverse(uint16(cpuInstance.Regs.C)<<8 | uint16(cpuInstance.Regs.B))
+		return uint16(cpuInstance.Regs.B)<<8 | uint16(cpuInstance.Regs.C)
 	case RT_DE:
-		return Reverse(uint16(cpuInstance.Regs.E)<<8 | uint16(cpuInstance.Regs.D))
+		return uint16(cpuInstance.Regs.D)<<8 | uint16(cpuInstance.Regs.E)
 	case RT_HL:
-		return Reverse(uint16(cpuInstance.Regs.L)<<8 | uint16(cpuInstance.Regs.H))
+		return uint16(cpuInstance.Regs.H)<<8 | uint16(cpuInstance.Regs.L)
 	case RT_PC:
 		return cpuInstance.Regs.Pc
 	case RT_SP:
@@ -63,56 +62,38 @@ func CpuSetReg(regType regTypes, val uint16) {
 	switch regType {
 	case RT_A:
 		cpuInstance.Regs.A = byte(val & 0xFF)
-		return
 	case RT_F:
-		cpuInstance.Regs.F = byte(val & 0xFF)
-		return
+		cpuInstance.Regs.F = byte(val & 0xF0)
 	case RT_B:
 		cpuInstance.Regs.B = byte(val & 0xFF)
-		return
 	case RT_C:
 		cpuInstance.Regs.C = byte(val & 0xFF)
-		return
 	case RT_D:
 		cpuInstance.Regs.D = byte(val & 0xFF)
-		return
 	case RT_E:
 		cpuInstance.Regs.E = byte(val & 0xFF)
-		return
 	case RT_H:
 		cpuInstance.Regs.H = byte(val & 0xFF)
-		return
 	case RT_L:
 		cpuInstance.Regs.L = byte(val & 0xFF)
-		return
 	case RT_AF:
-		result := Reverse(val)
-		cpuInstance.Regs.F = byte((result >> 8) & 0xFF)
-		cpuInstance.Regs.A = byte((result) & 0xFF)
-		return
+		cpuInstance.Regs.A = byte((val >> 8) & 0xFF)
+		cpuInstance.Regs.F = byte(val & 0xF0)
 	case RT_BC:
-		result := Reverse(val)
-		cpuInstance.Regs.C = byte((result >> 8) & 0xFF)
-		cpuInstance.Regs.B = byte((result) & 0xFF)
-		return
+		cpuInstance.Regs.B = byte((val >> 8) & 0xFF)
+		cpuInstance.Regs.C = byte(val & 0xFF)
 	case RT_DE:
-		result := Reverse(val)
-		cpuInstance.Regs.E = byte((result >> 8) & 0xFF)
-		cpuInstance.Regs.D = byte((result) & 0xFF)
-		return
+		cpuInstance.Regs.D = byte((val >> 8) & 0xFF)
+		cpuInstance.Regs.E = byte(val & 0xFF)
 	case RT_HL:
-		result := Reverse(val)
-		cpuInstance.Regs.L = byte((result >> 8) & 0xFF)
-		cpuInstance.Regs.H = byte((result) & 0xFF)
-		return
+		cpuInstance.Regs.H = byte((val >> 8) & 0xFF)
+		cpuInstance.Regs.L = byte(val & 0xFF)
 	case RT_PC:
 		cpuInstance.Regs.Pc = val
-		return
 	case RT_SP:
 		cpuInstance.Regs.Sp = val
-		return
 	case RT_NONE:
-		return
+		// Do nothing
 	}
 }
 
@@ -121,7 +102,7 @@ func CpuRegRead8(rt regTypes) byte {
 	case RT_A:
 		return cpuInstance.Regs.A
 	case RT_F:
-		return cpuInstance.Regs.F
+		return cpuInstance.Regs.F & 0xF0
 	case RT_B:
 		return cpuInstance.Regs.B
 	case RT_C:
@@ -135,43 +116,35 @@ func CpuRegRead8(rt regTypes) byte {
 	case RT_L:
 		return cpuInstance.Regs.L
 	case RT_HL:
-		return pubsub.BusCtx().BusRead(CpuRegRead(RT_HL))
+		addr := CpuRegRead(RT_HL)
+		return pubsub.BusCtx().BusRead(addr)
 	default:
 		log.Fatal("**ERR INVALID REG8: %d\n", rt)
-
+		return 0
 	}
-	return 0
 }
 
 func CpuSetReg8(rt regTypes, val byte) {
 	switch rt {
 	case RT_A:
-		cpuInstance.Regs.A = val & 0xFF
-		return
+		cpuInstance.Regs.A = val
 	case RT_F:
-		cpuInstance.Regs.F = val & 0xFF
-		return
+		cpuInstance.Regs.F = val & 0xF0
 	case RT_B:
-		cpuInstance.Regs.B = val & 0xFF
-		return
+		cpuInstance.Regs.B = val
 	case RT_C:
-		cpuInstance.Regs.C = val & 0xFF
-		return
+		cpuInstance.Regs.C = val
 	case RT_D:
-		cpuInstance.Regs.D = val & 0xFF
-		return
+		cpuInstance.Regs.D = val
 	case RT_E:
-		cpuInstance.Regs.E = val & 0xFF
-		return
+		cpuInstance.Regs.E = val
 	case RT_H:
-		cpuInstance.Regs.H = val & 0xFF
-		return
+		cpuInstance.Regs.H = val
 	case RT_L:
-		cpuInstance.Regs.L = val & 0xFF
-		return
+		cpuInstance.Regs.L = val
 	case RT_HL:
-		pubsub.BusCtx().BusWrite(CpuRegRead(RT_HL), val)
-		return
+		addr := CpuRegRead(RT_HL)
+		pubsub.BusCtx().BusWrite(addr, val)
 	default:
 		log.Fatal("**ERR INVALID REG8: %d\n", rt)
 	}

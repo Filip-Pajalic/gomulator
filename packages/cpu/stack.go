@@ -5,27 +5,27 @@ import (
 )
 
 func StackPush(data byte) {
-	CpuGetRegs().Sp--
-	pubsub.BusCtx().BusWrite(CpuGetRegs().Sp, data)
-
+	regs := CpuGetRegs()
+	regs.Sp--
+	pubsub.BusCtx().BusWrite(regs.Sp, data)
 }
 
 func StackPush16(data uint16) {
-	value := (data >> 8) & 0xFF
-	value2 := data & 0xFF
-	StackPush(byte(value))
-	StackPush(byte(value2))
+	lowByte := byte(data & 0xFF)
+	highByte := byte((data >> 8) & 0xFF)
+	StackPush(highByte)
+	StackPush(lowByte)
 }
 
 func StackPop() byte {
-	result := pubsub.BusCtx().BusRead(CpuGetRegs().Sp)
-	CpuGetRegs().Sp++
+	regs := CpuGetRegs()
+	result := pubsub.BusCtx().BusRead(regs.Sp)
+	regs.Sp++
 	return result
 }
 
 func StackPop16() uint16 {
-	var lo = uint16(StackPop())
-	var hi = uint16(StackPop())
-
-	return (hi << 8) | lo
+	low := uint16(StackPop())
+	high := uint16(StackPop())
+	return (high << 8) | low
 }

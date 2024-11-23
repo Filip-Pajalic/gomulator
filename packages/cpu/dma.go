@@ -1,8 +1,6 @@
 package cpu
 
 import (
-	"time"
-
 	log "pajalic.go.emulator/packages/logger"
 )
 
@@ -11,65 +9,58 @@ type DMA interface {
 	DMATransferring() bool
 }
 
-var instance *DMAContext
+var dmaInstance *DMAContext
 
 type DMAContext struct {
-	active     bool
-	byte       byte
-	value      byte
-	startDelay byte
+	active      bool
+	currentByte byte
+	value       byte
+	startDelay  byte
 }
 
-func NewDmaContext(start byte) *DMAContext {
+func NewDMAContext(start byte) *DMAContext {
 	return &DMAContext{
-		active:     true,
-		byte:       0,
-		value:      start,
-		startDelay: 2,
+		active:      true,
+		currentByte: 0,
+		value:       start,
+		startDelay:  2,
 	}
 }
 
 func GetDMAContext() *DMAContext {
-	if instance == nil {
-		instance = NewDmaContext(2)
+	if dmaInstance == nil {
+		dmaInstance = NewDMAContext(0)
 	}
-	return instance
+	return dmaInstance
 }
 
 func RestartDMAContext(start byte) *DMAContext {
-	instance = NewDmaContext(start)
-	return instance
+	dmaInstance = NewDMAContext(start)
+	return dmaInstance
 }
 
-/*
-	func DmaStart(start byte) {
-		dmaCtx.active = true
-		dmaCtx.byte = 0
-		dmaCtx.startDelay = 2
-		dmaCtx.value = start
-	}
-*/
 func (d *DMAContext) DMATick() {
 	if !d.active {
 		return
 	}
-	//is it bigger than zero or equals to 1 here
 	if d.startDelay > 0 {
 		d.startDelay--
 		return
 	}
-	//might be wrong
+	//Restore this later
+	// Calculate source address
+	//sourceAddr := (uint16(d.value) << 8) | uint16(d.currentByte)
+	// Read data from source
+	//data := memory.BusCtx().BusRead(sourceAddr)
+	// Write data to OAM
+	//ppu.GetPPUContext().OamWrite(uint16(d.currentByte), data)
 
-	// NOTE FIX THIS TODO, PLEASE IMPL
-	//ppu.GetPPUContext().OamWrite(uint16(d.byte), memory.BusCtx().BusRead((uint16(d.value)*0x100)+(uint16(d.byte))))
+	d.currentByte++
 
-	d.byte++
-
-	d.active = d.byte < 0xA0
-
-	if !d.active {
-		log.Info("DMA DONE!\n")
-		time.Sleep(2)
+	// Check if DMA transfer is complete
+	if d.currentByte >= 0xA0 {
+		d.active = false
+		log.Info("DMA DONE!")
 	}
 }
 
