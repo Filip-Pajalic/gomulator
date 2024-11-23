@@ -22,7 +22,7 @@ var rtLookup = []regTypes{
 
 // probably wrong , probably needs to have a byte assigned to each rT
 func decodeReg(reg byte) regTypes {
-	if reg > 0b111 {
+	if reg >= 0b111 {
 		return RT_NONE
 	}
 
@@ -35,10 +35,7 @@ func procNop(cpucontext *CpuContext) {
 
 func procLd(ctx *CpuContext) {
 	if ctx.DestIsMem {
-		//LD (BC), A for instance...
-
 		if is16bit(ctx.currentInst.Reg2) {
-			//if 16 bit register...
 			Cm.IncreaseCycle(1)
 			pubsub.BusCtx().BusWrite16(ctx.MemDest, ctx.FetchedData)
 		} else {
@@ -49,40 +46,23 @@ func procLd(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
-		//        u8 hflag = (cpu_read_reg(ctx->cur_inst->reg_2) & 0xF) +
-		//            (ctx->fetched_data & 0xF) >= 0x10;
-		//
-		//        u8 cflag = (cpu_read_reg(ctx->cur_inst->reg_2) & 0xFF) +
-		//            (ctx->fetched_data & 0xFF) >= 0x100;
-		//
-		//        cpu_set_flags(ctx, 0, 0, hflag, cflag);
-		//        cpu_set_reg(ctx->cur_inst->reg_1,
-		//            cpu_read_reg(ctx->cur_inst->reg_2) + (int8_t)ctx->fetched_data);
-		//
-		//        return;
+		value := int8(ctx.FetchedData)
+		sp := CpuRegRead(RT_SP)
+		result := uint16(int32(sp) + int32(value))
 
-		//
-
-		var hflag = ((CpuRegRead(ctx.currentInst.Reg2) & 0x0F) + (ctx.FetchedData & 0x0F)) >= 0x10
-
-		// Calculate cflag
-		var cflag = ((CpuRegRead(ctx.currentInst.Reg2) & 0xFF) + (uint16(ctx.FetchedData) & 0xFF)) >= 0x100
+		hflag := ((sp & 0x0F) + (uint16(value) & 0x0F)) > 0x0F
+		cflag := ((sp & 0xFF) + (uint16(value) & 0xFF)) > 0xFF
 
 		zflag := false
 		nflag := false
 
-		// Set flags
 		CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+		CpuSetReg(RT_HL, result)
 
-		// Cast fetched data to int8
-		signedFetchedData := int8(ctx.FetchedData)
-
-		// Set register value
-		CpuSetReg(ctx.currentInst.Reg1, CpuRegRead(ctx.currentInst.Reg2)+uint16(signedFetchedData))
-
+		Cm.IncreaseCycle(1)
 		return
 	}
-	//probleem när ctx.FetchedData är 143? Efter CALL?
+
 	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
 }
 
@@ -124,28 +104,36 @@ func procCb(ctx *CpuContext) {
 
 	switch bit {
 	case 0:
-		{
-			//RLC
-			var setC = false
-			var result = (regval << 1) & 0xFF
 
-			// Set carry flag based on carry-out from MSB of regval
-			if (regval & (1 << 7)) != 0 {
-				setC = true
-				result |= 1 // Move the MSB to the LSB
-			}
+		result := (regval << 1) | (regval >> 7)
+		zflag := result == 0
+		nflag := false
+		hflag := false
+		cflag := (regval & 0x80) != 0
 
-			// Set zero flag
-			zflag := result == 0
-
-			// Negative and half carry flags are not set in this operation
-			nflag := false
-			hflag := false
-
-			CpuSetReg8(reg, result)
-			CpuSetFlags(ctx, &zflag, &nflag, &hflag, &setC)
-			return
-		}
+		CpuSetReg8(reg, result)
+		CpuSetFlags(ctx, &zflag, &nflag, &hflag, &cflag)
+		return
+		//RLC
+		//var setC = false
+		//var result = (regval << 1) & 0xFF
+		//
+		//// Set carry flag based on carry-out from MSB of regval
+		//if (regval & (1 << 7)) != 0 {
+		//	setC = true
+		//	result |= 1 // Move the MSB to the LSB
+		//}
+		//
+		//// Set zero flag
+		//zflag := result == 0
+		//
+		//// Negative and half carry flags are not set in this operation
+		//nflag := false
+		//hflag := false
+		//
+		//CpuSetReg8(reg, result)
+		//CpuSetFlags(ctx, &zflag, &nflag, &hflag, &setC)
+		//return
 
 	case 1:
 		{

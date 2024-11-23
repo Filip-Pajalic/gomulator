@@ -1,14 +1,14 @@
 package pubsub
 
 // Define event types as needed
-type EventOperation int
+type OperationType int
 
 const (
-	MemoryReadEvent EventOperation = iota
+	MemoryReadEvent OperationType = iota
 	MemoryWriteEvent
 	MemoryDataBusEvent
 	DMATransferEvent
-	PPUWramReadEvent
+	PPUVramReadEvent
 	PPUWramWriteEvent
 	PPUOamReadEvent
 	PPUOamWriteEvent
@@ -18,107 +18,96 @@ const (
 	IoWriteEvent
 	HramReadEvent
 	HramWriteEvent
+	NoEvent
 	// Add more events as needed
 )
 
-type EventAction int
+type ExchangeType int
 
 const (
-	Request EventAction = iota
+	Request ExchangeType = iota
 	Response
 
 	// Add more events as needed
 )
 
 type Event struct {
-	Type         EventOperation
-	ExchangeType EventAction
+	Operation OperationType
+	Exchange  ExchangeType
 }
 
-type EventChannel interface {
+type EventChannel[T MemoryArchitecture, U MemoryArchitecture] interface {
 	Event() Event
-	Data() interface{}
+	Data() T
+	Address() U
 }
 
-type WriteData interface {
-	WriteData(eventType Event)
+type MemoryArchitecture interface {
+	~uint16 | ~byte
 }
 
-type ReadData[T any] interface {
-	ReadData(eventType Event) T
+type ReadEvent[T MemoryArchitecture, U MemoryArchitecture] struct {
+	EventType   Event
+	AddressType T
+	DataType    U
 }
 
-// Not sure if this is the best solution atm, cause it returns itself
-type ReadEvent[T ReadData[T]] struct {
-	EventType Event
-	EventData T
+type WriteEvent[T MemoryArchitecture, U MemoryArchitecture] struct {
+	eventType   Event
+	AddressType T
+	DataType    U
 }
 
-type WriteEvent[T WriteData] struct {
-	eventType Event
-	eventData T
-}
-
-type Read8BitData struct {
-	Address uint16
-	Data    uint8
-}
-
-type Read16BitData struct {
-	Address uint16
-	Data    uint16
-}
-
-type Write8BitData struct {
-	Address uint16
-	Data    uint8
-}
-
-type Write16BitData struct {
-	Address uint16
-	Data    uint16
-}
-
-func (e ReadEvent[T]) Event() Event {
+func (e ReadEvent[T, U]) Event() Event {
 	return e.EventType
 }
 
-func (e ReadEvent[T]) Data() interface{} {
-	return e.EventData
+func (e ReadEvent[T, U]) Data() interface{} {
+	return e.DataType
 }
 
-func (e WriteEvent[T]) Event() Event {
+func (e ReadEvent[T, U]) Address() interface{} {
+	return e.Address
+}
+
+func (e WriteEvent[T, U]) Event() Event {
 	return e.eventType
 }
 
-func (e WriteEvent[T]) Data() interface{} {
-	return e.eventData
+func (e WriteEvent[T, U]) Data() interface{} {
+	return e.DataType
 }
 
-func (data Write8BitData) WriteData(eventType Event) {
+func (e WriteEvent[T, U]) Address() interface{} {
+	return e.Address
+}
+
+/*
+func (data Write8BitData) ProcessData(eventType Event) {
 	event := WriteEvent[Write8BitData]{
 		eventType: eventType,
 		eventData: data,
 	}
 
-	GetPubSubManager().Publish(event)
+	PbManager.Publish(event)
 }
 
-func (data Write16BitData) WriteData(eventType Event) {
+func (data Write16BitData) ProcessData(eventType Event) {
 	event := WriteEvent[Write16BitData]{
 		eventType: eventType,
 		eventData: data,
 	}
-	GetPubSubManager().Publish(event)
+	PbManager.Publish(event)
 }
 
-func (data Read8BitData) ReadData(eventType Event) Read8BitData {
-	eventData := <-GetPubSubManager().Subscribe(eventType)
+func (data Read8BitData) ProcessData(eventType Event) Read8BitData {
+	eventData := <-PbManager.Subscribe(eventType)
 	return eventData.(ReadEvent[Read8BitData]).Data().(Read8BitData)
 
 }
 
-func (data Read16BitData) ReadData(eventType Event) Read16BitData {
-	eventData := <-GetPubSubManager().Subscribe(eventType)
+func (data Read16BitData) ProcessData(eventType Event) Read16BitData {
+	eventData := <-PbManager.Subscribe(eventType)
 	return eventData.(ReadEvent[Read8BitData]).Data().(Read16BitData)
 }
+*/

@@ -4,44 +4,43 @@ import (
 	"sync"
 )
 
-var pbManager *Manager
+var PbManager *Manager
 var once sync.Once
 
+type EventChannelBase struct {
+	Event   Event
+	Data    interface{}
+	Address interface{}
+}
+
 type Manager struct {
-	subscribers map[Event][]chan EventChannel
+	subscribers map[Event][]chan EventChannelBase
 	mu          sync.RWMutex
 }
 
-func NewManager() *Manager {
-	return &Manager{
-		subscribers: make(map[Event][]chan EventChannel),
+func init() {
+	PbManager = &Manager{
+		subscribers: make(map[Event][]chan EventChannelBase),
 	}
 }
 
-func GetPubSubManager() *Manager {
-	once.Do(func() {
-		pbManager = NewManager()
-	})
-	return pbManager
-}
-
-func (m *Manager) Subscribe(eventType Event) chan EventChannel {
+func (m *Manager) Subscribe(eventType Event) chan EventChannelBase {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan EventChannel, 1)
+	ch := make(chan EventChannelBase, 1)
 	m.subscribers[eventType] = append(m.subscribers[eventType], ch)
 	return ch
 }
 
-func (m *Manager) Publish(event EventChannel) {
+func (m *Manager) Publish(event Event, data interface{}) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for _, ch := range m.subscribers[event.Event()] {
+	for _, ch := range m.subscribers[event] {
 		// Non-blocking send
 		select {
-		case ch <- event:
+		case ch <- EventChannelBase{Event: event, Data: data}:
 		default:
 			// Handle the case where the channel is full
 			// This can be logging, dropping the message, etc.

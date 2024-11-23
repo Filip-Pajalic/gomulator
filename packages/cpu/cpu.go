@@ -83,7 +83,7 @@ var cpuInstance *CpuContext
 func NewCpuContext() *CpuContext {
 
 	//GetTimerContext().div = 0xABCC TODO
-
+	InitInstructions()
 	InitProcessors()
 	return &CpuContext{
 		Regs: CpuRegisters{
@@ -114,13 +114,14 @@ func NewCpuContext() *CpuContext {
 
 func CpuCtx() *CpuContext {
 	if cpuInstance == nil {
+
 		cpuInstance = NewCpuContext()
 	}
 	return cpuInstance
 }
 
 func (c *CpuContext) Fetch() {
-	//pubsub.GetPubSubManager().Subscribe(pubsub.PPUWramReadEvent)
+	//pubsub.GetPubSubManager().Subscribe(pubsub.PPUVramReadEvent)
 	c.CurOpCode = pubsub.BusCtx().BusRead(c.Regs.Pc)
 	c.Regs.Pc++
 	c.currentInst = instructionByOpcode(c.CurOpCode)
@@ -137,7 +138,6 @@ func (c *CpuContext) Execute() {
 
 // This should probably not call the emulator
 func (c *CpuContext) Step() bool {
-	log.Info("HERE")
 	if !c.Halted {
 		pc := c.Regs.Pc
 		c.Fetch()

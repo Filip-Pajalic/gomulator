@@ -148,6 +148,7 @@ var cartInstance *CartContext
 
 func CartCtx() *CartContext {
 	if cartInstance == nil {
+
 		cartInstance = &CartContext{}
 	}
 	return cartInstance
@@ -282,7 +283,7 @@ func (c *CartContext) CartLoad(cart string) bool {
 	c.header.Title[15] = 0
 	log.Info("Cartridge Loaded:")
 	log.Info("Title    : %s", string(c.header.Title[:]))
-	log.Info("Type     : %2.2X (%s)", c.header.CartType, c.cartTypeName())
+	log.Info("Operation     : %2.2X (%s)", c.header.CartType, c.cartTypeName())
 	log.Info("ROM Size : %d KB", 32<<c.header.RomSize)
 	log.Info("RAM Size : %2.2X", c.header.RamSize)
 	log.Info("LIC Code : %2.2X (%s)", c.header.LicCode, c.cartLicName())
@@ -297,73 +298,34 @@ func (c *CartContext) CartLoad(cart string) bool {
 	return true
 }
 
-func SubscribeLoop() {
-	manager := pubsub.GetPubSubManager()
-
-	// Subscribe to CartReadEvent and CartWriteEvent
-	readCh := manager.Subscribe(pubsub.Event{
-		Type:         pubsub.MemoryReadEvent,
-		ExchangeType: pubsub.Request,
-	})
-	//writeCh := manager.Subscribe(pubsub.MemoryWriteEvent)
-
-	// Start a goroutine to listen for events
-	go func() {
-		for {
-			select {
-			case readEvent := <-readCh:
-				// Handle the CartRead event
-				eventdata := readEvent.Data
-				log.Info("data", eventdata)
-				//Try to cast here otherwise cast 16BIt
-				address := readEvent.Data().(pubsub.Read8BitData).Address
-				data := CartCtx().CartRead(address)
-				readData := pubsub.Read8BitData{Address: address, Data: data}
-				//I think I want some abstraction for this to not export everything
-				responseEvent := pubsub.ReadEvent[pubsub.Read8BitData]{EventType: pubsub.Event{
-					Type:         pubsub.MemoryReadEvent,
-					ExchangeType: pubsub.Response,
-				}, EventData: readData}
-
-				manager.Publish(responseEvent)
-				/*eventData := eventdata.(struct {
-					Address uint16
-				})
-				address := eventData.Address
-				data := CartCtx().CartRead(address)
-
-				// Publish the read data back
-				manager.Publish(pubsub.EventChannel{
-					Type: pubsub.MemoryReadEvent,
-					Data: data,
-				})*/
-				//case writeEvent := <-writeCh:
-				//log.Info(writeEvent.Event().Type)
-				// Handle the CartWrite event
-				/*eventdata := writeEvent.Data
-				log.Info("data write %x", eventdata)
-				eventData := eventdata.(struct {
-					Address uint16
-					Data    byte
-				})
-				CartCtx().CartWrite(eventData.Address, eventData.Data)
-
-				// Optionally publish an acknowledgment or result of the write operation
-				manager.Publish(pubsub.EventChannel{
-					Type: pubsub.MemoryWriteEvent,
-					Data: nil, // No specific data to return, but could return success/failure
-				})*/
-			}
-		}
-	}()
-}
-
 func (c *CartContext) CartWrite(address uint16, data byte) {
-
 	c.romData[address] = data
 
 }
 
 func (c *CartContext) CartRead(address uint16) byte {
 	return c.romData[address]
+}
+
+func (c *CartContext) initEventProcessor() {
+
+	config := &pubsub.ReadWrite8BitConfig{
+		ReadType:     pubsub.MemoryReadEvent,
+		WriteType:    pubsub.MemoryWriteEvent,
+		ProcessRead:  c.processRead(),
+		ProcessWrite: c.processWrite(),
+	}
+	go pubsub.ProcessChannelTransactions(config)
+}
+
+func (c *CartContext) processRead() pubsub.Read8BitFunc {
+	return func(address uint16) byte {
+		return c.CartRead(address)
+	}
+}
+
+func (c *CartContext) processWrite() pubsub.Write8BitFunc {
+	return func(address uint16, data byte) {
+		c.CartWrite(address, data)
+	}
 }

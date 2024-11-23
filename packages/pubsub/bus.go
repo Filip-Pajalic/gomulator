@@ -31,40 +31,28 @@ func NewBus() *Bus {
 }
 
 func BusCtx() *Bus {
-	if busInstance == nil {
-
+	once.Do(func() {
 		busInstance = NewBus()
-	}
+	})
 	return busInstance
 }
 
 func (m *Bus) BusRead(address uint16) byte {
-	readData := Read8BitData{Address: address, Data: 0}
-	requestEvent := ReadEvent[Read8BitData]{EventType: Event{
-		Type:         toReadEvent(address),
-		ExchangeType: Request,
-	}, EventData: readData}
 
-	GetPubSubManager().Publish(requestEvent)
-	/*	m.psManager.Publish(EventChannel{
-			Type: toReadEvent(address),
-			Data: struct {
-				Address uint16
-			}{address},
-		})
-	*/
-	/*	responseEvent := ReadEvent[Read8BitData]{eventType: Event{
-			Type:         toReadEvent(address),
-			ExchangeType: Response,
-		}, eventData: readData}
-	*/
-	eventData := <-GetPubSubManager().Subscribe(Event{
-		Type:         toReadEvent(address),
-		ExchangeType: Response})
+	config := &Read8BitConfig{
+		ReadType: toReadEvent(address),
+	}
 
-	data := eventData.Data().(Read8BitData)
+	PublishChannelRequest(config)
 
-	return data.Data
+	config2 := &Write8BitConfig{
+		WriteType: toWriteEvent(address),
+	}
+
+	eventData := <-SubscribeChannelRequest(config2)
+	data := eventData.Data
+	return data
+
 }
 
 func (m *Bus) BusWrite(address uint16, data byte) {
@@ -74,7 +62,7 @@ func (m *Bus) BusWrite(address uint16, data byte) {
 		pbManager.Publish(event)*/
 	// Publish a memory write event
 	/*	m.psManager.Publish(EventChannel{
-		Type: toWriteEvent(address),
+		Operation: toWriteEvent(address),
 		Data: struct {
 			Address uint16
 			Data    byte
@@ -83,7 +71,7 @@ func (m *Bus) BusWrite(address uint16, data byte) {
 
 }
 
-func toWriteEvent(address uint16) EventOperation {
+func toWriteEvent(address uint16) OperationType {
 	if address < 0x8000 {
 		return MemoryWriteEvent
 		//return CartRead(address)
@@ -122,13 +110,13 @@ func toWriteEvent(address uint16) EventOperation {
 	return HramWriteEvent
 }
 
-func toReadEvent(address uint16) EventOperation {
+func toReadEvent(address uint16) OperationType {
 	if address < 0x8000 {
 		return MemoryReadEvent
 		//return CartRead(address)
 	} else if address < 0xA000 {
 		//Char/Map Data
-		return PPUWramReadEvent
+		return PPUVramReadEvent
 	} else if address < 0xC000 {
 		//Cartridge ram //not working
 		return MemoryReadEvent
@@ -167,7 +155,7 @@ Writes data from the cartridge, memory locations above represent what the differ
 @Param byte - what to write
 */
 
-func oldBusWrite(address uint16, data byte) EventOperation {
+func oldBusWrite(address uint16, data byte) OperationType {
 
 	if address < 0x8000 {
 		//CartWrite(address, data)
@@ -225,4 +213,21 @@ func (m *Bus) BusRead16(address uint16) uint16 {
 	var hi = uint16(m.BusRead(address + 1))
 
 	return lo | (hi << 8)
+}
+
+// BusManager is responsible for handling channel transactions and events
+type BusManager struct {
+	Processors []ChannelProcessor[MemoryArchitecture, MemoryArchitecture, MemoryArchitecture, MemoryArchitecture]
+}
+
+// AddProcessor adds a ChannelProcessor to the BusManager
+func (bm *BusManager) AddProcessor(processor ChannelProcessor[MemoryArchitecture, MemoryArchitecture, MemoryArchitecture, MemoryArchitecture]) {
+	bm.Processors = append(bm.Processors, processor)
+}
+
+// ProcessAllChannels processes all registered channels and handles incoming events
+func (bm *BusManager) ProcessAllChannels() {
+	for _, processor := range bm.Processors {
+		go ProcessChannelTransactions(processor)
+	}
 }

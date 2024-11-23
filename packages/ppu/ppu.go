@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"pajalic.go.emulator/packages/cpu"
 	log "pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/pubsub"
 	"pajalic.go.emulator/packages/ui"
 )
 
@@ -131,6 +132,39 @@ func PpuCtx() *PpuContext {
 		ppuInstance = NewPpuContext(cpu.CpuCtx())
 	}
 	return ppuInstance
+}
+
+func SubscribeLoop() {
+	manager := pubsub.GetPubSubManager()
+
+	// Subscribe to CartReadEvent and CartWriteEvent
+	//Vram and wram
+	readCh := manager.Subscribe(pubsub.Event{
+		Operation: pubsub.PPUVramReadEvent,
+		Exchange:  pubsub.Request,
+	})
+	//writeCh := manager.Subscribe(pubsub.MemoryWriteEvent)
+
+	// Start a goroutine to listen for events
+	go func() {
+		for {
+			select {
+			case readEvent := <-readCh:
+
+				address := readEvent.Data().(pubsub.Read8BitData).Address
+				data := PpuCtx().VramRead(address)
+				readData := pubsub.Read8BitData{Address: address, Data: data}
+				//I think I want some abstraction for this to not export everything
+				responseEvent := pubsub.ReadEvent[pubsub.Read8BitData]{EventType: pubsub.Event{
+					Operation: pubsub.MemoryReadEvent,
+					Exchange:  pubsub.Response,
+				}, EventData: readData}
+
+				manager.Publish(responseEvent)
+
+			}
+		}
+	}()
 }
 
 func (p *PpuContext) VramWrite(address uint16, value byte) {
