@@ -1,14 +1,17 @@
 package ppu
 
 import (
-	"fmt"
 	"pajalic.go.emulator/packages/cpu"
 	"pajalic.go.emulator/packages/ui"
-	"time"
 )
 
+// Existing methods...
+
 // IncrementLY increments the LY register and checks for LY compare interrupt
-func IncrementLY() {
+func (p *PpuContext) IncrementLY() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	lcdCtx := ui.LcdCtx()
 	lcdCtx.Ly++
 
@@ -16,8 +19,8 @@ func IncrementLY() {
 		ui.LCDSLycSet(true)
 
 		if ui.LCDSStatInt(ui.SSLyc) {
-			//!TODO
-			PpuCtx().externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
+			// Request LCD STAT interrupt
+			p.externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
 		}
 	} else {
 		ui.LCDSLycSet(false)
@@ -25,48 +28,58 @@ func IncrementLY() {
 }
 
 // LoadLineSprites loads the sprites for the current line
-func LoadLineSprites() {
+func (p *PpuContext) LoadLineSprites() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	curY := ui.LcdCtx().Ly
 	spriteHeight := ui.LCDCObjHeight()
-	//This is probably bad
-	PpuCtx().LineEntryArray = [10]OamLineEntry(make([]OamLineEntry, 40))
-	PpuCtx().LineSpriteCount = 0
+
+	// Reset LineEntryArray and LineSpriteCount
+	for i := range p.LineEntryArray {
+		p.LineEntryArray[i] = OamLineEntry{}
+	}
+	p.LineSpriteCount = 0
+	p.LineSprites = nil
 
 	for i := 0; i < 40; i++ {
-		e := PpuCtx().OamRam[i]
+		e := p.OamRam[i]
 
 		if e.X == 0 {
 			// x = 0 means not visible...
 			continue
 		}
 
-		if PpuCtx().LineSpriteCount >= 10 {
+		if p.LineSpriteCount >= 10 {
 			// max 10 sprites per line...
 			break
 		}
 
-		if e.Y <= curY+16 && e.Y+spriteHeight > curY+16 {
+		if e.Y <= curY+16 && e.Y+uint8(spriteHeight) > curY+16 {
 			// this sprite is on the current line.
-			entry := &PpuCtx().LineEntryArray[PpuCtx().LineSpriteCount]
-			PpuCtx().LineSpriteCount++
+			entry := &p.LineEntryArray[p.LineSpriteCount]
+			p.LineSpriteCount++
 
 			entry.Entry = e
 			entry.Next = nil
 
-			if PpuCtx().LineSprites == nil || PpuCtx().LineSprites.Entry.X > e.X {
-				entry.Next = PpuCtx().LineSprites
-				PpuCtx().LineSprites = entry
+			if p.LineSprites == nil || p.LineSprites.Entry.X > e.X {
+				entry.Next = p.LineSprites
+				p.LineSprites = entry
 				continue
 			}
 
-			// do some sorting...
-			le := PpuCtx().LineSprites
+			// Insert sprite in sorted order based on X position
+			le := p.LineSprites
 			var prev *OamLineEntry
 
 			for le != nil {
 				if le.Entry.X > e.X {
-					prev.Next = entry
+					if prev != nil {
+						prev.Next = entry
+					} else {
+						p.LineSprites = entry
+					}
 					entry.Next = le
 					break
 				}
@@ -83,100 +96,4 @@ func LoadLineSprites() {
 	}
 }
 
-// PPUModeOam handles the PPU OAM mode
-func PPUModeOam() {
-
-	if PpuCtx().LineTicks >= 80 {
-		ui.LCDSModeSet(ui.ModeXfer)
-		PpuCtx().Pfc.CurFetchState = FS_TILE
-		PpuCtx().Pfc.LineX = 0
-		PpuCtx().Pfc.FetchX = 0
-		PpuCtx().Pfc.PushedX = 0
-		PpuCtx().Pfc.FifoX = 0
-	}
-
-	if PpuCtx().LineTicks == 1 {
-		// read oam on the first tick only...
-		PpuCtx().LineSprites = nil
-		PpuCtx().LineSpriteCount = 0
-		LoadLineSprites()
-	}
-}
-
-// PPUModeXfer handles the PPU transfer mode
-func PPUModeXfer() {
-	PipelineProcess()
-
-	if PpuCtx().Pfc.PushedX >= XRES {
-		PipelineFifoReset()
-		ui.LCDSModeSet(ui.ModeHBlank)
-
-		if ui.LCDSStatInt(ui.SSHBlank) {
-			PpuCtx().externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
-		}
-	}
-}
-
-// PPUModeVblank handles the PPU VBlank mode
-func PPUModeVblank() {
-
-	if PpuCtx().LineTicks >= TICKS_PER_LINE {
-		IncrementLY()
-
-		if ui.LcdCtx().Ly >= LINES_PER_FRAME {
-			ui.LCDSModeSet(ui.ModeOam)
-			ui.LcdCtx().Ly = 0
-		}
-
-		PpuCtx().LineTicks = 0
-	}
-}
-
-var (
-	targetFrameTime = 1000 / 60
-	prevFrameTime   = time.Now().UnixMilli()
-	startTimer      = time.Now().UnixMilli()
-	frameCount      = 0
-)
-
-// PPUModeHblank handles the PPU HBlank mode
-func PPUModeHblank() {
-
-	if PpuCtx().LineTicks >= TICKS_PER_LINE {
-		IncrementLY()
-
-		if ui.LcdCtx().Ly >= YRES {
-			ui.LCDSModeSet(ui.ModeVBlank)
-			PpuCtx().externalPins.RequestInterrupt(cpu.IT_VBLANK)
-
-			if ui.LCDSStatInt(ui.SSVBlank) {
-				PpuCtx().externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
-			}
-
-			PpuCtx().CurrentFrame++
-
-			// calculate FPS...
-			end := time.Now().UnixMilli()
-			frameTime := end - prevFrameTime
-
-			if frameTime < int64(targetFrameTime) {
-				time.Sleep(time.Duration(int64(targetFrameTime)-frameTime) * time.Millisecond)
-			}
-
-			if end-startTimer >= 1000 {
-				fps := frameCount
-				startTimer = end
-				frameCount = 0
-
-				fmt.Printf("FPS: %d\n", fps)
-			}
-
-			frameCount++
-			prevFrameTime = time.Now().UnixMilli()
-		} else {
-			ui.LCDSModeSet(ui.ModeOam)
-		}
-
-		PpuCtx().LineTicks = 0
-	}
-}
+// Other methods like PPUModeOam, PPUModeXfer, etc., should also use locking where they modify shared state.

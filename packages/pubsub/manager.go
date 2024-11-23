@@ -1,49 +1,73 @@
+// pubsub/manager.go
 package pubsub
 
 import (
+	"log"
 	"sync"
 )
 
-var PbManager *Manager
-var once sync.Once
-
-type EventChannelBase struct {
-	Event   Event
-	Data    interface{}
-	Address interface{}
-}
-
-type Manager struct {
-	subscribers map[Event][]chan EventChannelBase
+// PubSubManager manages subscribers and event dispatching
+type PubSubManager struct {
+	subscribers map[OperationType]chan EventChannelBase
 	mu          sync.RWMutex
 }
 
+// Singleton instance
+var PbManager *PubSubManager
+var once sync.Once
+
+// Initialize the PubSubManager singleton
 func init() {
-	PbManager = &Manager{
-		subscribers: make(map[Event][]chan EventChannelBase),
-	}
+	once.Do(func() {
+		PbManager = &PubSubManager{
+			subscribers: make(map[OperationType]chan EventChannelBase),
+		}
+	})
 }
 
-func (m *Manager) Subscribe(eventType Event) chan EventChannelBase {
+// Subscribe allows a component to subscribe to an Event
+// Returns a channel to receive EventChannelBase
+func (m *PubSubManager) Subscribe(event Event) chan EventChannelBase {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan EventChannelBase, 1)
-	m.subscribers[eventType] = append(m.subscribers[eventType], ch)
+	ch, exists := m.subscribers[event.Operation]
+	if !exists {
+		// Create a new buffered channel for this OperationType
+		ch = make(chan EventChannelBase, 100) // Adjust buffer size as needed
+		m.subscribers[event.Operation] = ch
+		log.Printf("pubsub: Subscribed to event type %s", event.Operation)
+	}
 	return ch
 }
 
-func (m *Manager) Publish(event Event, data interface{}) {
+// Publish sends data to all subscribers of an OperationType
+func (m *PubSubManager) Publish(event Event, data EventChannelBase) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	ch, exists := m.subscribers[event.Operation]
+	m.mu.RUnlock()
 
-	for _, ch := range m.subscribers[event] {
-		// Non-blocking send
-		select {
-		case ch <- EventChannelBase{Event: event, Data: data}:
-		default:
-			// Handle the case where the channel is full
-			// This can be logging, dropping the message, etc.
-		}
+	if !exists {
+		log.Printf("pubsub: No subscribers for event type %s", event.Operation)
+		return
+	}
+
+	select {
+	case ch <- data:
+		// Successfully sent
+	default:
+		// Channel is full; handle overflow
+		log.Printf("pubsub: Event queue for %s is full. Dropping event.", event.Operation)
+	}
+}
+
+// CloseAll closes all subscriber channels (for graceful shutdown)
+func (m *PubSubManager) CloseAll() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for eventType, ch := range m.subscribers {
+		close(ch)
+		log.Printf("pubsub: Closed channel for %s", eventType)
+		delete(m.subscribers, eventType)
 	}
 }

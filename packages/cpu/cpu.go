@@ -116,12 +116,46 @@ func CpuCtx() *CpuContext {
 	if cpuInstance == nil {
 
 		cpuInstance = NewCpuContext()
+		cpuInstance.Start()
 	}
 	return cpuInstance
 }
 
+func (c *CpuContext) Start() {
+	// Subscribe to interrupt request events
+	interruptChannel := pubsub.PbManager.Subscribe(pubsub.InterruptRequestEvent)
+
+	// Start a goroutine to listen for interrupt requests
+	go func() {
+		for eventBase := range interruptChannel {
+			eventData, ok := eventBase.(pubsub.EventChannelBase)
+			if !ok {
+				log.Println("cpu: Invalid EventChannelBase received")
+				continue
+			}
+
+			interruptType, ok := eventData.Data.(InterruptType)
+			if !ok {
+				log.Println("cpu: Invalid InterruptType received")
+				continue
+			}
+
+			// Queue the interrupt
+			select {
+			case c.interrupts <- interruptType:
+				log.Printf("cpu: Queued interrupt %s", interruptType)
+			default:
+				// Interrupt queue is full; handle accordingly
+				log.Printf("cpu: Interrupt queue full. Dropping interrupt %s", interruptType)
+			}
+		}
+	}()
+
+	// Start a separate goroutine to handle queued interrupts
+	go c.handleInterrupts()
+}
+
 func (c *CpuContext) Fetch() {
-	//pubsub.GetPubSubManager().Subscribe(pubsub.PPUVramReadEvent)
 	c.CurOpCode = pubsub.BusCtx().BusRead(c.Regs.Pc)
 	c.Regs.Pc++
 	c.currentInst = instructionByOpcode(c.CurOpCode)
