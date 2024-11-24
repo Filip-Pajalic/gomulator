@@ -1,11 +1,11 @@
-package emulator
+package ui
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
 	"pajalic.go.emulator/packages/cpu"
+	"pajalic.go.emulator/packages/input"
 	"pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/memory"
-	"pajalic.go.emulator/packages/ppu"
 	"time"
 )
 
@@ -25,24 +25,26 @@ type EmuContext struct {
 	Running  bool
 	Ticks    uint64
 	Die      bool
-	cpuCtx   cpu.CPU
-	cartCtx  memory.Cartridge
+	CpuCtx   cpu.CPU
+	CartCtx  memory.Cartridge
+	PpuCtx   PPU
 	timerCtx *cpu.TimerContext
 	dmaCtx   cpu.DMA
 }
 
 var emuInstance *EmuContext
 
-func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext, dmaCtx cpu.DMA) *EmuContext {
+func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext, dmaCtx cpu.DMA, ppuCtx PPU) *EmuContext {
 	return &EmuContext{
 		Paused:   false,
 		Running:  true,
 		Ticks:    0,
 		Die:      false,
-		cpuCtx:   cpuCtx,
-		cartCtx:  cartCtx,
+		CpuCtx:   cpuCtx,
+		CartCtx:  cartCtx,
 		dmaCtx:   dmaCtx,
 		timerCtx: timerCtx,
+		PpuCtx:   ppuCtx,
 	}
 }
 
@@ -59,7 +61,7 @@ func (e *EmuContext) runCPULoop() {
 			continue
 		}
 
-		if !e.cpuCtx.Step() {
+		if !e.CpuCtx.Step() {
 			e.Die = true
 			logger.Fatal("CPU has stopped unexpectedly.")
 		}
@@ -89,7 +91,7 @@ func (e *EmuContext) DelaySDL(ms uint32) {
 
 // LoadROM loads a ROM file into the cartridge context
 func (e *EmuContext) LoadROM(romFile string) bool {
-	if !e.cartCtx.CartLoad(romFile) {
+	if !e.CartCtx.CartLoad(romFile) {
 		logger.Error("Failed to load ROM file:", romFile)
 		return false
 	}
@@ -97,7 +99,7 @@ func (e *EmuContext) LoadROM(romFile string) bool {
 }
 
 // StartEmulator initializes all components, loads the ROM, and starts the emulation
-func StartEmulator(romFile string) {
+func StartEmulator(romFile string) *EmuContext {
 	cartContext := memory.CartCtx()
 
 	if !cartContext.CartLoad(romFile) {
@@ -107,14 +109,16 @@ func StartEmulator(romFile string) {
 	// Continue initializing other components
 	timerContext := cpu.TimerCtx()
 	dmaContext := cpu.DmaCtx()
-	ppuContext := ppu.PpuCtx()
+	ppuContext := PpuCtx()
 	ramContext := memory.RamCtx()
+	ioContext := input.NewIo(nil, timerContext, dmaContext)
 
-	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext)
+	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext, ioContext)
 	cpuContext := cpu.NewCpuContext(busContext)
 
 	// Create the emulator context
-	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext)
+	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext)
+	return emuInstance
+	//emuInstance.Start()
 
-	emuInstance.Start()
 }

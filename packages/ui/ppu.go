@@ -1,10 +1,9 @@
-package ppu
+package ui
 
 import (
 	"bytes"
 	"encoding/binary"
 	logger "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/ui"
 )
 
 type InterruptType byte
@@ -22,10 +21,11 @@ const (
 
 // PPU interface defines PPU operations
 type PPU interface {
-	PpuWramWrite(address uint16, value byte)
-	PpuWramRead(address uint16) byte
+	WramWrite(address uint16, value byte)
+	WramRead(address uint16) byte
 	OamWrite(address uint16, value byte)
 	OamRead(address uint16) byte
+	VideBuffer() []uint32
 }
 
 // PpuContext represents the state of the PPU
@@ -118,31 +118,33 @@ func NewPpuContext() *PpuContext {
 	}
 }
 
+func (p *PpuContext) VideBuffer() []uint32 {
+	return p.VideoBuffer
+}
+
 // PpuCtx returns the singleton PPU context
 func PpuCtx() *PpuContext {
 	if ppuInstance == nil {
-		ui.LcdInit()
-		ui.LCDSModeSet(ui.ModeOam)
 		ppuInstance = NewPpuContext()
 	}
 	return ppuInstance
 }
 
 // VramWrite writes a byte to VRAM
-func (p *PpuContext) PpuWramWrite(address uint16, value byte) {
+func (p *PpuContext) WramWrite(address uint16, value byte) {
 	if address >= 0x8000 && address < 0xA000 {
 		p.Vram[address-0x8000] = value
 	} else {
-		logger.Warn("PPU PpuWramWrite: Invalid address %04X", address)
+		logger.Warn("PPU WramWrite: Invalid address %04X", address)
 	}
 }
 
 // VramRead reads a byte from VRAM
-func (p *PpuContext) PpuWramRead(address uint16) byte {
+func (p *PpuContext) WramRead(address uint16) byte {
 	if address >= 0x8000 && address < 0xA000 {
 		return p.Vram[address-0x8000]
 	}
-	logger.Warn("PPU PpuWramRead: Invalid address %04X", address)
+	logger.Warn("PPU WramRead: Invalid address %04X", address)
 	return 0xFF
 }
 

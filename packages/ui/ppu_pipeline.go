@@ -1,10 +1,9 @@
 // ppu_pipeline.go
-package ppu
+package ui
 
 import (
 	"pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/memory"
-	"pajalic.go.emulator/packages/ui"
 )
 
 // Other imports...
@@ -12,11 +11,11 @@ import (
 // WindowVisible checks if the window should be visible based on LCDC settings
 func (p *PpuContext) WindowVisible() bool {
 
-	return ui.LCDCWinEnable() &&
-		ui.LcdCtx().WinX >= 0 &&
-		ui.LcdCtx().WinX <= 166 &&
-		ui.LcdCtx().WinY >= 0 &&
-		ui.LcdCtx().WinY < YRES
+	return LCDCWinEnable() &&
+		LcdCtx().WinX >= 0 &&
+		LcdCtx().WinX <= 166 &&
+		LcdCtx().WinY >= 0 &&
+		LcdCtx().WinY < YRES
 }
 
 // PixelFifoPush pushes a pixel value onto the FIFO queue
@@ -59,7 +58,7 @@ func (p *PpuContext) PixelFifoPop() uint32 {
 func (p *PpuContext) FetchSpritePixels(bit int, color uint32, bgColor uint8) uint32 {
 
 	for i := 0; i < int(p.FetchedEntryCount); i++ {
-		spX := (p.FetchedEntries[i].X - 8) + (ui.LcdCtx().ScrollX % 8)
+		spX := (p.FetchedEntries[i].X - 8) + (LcdCtx().ScrollX % 8)
 
 		if spX+8 < p.Pfc.FifoX {
 			continue
@@ -87,9 +86,9 @@ func (p *PpuContext) FetchSpritePixels(bit int, color uint32, bgColor uint8) uin
 
 		if bgPriority != 0 || bgColor == 0 {
 			if p.FetchedEntries[i].FPn > 0 {
-				color = ui.LcdCtx().Sp2Colors[hi|lo]
+				color = LcdCtx().Sp2Colors[hi|lo]
 			} else {
-				color = ui.LcdCtx().Sp1Colors[hi|lo]
+				color = LcdCtx().Sp1Colors[hi|lo]
 			}
 
 			if hi|lo != 0 {
@@ -108,19 +107,19 @@ func (p *PpuContext) PipelineFifoAdd() bool {
 		return false
 	}
 
-	x := p.Pfc.FetchX - (8 - (ui.LcdCtx().ScrollX % 8))
+	x := p.Pfc.FetchX - (8 - (LcdCtx().ScrollX % 8))
 
 	for i := 0; i < 8; i++ {
 		bit := 7 - i
 		hi := (p.Pfc.BgwFetchData[1] & (1 << bit)) >> bit
 		lo := (p.Pfc.BgwFetchData[2] & (1 << bit)) << 1
-		color := ui.LcdCtx().BgColors[hi|lo]
+		color := LcdCtx().BgColors[hi|lo]
 
-		if !ui.LCDCObjEnable() {
-			color = ui.LcdCtx().BgColors[0]
+		if !LCDCObjEnable() {
+			color = LcdCtx().BgColors[0]
 		}
 
-		if ui.LCDCObjEnable() {
+		if LCDCObjEnable() {
 			color = p.FetchSpritePixels(bit, color, hi|lo)
 		}
 
@@ -139,7 +138,7 @@ func (p *PpuContext) PipelineLoadSpriteTile() {
 	le := p.LineSprites
 
 	for le != nil {
-		spX := (le.Entry.X - 8) + (ui.LcdCtx().ScrollX % 8)
+		spX := (le.Entry.X - 8) + (LcdCtx().ScrollX % 8)
 
 		if (spX >= p.Pfc.FetchX && spX < p.Pfc.FetchX+8) ||
 			((spX+8) >= p.Pfc.FetchX && (spX+8) < p.Pfc.FetchX+8) {
@@ -158,8 +157,8 @@ func (p *PpuContext) PipelineLoadSpriteTile() {
 // PipelineLoadSpriteData loads sprite data based on the current fetch offset
 func (p *PpuContext) PipelineLoadSpriteData(offset uint8) {
 
-	curY := ui.LcdCtx().Ly
-	spriteHeight := ui.LCDCObjHeight()
+	curY := LcdCtx().Ly
+	spriteHeight := LCDCObjHeight()
 
 	for i := 0; i < int(p.FetchedEntryCount); i++ {
 		ty := ((curY + 16) - p.FetchedEntries[i].Y) * 2
@@ -186,23 +185,23 @@ func (p *PpuContext) PipelineLoadWindowTile() {
 		return
 	}
 
-	windowY := ui.LcdCtx().WinY
+	windowY := LcdCtx().WinY
 
-	if p.Pfc.FetchX+7 >= ui.LcdCtx().WinX &&
-		p.Pfc.FetchX+7 < ui.LcdCtx().WinX+YRES+14 {
-		if ui.LcdCtx().Ly >= windowY && ui.LcdCtx().Ly < windowY+XRES {
+	if p.Pfc.FetchX+7 >= LcdCtx().WinX &&
+		p.Pfc.FetchX+7 < LcdCtx().WinX+YRES+14 {
+		if LcdCtx().Ly >= windowY && LcdCtx().Ly < windowY+XRES {
 			wTileY := p.WindowLine / 8
 
 			var addr uint16
-			if ui.LCDCWinMapArea() == 0x9800 {
-				addr = ui.LCDCWinMapArea() + uint16((p.Pfc.FetchX+7-ui.LcdCtx().WinX)/8) + uint16(wTileY*32)
+			if LCDCWinMapArea() == 0x9800 {
+				addr = LCDCWinMapArea() + uint16((p.Pfc.FetchX+7-LcdCtx().WinX)/8) + uint16(wTileY*32)
 			} else {
-				addr = ui.LCDCWinMapArea() + uint16((p.Pfc.FetchX+7-ui.LcdCtx().WinX)/8) + uint16(wTileY*32)
+				addr = LCDCWinMapArea() + uint16((p.Pfc.FetchX+7-LcdCtx().WinX)/8) + uint16(wTileY*32)
 			}
 
 			p.Pfc.BgwFetchData[0] = memory.BusCtx().BusRead(addr)
 
-			if ui.LCDCWinMapArea() == 0x8800 {
+			if LCDCWinMapArea() == 0x8800 {
 				p.Pfc.BgwFetchData[0] += 128
 			}
 		}

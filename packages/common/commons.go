@@ -1,4 +1,4 @@
-package cpu
+package common
 
 func BitSet(a byte, n byte, on bool) byte {
 	if on {

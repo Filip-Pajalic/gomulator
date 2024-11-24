@@ -1,24 +1,25 @@
 package cpu
 
 import (
+	"pajalic.go.emulator/packages/common"
 	logger "pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/memory"
 )
 
 func CpuFlagZ() bool {
-	return Bit(cpuInstance.Regs.F, 7)
+	return common.Bit(cpuInstance.Regs.F, 7)
 }
 
 func CpuFlagN() bool {
-	return Bit(cpuInstance.Regs.F, 6)
+	return common.Bit(cpuInstance.Regs.F, 6)
 }
 
 func CpuFlagH() bool {
-	return Bit(cpuInstance.Regs.F, 5)
+	return common.Bit(cpuInstance.Regs.F, 5)
 }
 
 func CpuFlagC() bool {
-	return Bit(cpuInstance.Regs.F, 4)
+	return common.Bit(cpuInstance.Regs.F, 4)
 }
 
 // Broken here

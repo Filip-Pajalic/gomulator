@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"os"
 	logger "pajalic.go.emulator/packages/logger"
 )
 
@@ -40,18 +41,17 @@ func (r *RamContext) WramWrite(address uint16, value byte) {
 
 // HramRead reads a byte from HRAM at the given address
 func (r *RamContext) HramRead(address uint16) byte {
-	if address < 0xFF80 || address >= 0xFFFF {
+	if address < 0xFF80 || address > 0xFFFE {
 		logger.Warn("HRAM Read: Invalid address %04X", address)
-		return 0xFF // Return default value for invalid addresses
+		os.Exit(1)
 	}
 	return r.Hram[address-0xFF80]
 }
 
-// HramWrite writes a byte to HRAM at the given address
 func (r *RamContext) HramWrite(address uint16, value byte) {
-	if address < 0xFF80 || address >= 0xFFFF {
+	if address < 0xFF80 || address > 0xFFFE {
 		logger.Warn("HRAM Write: Invalid address %04X", address)
-		return
+		os.Exit(1)
 	}
 	r.Hram[address-0xFF80] = value
 }

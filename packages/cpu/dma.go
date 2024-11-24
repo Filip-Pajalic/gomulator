@@ -34,9 +34,8 @@ func DmaCtx() *DMAContext {
 	return dmaInstance
 }
 
-func RestartDMAContext(start byte) *DMAContext {
+func (d *DMAContext) RestartDMAContext(start byte) {
 	dmaInstance = NewDMAContext(start)
-	return dmaInstance
 }
 
 func (d *DMAContext) DMATick() {

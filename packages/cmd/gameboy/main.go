@@ -2,8 +2,8 @@ package main
 
 import (
 	"os"
-	"pajalic.go.emulator/packages/emulator"
 	"pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/ui"
 )
 
 func main() {
@@ -12,5 +12,6 @@ func main() {
 	}
 	romFile := os.Args[1]
 
-	emulator.StartEmulator(romFile)
+	emuInstance := ui.StartEmulator(romFile)
+	ui.UiInit(emuInstance)
 }

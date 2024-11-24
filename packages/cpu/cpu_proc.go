@@ -1,6 +1,7 @@
 package cpu
 
 import (
+	"pajalic.go.emulator/packages/common"
 	"pajalic.go.emulator/packages/logger"
 	"pajalic.go.emulator/packages/memory"
 )
@@ -332,21 +333,22 @@ func procEi(ctx *CpuContext) {
 func procPop(ctx *CpuContext) {
 	lo := uint16(StackPop())
 	Cm.IncreaseCycle(1)
+
 	hi := uint16(StackPop())
 	Cm.IncreaseCycle(1)
 	n := (hi << 8) | lo
 	CpuSetReg(ctx.currentInst.Reg1, n)
-
 	if ctx.currentInst.Reg1 == RT_AF {
 		CpuSetReg(ctx.currentInst.Reg1, n&0xFFF0)
 	}
 }
 
 func procPush(ctx *CpuContext) {
-	hi := byte((CpuRegRead(ctx.currentInst.Reg1) >> 8) & 0xFF)
+	value := CpuRegRead(ctx.currentInst.Reg1)
+	lo := byte(value & 0xFF)
+	hi := byte((value >> 8) & 0xFF)
 	Cm.IncreaseCycle(1)
 	StackPush(hi)
-	lo := byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
 	Cm.IncreaseCycle(1)
 	StackPush(lo)
 	Cm.IncreaseCycle(1)
@@ -369,8 +371,8 @@ func procJp(ctx *CpuContext) {
 
 // Jump relative
 func procJr(ctx *CpuContext) {
-	rel := int8(ctx.FetchedData & 0xFF)
-	addr := ctx.Regs.Pc + uint16(rel)
+	rel := int8(ctx.FetchedData)
+	addr := uint16(int32(ctx.Regs.Pc) + int32(rel))
 	goToAddr(ctx, addr, false)
 }
 
@@ -705,18 +707,18 @@ func InstGetProccessor(intype InType) InProc {
 
 func CpuSetFlags(ctx *CpuContext, z *bool, n *bool, h *bool, c *bool) {
 	if z != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 7, *z)
+		ctx.Regs.F = common.BitSet(ctx.Regs.F, 7, *z)
 	}
 
 	if n != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 6, *n)
+		ctx.Regs.F = common.BitSet(ctx.Regs.F, 6, *n)
 	}
 
 	if h != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 5, *h)
+		ctx.Regs.F = common.BitSet(ctx.Regs.F, 5, *h)
 	}
 
 	if c != nil {
-		ctx.Regs.F = BitSet(ctx.Regs.F, 4, *c)
+		ctx.Regs.F = common.BitSet(ctx.Regs.F, 4, *c)
 	}
 }

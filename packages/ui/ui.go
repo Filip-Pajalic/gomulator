@@ -1,270 +1,158 @@
 package ui
 
 import (
-	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
-	"pajalic.go.emulator/packages/input"
-	logger "pajalic.go.emulator/packages/logger"
-	"unsafe"
+	"github.com/hajimehoshi/ebiten/v2"
+	"image/color"
+	"pajalic.go.emulator/packages/logger"
 )
 
 const (
-	SCREEN_WIDTH  = 640
-	SCREEN_HEIGHT = 480
-	scale         = 4
+	ScreenWidth  = 160 // Game Boy screen width
+	ScreenHeight = 144 // Game Boy screen height
+	scale        = 4
 )
 
-var (
-	sdlWindow        *sdl.Window
-	sdlRenderer      *sdl.Renderer
-	sdlTexture       *sdl.Texture
-	screen           *sdl.Surface
-	sdlDebugWindow   *sdl.Window
-	sdlDebugRenderer *sdl.Renderer
-	sdlDebugTexture  *sdl.Texture
-	debugScreen      *sdl.Surface
-)
-
-func UiInit() {
-	logger.Info("Cart loaded..")
-	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-		logger.Fatal("SDL init failed:", err)
-	}
-	logger.Info("SDL INIT")
-
-	if err := ttf.Init(); err != nil {
-		logger.Fatal("TTF init failed:", err)
-	}
-	logger.Info("TTF INIT")
-
-	var err error
-	sdlWindow, sdlRenderer, err = sdl.CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_RESIZABLE)
-	if err != nil {
-		logger.Fatal("Failed to create window and renderer:", err)
-	}
-
-	sdlDebugWindow, sdlDebugRenderer, err = sdl.CreateWindowAndRenderer(16*8*scale, 32*8*scale, 0)
-	if err != nil {
-		logger.Fatal("Failed to create debug window and renderer:", err)
-	}
-
-	debugScreen, err = sdl.CreateRGBSurface(0, (16*8*scale)+(16*scale),
-		(32*8*scale)+(64*scale), 32,
-		0x00FF0000,
-		0x0000FF00,
-		0x000000FF,
-		0xFF000000)
-	if err != nil {
-		logger.Fatal("Failed to create debug screen surface:", err)
-	}
-
-	sdlDebugTexture, err = sdlDebugRenderer.CreateTexture(
-		sdl.PIXELFORMAT_ABGR8888,
-		sdl.TEXTUREACCESS_STREAMING,
-		(16*8*scale)+(16*scale),
-		(32*8*scale)+(64*scale))
-	if err != nil {
-		logger.Fatal("Failed to create debug texture:", err)
-	}
-
-	sdlTexture, err = sdlRenderer.CreateTexture(
-		sdl.PIXELFORMAT_ARGB8888,
-		sdl.TEXTUREACCESS_STREAMING,
-		SCREEN_WIDTH,
-		SCREEN_HEIGHT)
-	if err != nil {
-		logger.Fatal("Failed to create SDL texture:", err)
-	}
-
-	screen, err = sdl.CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32,
-		0x00FF0000,
-		0x0000FF00,
-		0x000000FF,
-		0xFF000000)
-	if err != nil {
-		logger.Fatal("Failed to create screen surface:", err)
-	}
-
-	x, y := sdlWindow.GetPosition()
-	sdlDebugWindow.SetPosition(x+SCREEN_WIDTH+10, y)
+// Game represents the game state
+type Game struct {
+	EmuCtx     *EmuContext
+	VideoImage *ebiten.Image
+	// Debug variables
+	debugImage *ebiten.Image
 }
 
-func DestroyWindow() {
-	sdlWindow.Destroy()
-	sdlDebugWindow.Destroy()
-}
-
-func delay(ms uint32) {
-	sdl.Delay(ms)
-}
-
-// Might be wrong
-var tileColors = [4]uint32{0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000}
-
-func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x int32, y int32) {
-	// Ensure surface is valid
-	if surface == nil {
-		logger.Error("Invalid SDL surface provided.")
-		return
+// NewGame initializes a new Game instance
+func NewGame(emuInstance *EmuContext) *Game {
+	LcdInit()
+	g := &Game{
+		EmuCtx:     emuInstance,
+		VideoImage: ebiten.NewImage(ScreenWidth, ScreenHeight),
 	}
 
-	var rc sdl.Rect
+	// Create the debug image
+	g.debugImage = ebiten.NewImage(16*8*scale, 32*8*scale)
+	return g
+}
 
-	for tileY := int32(0); tileY < 16; tileY += 2 {
-		//var b1 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY))
-		//var b2 = emu.BusRead(startLocation + (tileNum * 16) + uint16(tileY) + 1)
+// Update handles game logic and input
+func (g *Game) Update() error {
+	// Handle input
+	g.handleInput()
 
-		b1, b2 := 0, 0
+	// Update emulator state
+	if !g.EmuCtx.CpuCtx.Step() {
+		g.EmuCtx.Die = true
+		logger.Fatal("CPU has stopped unexpectedly.")
+	}
 
-		for bit := int32(7); bit >= 0; bit-- {
-			var b1bit byte = 0
-			var b2bit byte = 0
-			if b1&(1<<bit) != 0 {
-				b1bit = 1
-			}
-			if b2&(1<<bit) != 0 {
-				b2bit = 1
-			}
+	// You might need to call ExecuteCycles here if needed
+	// g.EmuCtx.ExecuteCycles(cycles)
 
-			var hi = b1bit << 1
-			var lo = b2bit
+	return nil
+}
 
-			var color = hi | lo
+// Draw renders the game screen
+func (g *Game) Draw(screen *ebiten.Image) {
+	// Clear the screen
+	screen.Fill(color.Black)
 
-			rc.X = x + ((7 - bit) * scale)
-			rc.Y = y + (tileY / 2 * scale)
-			rc.W = scale
-			rc.H = scale
-			surface.FillRect(&rc, tileColors[color])
+	// Draw the emulator's video buffer
+	g.drawVideoBuffer(screen)
+
+	// Draw debug windows if needed
+	g.updateDebugWindows()
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
+	screen.DrawImage(g.debugImage, opts)
+}
+
+// Layout defines the screen dimensions
+func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
+	totalWidth := ScreenWidth*scale + 16*8*scale + 10 // Main screen + debug window + padding
+	totalHeight := ScreenHeight * scale
+	return totalWidth, totalHeight
+}
+
+// handleInput processes user input
+func (g *Game) handleInput() {
+	state := GamePadGetState()
+
+	state.B = ebiten.IsKeyPressed(ebiten.KeyZ)
+	state.A = ebiten.IsKeyPressed(ebiten.KeyX)
+	state.Start = ebiten.IsKeyPressed(ebiten.KeyEnter)
+	state.Select = ebiten.IsKeyPressed(ebiten.KeyTab)
+	state.Up = ebiten.IsKeyPressed(ebiten.KeyArrowUp)
+	state.Down = ebiten.IsKeyPressed(ebiten.KeyArrowDown)
+	state.Left = ebiten.IsKeyPressed(ebiten.KeyArrowLeft)
+	state.Right = ebiten.IsKeyPressed(ebiten.KeyArrowRight)
+}
+
+// drawVideoBuffer renders the emulator's video buffer to the screen
+func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
+	videoBuffer := g.EmuCtx.PpuCtx.VideBuffer()
+
+	// Set pixels on the VideoImage
+	for y := 0; y < ScreenHeight; y++ {
+		for x := 0; x < ScreenWidth; x++ {
+			pixelValue := videoBuffer[y*ScreenWidth+x]
+			col := convertColor(pixelValue)
+			g.VideoImage.Set(x, y, col)
 		}
 	}
+
+	// Draw the image onto the screen with scaling
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Scale(scale, scale)
+	screen.DrawImage(g.VideoImage, opts)
 }
 
-func UpdateDbgWindows() {
+// updateDebugWindows updates and draws the debug window
+func (g *Game) updateDebugWindows() {
+	// Clear the debug image
+	g.debugImage.Clear()
+
+	// Draw tiles or debug information
 	var tileNum uint16 = 0
-	var xDraw int32 = 0
-	var yDraw int32 = 0
-	var rc sdl.Rect
-	rc.X = 0
-	rc.Y = 0
-	rc.W = debugScreen.W
-	rc.H = debugScreen.H
-	err := debugScreen.FillRect(&rc, 0xFF111111)
-	if err != nil {
-		logger.Error(err.Error())
-	}
+	var xDraw, yDraw int
 
-	var addr uint16 = 0x8000
-
-	for y := int32(0); y < 24; y++ {
-		for x := int32(0); x < 16; x++ {
-			displayTile(debugScreen, addr, tileNum, xDraw+(x*scale), yDraw+(y*scale))
-			xDraw += 8 * scale
+	for y := 0; y < 24; y++ {
+		for x := 0; x < 16; x++ {
+			g.displayTile(g.debugImage, 0x8000, tileNum, xDraw+(x*8*scale), yDraw+(y*8*scale))
 			tileNum++
 		}
-
 		yDraw += 8 * scale
 		xDraw = 0
 	}
-
-	pixels := debugScreen.Pixels()
-
-	err = sdlDebugTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(debugScreen.Pitch))
-	if err != nil {
-		logger.Error(err.Error())
-	}
-	err = sdlDebugRenderer.Clear()
-	if err != nil {
-		logger.Error(err.Error())
-	}
-	err = sdlDebugRenderer.Copy(sdlDebugTexture, nil, nil)
-	if err != nil {
-		logger.Error(err.Error())
-	}
-
-	sdlDebugRenderer.Present()
 }
 
-func UiUpdate() {
-	// Ensure sdlRenderer and sdlTexture are valid
-	if sdlRenderer == nil || sdlTexture == nil {
-		logger.Error("Invalid SDL renderer or texture.")
-		return
-	}
+// displayTile draws a single tile onto the given image
+func (g *Game) displayTile(img *ebiten.Image, startLocation uint16, tileNum uint16, x int, y int) {
+	// Implement tile drawing logic based on your emulator's memory and tile data
+	// For demonstration purposes, we'll draw a simple rectangle
 
-	var rc sdl.Rect
-	rc.X = 0
-	rc.Y = 0
-	rc.W = 2048
-	rc.H = 2048
-	//TODO temporary to compile
-	//videoBuffer := ppu.PpuCtx.VideoBuffer
-
-	/*	for lineNum := 0; lineNum < ppu.YRES; lineNum++ {
-		for x := 0; x < ppu.XRES; x++ {
-			rc.X = int32(x * scale)
-			rc.Y = int32(lineNum * scale)
-			rc.W = int32(scale)
-			rc.H = int32(scale)
-			//TODO
-			//screen.FillRect(&rc, videoBuffer[x+(lineNum*ppu.XRES)])
-		}
-	}*/
-
-	// Update SDL texture with updated screen pixels
-	pixels := screen.Pixels()
-	if err := sdlTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(screen.Pitch)); err != nil {
-		logger.Error("Failed to update SDL texture:", err)
-		return
-	}
-
-	// Render SDL texture
-	sdlRenderer.Clear()
-	sdlRenderer.Copy(sdlTexture, nil, nil)
-	sdlRenderer.Present()
-
-	// Update debug windows
-	UpdateDbgWindows()
+	// Replace this with actual tile rendering logic
+	rect := &ebiten.DrawImageOptions{}
+	rect.GeoM.Translate(float64(x), float64(y))
+	tileImage := ebiten.NewImage(8*scale, 8*scale)
+	tileImage.Fill(color.RGBA{0xAA, 0xAA, 0xAA, 0xFF})
+	img.DrawImage(tileImage, rect)
 }
 
-func UiHandleEvents() {
-	var e sdl.Event
-
-	for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-		switch t := e.(type) {
-		case *sdl.KeyboardEvent:
-			if t.Type == sdl.KEYDOWN {
-				uiOnKey(true, t.Keysym.Sym)
-			} else if t.Type == sdl.KEYUP {
-				uiOnKey(false, t.Keysym.Sym)
-			}
-		case *sdl.WindowEvent:
-			if t.Event == sdl.WINDOWEVENT_CLOSE {
-				//emu.GetEmuContext().Die = true
-			}
-		}
+// convertColor converts a pixel value to a color.RGBA
+func convertColor(value uint32) color.RGBA {
+	return color.RGBA{
+		R: uint8((value >> 16) & 0xFF),
+		G: uint8((value >> 8) & 0xFF),
+		B: uint8(value & 0xFF),
+		A: 0xFF,
 	}
-
 }
 
-func uiOnKey(down bool, keyCode sdl.Keycode) {
-	state := input.GamePadGetState()
-	switch keyCode {
-	case sdl.K_z:
-		state.B = down
-	case sdl.K_x:
-		state.A = down
-	case sdl.K_RETURN:
-		state.Start = down
-	case sdl.K_TAB:
-		state.Select = down
-	case sdl.K_UP:
-		state.Up = down
-	case sdl.K_DOWN:
-		state.Down = down
-	case sdl.K_LEFT:
-		state.Left = down
-	case sdl.K_RIGHT:
-		state.Right = down
+// UiInit initializes the UI and starts the game loop
+func UiInit(emuInstance *EmuContext) {
+	game := NewGame(emuInstance)
+	ebiten.SetWindowSize(ScreenWidth*scale+16*8*scale+10, ScreenHeight*scale)
+	ebiten.SetWindowTitle("Emulator")
+	if err := ebiten.RunGame(game); err != nil {
+		logger.Fatal("Failed to run game:", err)
 	}
 }

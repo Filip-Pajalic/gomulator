@@ -1,4 +1,4 @@
-package input
+package ui
 
 type GamePadState struct {
 	Start  bool

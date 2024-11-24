@@ -1,32 +1,28 @@
-package ppu
-
-import (
-	"pajalic.go.emulator/packages/ui"
-)
+package ui
 
 // Existing methods...
 
 // IncrementLY increments the LY register and checks for LY compare interrupt
 func (p *PpuContext) IncrementLY() {
-	lcdCtx := ui.LcdCtx()
+	lcdCtx := LcdCtx()
 	lcdCtx.Ly++
 
 	if lcdCtx.Ly == lcdCtx.LyCompare {
-		ui.LCDSLycSet(true)
+		LCDSLycSet(true)
 
-		if ui.LCDSStatInt(ui.SSLyc) {
+		if LCDSStatInt(SSLyc) {
 			// Request LCD STAT interrupt
 			//p.externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
 		}
 	} else {
-		ui.LCDSLycSet(false)
+		LCDSLycSet(false)
 	}
 }
 
 // LoadLineSprites loads the sprites for the current line
 func (p *PpuContext) LoadLineSprites() {
-	curY := ui.LcdCtx().Ly
-	spriteHeight := ui.LCDCObjHeight()
+	curY := LcdCtx().Ly
+	spriteHeight := LCDCObjHeight()
 
 	// Reset LineEntryArray and LineSpriteCount
 	for i := range p.LineEntryArray {
