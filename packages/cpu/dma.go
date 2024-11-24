@@ -1,7 +1,7 @@
 package cpu
 
 import (
-	log "pajalic.go.emulator/packages/logger"
+	logger "pajalic.go.emulator/packages/logger"
 )
 
 type DMA interface {
@@ -27,7 +27,7 @@ func NewDMAContext(start byte) *DMAContext {
 	}
 }
 
-func GetDMAContext() *DMAContext {
+func DmaCtx() *DMAContext {
 	if dmaInstance == nil {
 		dmaInstance = NewDMAContext(0)
 	}
@@ -60,7 +60,7 @@ func (d *DMAContext) DMATick() {
 	// Check if DMA transfer is complete
 	if d.currentByte >= 0xA0 {
 		d.active = false
-		log.Info("DMA DONE!")
+		logger.Info("DMA DONE!")
 	}
 }
 

@@ -1,7 +1,6 @@
 package ppu
 
 import (
-	"pajalic.go.emulator/packages/cpu"
 	"pajalic.go.emulator/packages/ui"
 )
 
@@ -9,9 +8,6 @@ import (
 
 // IncrementLY increments the LY register and checks for LY compare interrupt
 func (p *PpuContext) IncrementLY() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	lcdCtx := ui.LcdCtx()
 	lcdCtx.Ly++
 
@@ -20,7 +16,7 @@ func (p *PpuContext) IncrementLY() {
 
 		if ui.LCDSStatInt(ui.SSLyc) {
 			// Request LCD STAT interrupt
-			p.externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
+			//p.externalPins.RequestInterrupt(cpu.IT_LCD_STAT)
 		}
 	} else {
 		ui.LCDSLycSet(false)
@@ -29,9 +25,6 @@ func (p *PpuContext) IncrementLY() {
 
 // LoadLineSprites loads the sprites for the current line
 func (p *PpuContext) LoadLineSprites() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	curY := ui.LcdCtx().Ly
 	spriteHeight := ui.LCDCObjHeight()
 

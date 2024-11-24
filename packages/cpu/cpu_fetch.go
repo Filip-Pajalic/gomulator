@@ -1,8 +1,8 @@
 package cpu
 
 import (
-	log "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/pubsub"
+	logger "pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/memory"
 )
 
 /*
@@ -34,14 +34,14 @@ func FetchData() {
 		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2) & 0xFF
 		return
 	case AM_R_D8, AM_D8:
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc)) & 0xFF
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc++
 		return
 	case AM_R_D16, AM_D16:
-		var lo = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		var lo = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
 		Cm.IncreaseCycle(1)
-		var hi = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc + 1))
+		var hi = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc + 1))
 		Cm.IncreaseCycle(1)
 		cpuInstance.FetchedData = lo | (hi << 8)
 		cpuInstance.Regs.Pc += 2
@@ -60,19 +60,19 @@ func FetchData() {
 		if cpuInstance.currentInst.Reg2 == RT_C {
 			addr |= 0xFF00
 		}
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(addr)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(addr)) & 0xFF
 		Cm.IncreaseCycle(1)
 		return
 	case AM_R_HLI:
 		addr := CpuRegRead(RT_HL)
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(addr)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(addr)) & 0xFF
 		Cm.IncreaseCycle(1)
 		CpuSetReg(RT_HL, addr+1)
 		return
 
 	case AM_R_HLD:
 		addr := CpuRegRead(RT_HL)
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(addr)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(addr)) & 0xFF
 		Cm.IncreaseCycle(1)
 		CpuSetReg(RT_HL, addr-1)
 		return
@@ -92,16 +92,16 @@ func FetchData() {
 		return
 
 	case AM_R_A8:
-		offset := uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		offset := uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc++
 		addr := 0xFF00 | offset
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(addr)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(addr)) & 0xFF
 		Cm.IncreaseCycle(1)
 		return
 
 	case AM_A8_R:
-		offset := uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		offset := uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc++
 		cpuInstance.MemDest = 0xFF00 | offset
@@ -109,15 +109,15 @@ func FetchData() {
 		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2) & 0xFF
 		return
 	case AM_HL_SPR:
-		e8 := int8(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		e8 := int8(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc++
 		cpuInstance.FetchedData = uint16(int32(cpuInstance.Regs.Sp) + int32(e8))
 		return
 	case AM_A16_R, AM_D16_R:
-		var lo = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		var lo = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
 		Cm.IncreaseCycle(1)
-		var hi = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc + 1))
+		var hi = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc + 1))
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc += 2
 		cpuInstance.MemDest = lo | (hi << 8)
@@ -125,7 +125,7 @@ func FetchData() {
 		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2) & 0xFF
 		return
 	case AM_MR_D8:
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc)) & 0xFF
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc++
 		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
@@ -134,21 +134,21 @@ func FetchData() {
 	case AM_MR:
 		cpuInstance.MemDest = CpuRegRead(cpuInstance.currentInst.Reg1)
 		cpuInstance.DestIsMem = true
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(cpuInstance.MemDest)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(cpuInstance.MemDest)) & 0xFF
 		Cm.IncreaseCycle(1)
 		return
 	case AM_R_A16:
-		var lo = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		var lo = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
 		Cm.IncreaseCycle(1)
-		var hi = uint16(pubsub.BusCtx().BusRead(cpuInstance.Regs.Pc + 1))
+		var hi = uint16(memory.BusCtx().BusRead(cpuInstance.Regs.Pc + 1))
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc += 2
 		addr := lo | (hi << 8)
-		cpuInstance.FetchedData = uint16(pubsub.BusCtx().BusRead(addr)) & 0xFF
+		cpuInstance.FetchedData = uint16(memory.BusCtx().BusRead(addr)) & 0xFF
 		Cm.IncreaseCycle(1)
 		return
 	default:
-		log.Warn("Unknown Addressing Mode! %d (%02X)\n", cpuInstance.currentInst.Mode, cpuInstance.CurOpCode)
+		logger.Warn("Unknown Addressing Mode! %d (%02X)\n", cpuInstance.currentInst.Mode, cpuInstance.CurOpCode)
 		return
 	}
 }

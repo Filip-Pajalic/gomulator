@@ -4,7 +4,7 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 	"pajalic.go.emulator/packages/input"
-	log "pajalic.go.emulator/packages/logger"
+	logger "pajalic.go.emulator/packages/logger"
 	"unsafe"
 )
 
@@ -26,26 +26,26 @@ var (
 )
 
 func UiInit() {
-	log.Info("Cart loaded..")
+	logger.Info("Cart loaded..")
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-		log.Fatal("SDL init failed:", err)
+		logger.Fatal("SDL init failed:", err)
 	}
-	log.Info("SDL INIT")
+	logger.Info("SDL INIT")
 
 	if err := ttf.Init(); err != nil {
-		log.Fatal("TTF init failed:", err)
+		logger.Fatal("TTF init failed:", err)
 	}
-	log.Info("TTF INIT")
+	logger.Info("TTF INIT")
 
 	var err error
 	sdlWindow, sdlRenderer, err = sdl.CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_RESIZABLE)
 	if err != nil {
-		log.Fatal("Failed to create window and renderer:", err)
+		logger.Fatal("Failed to create window and renderer:", err)
 	}
 
 	sdlDebugWindow, sdlDebugRenderer, err = sdl.CreateWindowAndRenderer(16*8*scale, 32*8*scale, 0)
 	if err != nil {
-		log.Fatal("Failed to create debug window and renderer:", err)
+		logger.Fatal("Failed to create debug window and renderer:", err)
 	}
 
 	debugScreen, err = sdl.CreateRGBSurface(0, (16*8*scale)+(16*scale),
@@ -55,7 +55,7 @@ func UiInit() {
 		0x000000FF,
 		0xFF000000)
 	if err != nil {
-		log.Fatal("Failed to create debug screen surface:", err)
+		logger.Fatal("Failed to create debug screen surface:", err)
 	}
 
 	sdlDebugTexture, err = sdlDebugRenderer.CreateTexture(
@@ -64,7 +64,7 @@ func UiInit() {
 		(16*8*scale)+(16*scale),
 		(32*8*scale)+(64*scale))
 	if err != nil {
-		log.Fatal("Failed to create debug texture:", err)
+		logger.Fatal("Failed to create debug texture:", err)
 	}
 
 	sdlTexture, err = sdlRenderer.CreateTexture(
@@ -73,7 +73,7 @@ func UiInit() {
 		SCREEN_WIDTH,
 		SCREEN_HEIGHT)
 	if err != nil {
-		log.Fatal("Failed to create SDL texture:", err)
+		logger.Fatal("Failed to create SDL texture:", err)
 	}
 
 	screen, err = sdl.CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32,
@@ -82,7 +82,7 @@ func UiInit() {
 		0x000000FF,
 		0xFF000000)
 	if err != nil {
-		log.Fatal("Failed to create screen surface:", err)
+		logger.Fatal("Failed to create screen surface:", err)
 	}
 
 	x, y := sdlWindow.GetPosition()
@@ -104,7 +104,7 @@ var tileColors = [4]uint32{0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000}
 func displayTile(surface *sdl.Surface, startLocation uint16, tileNum uint16, x int32, y int32) {
 	// Ensure surface is valid
 	if surface == nil {
-		log.Error("Invalid SDL surface provided.")
+		logger.Error("Invalid SDL surface provided.")
 		return
 	}
 
@@ -151,7 +151,7 @@ func UpdateDbgWindows() {
 	rc.H = debugScreen.H
 	err := debugScreen.FillRect(&rc, 0xFF111111)
 	if err != nil {
-		log.Error(err.Error())
+		logger.Error(err.Error())
 	}
 
 	var addr uint16 = 0x8000
@@ -171,15 +171,15 @@ func UpdateDbgWindows() {
 
 	err = sdlDebugTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(debugScreen.Pitch))
 	if err != nil {
-		log.Error(err.Error())
+		logger.Error(err.Error())
 	}
 	err = sdlDebugRenderer.Clear()
 	if err != nil {
-		log.Error(err.Error())
+		logger.Error(err.Error())
 	}
 	err = sdlDebugRenderer.Copy(sdlDebugTexture, nil, nil)
 	if err != nil {
-		log.Error(err.Error())
+		logger.Error(err.Error())
 	}
 
 	sdlDebugRenderer.Present()
@@ -188,7 +188,7 @@ func UpdateDbgWindows() {
 func UiUpdate() {
 	// Ensure sdlRenderer and sdlTexture are valid
 	if sdlRenderer == nil || sdlTexture == nil {
-		log.Error("Invalid SDL renderer or texture.")
+		logger.Error("Invalid SDL renderer or texture.")
 		return
 	}
 
@@ -214,7 +214,7 @@ func UiUpdate() {
 	// Update SDL texture with updated screen pixels
 	pixels := screen.Pixels()
 	if err := sdlTexture.Update(nil, unsafe.Pointer(&pixels[0]), int(screen.Pitch)); err != nil {
-		log.Error("Failed to update SDL texture:", err)
+		logger.Error("Failed to update SDL texture:", err)
 		return
 	}
 

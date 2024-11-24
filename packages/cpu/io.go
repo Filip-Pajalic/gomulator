@@ -1,7 +1,7 @@
 package cpu
 
 import (
-	log "pajalic.go.emulator/packages/logger"
+	logger "pajalic.go.emulator/packages/logger"
 )
 
 var serialData [2]byte
@@ -19,9 +19,9 @@ func IoRead(address uint16) byte {
 		return ly
 	default:
 		if Between16(address, 0xFF04, 0xFF07) {
-			return GetTimerContext().Read(address)
+			return TimerCtx().Read(address)
 		}
-		log.Info("UNSUPPORTED bus_read(%04X)\n", address)
+		logger.Info("UNSUPPORTED bus_read(%04X)\n", address)
 		return 0xFF
 	}
 }
@@ -36,12 +36,12 @@ func IoWrite(address uint16, value byte) {
 		CpuSetIntFlags(value)
 	case 0xFF46:
 		RestartDMAContext(value)
-		log.Info("DMA START!")
+		logger.Info("DMA START!")
 	default:
 		if Between16(address, 0xFF04, 0xFF07) {
-			GetTimerContext().Write(address, value)
+			TimerCtx().Write(address, value)
 		} else {
-			log.Info("UNSUPPORTED bus_write(%04X)\n", address)
+			logger.Info("UNSUPPORTED bus_write(%04X)\n", address)
 		}
 	}
 }

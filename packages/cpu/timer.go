@@ -15,7 +15,7 @@ type TimerContext struct {
 
 var timerInstance *TimerContext
 
-func GetTimerContext() *TimerContext {
+func TimerCtx() *TimerContext {
 	if timerInstance == nil {
 		timerInstance = &TimerContext{
 			div: 0xAC00,

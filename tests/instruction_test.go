@@ -2,7 +2,7 @@ package tests
 
 import (
 	"fmt"
-	"log"
+	"logger"
 	"os"
 	gameboypackage "pajalic.go.emulator/packages/cpu"
 	"pajalic.go.emulator/packages/emulator"
@@ -208,14 +208,14 @@ func getAllTestFiles(dirPath string) []os.FileInfo {
 	// Open the directory
 	dir, err := os.Open(dirPath)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	defer dir.Close()
 
 	// Read the directory entries
 	files, err := dir.Readdir(-1)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	return files

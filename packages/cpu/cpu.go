@@ -2,8 +2,7 @@ package cpu
 
 import (
 	"os"
-	log "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/pubsub"
+	logger "pajalic.go.emulator/packages/logger"
 )
 
 /*
@@ -34,12 +33,17 @@ instead of specifying an address in an operation you can use HL as the destinati
 
 */
 
+type Bus interface {
+	BusRead(address uint16) byte
+	BusWrite(address uint16, data byte)
+}
+
 type CPU interface {
 	Fetch()
 	Step() bool
 	Execute()
-	setIERegister(b byte)
-	getIERegister() byte
+	SetIERegister(b byte)
+	GetIERegister() byte
 }
 
 type ExternalPins interface {
@@ -76,16 +80,17 @@ type CpuContext struct {
 	enablingIme      bool
 	iERegister       byte
 	IntFlags         byte
+	memoryBus        Bus
 }
 
 var cpuInstance *CpuContext
 
-func NewCpuContext() *CpuContext {
+func NewCpuContext(memoryBus Bus) *CpuContext {
 
-	//GetTimerContext().div = 0xABCC TODO
+	//TimerCtx().div = 0xABCC TODO
 	InitInstructions()
 	InitProcessors()
-	return &CpuContext{
+	cpuInstance = &CpuContext{
 		Regs: CpuRegisters{
 			A:  0x01,
 			F:  0xB0,
@@ -109,54 +114,21 @@ func NewCpuContext() *CpuContext {
 		enablingIme:      false,
 		iERegister:       0,
 		IntFlags:         0,
-	}
-}
-
-func CpuCtx() *CpuContext {
-	if cpuInstance == nil {
-
-		cpuInstance = NewCpuContext()
-		cpuInstance.Start()
+		memoryBus:        memoryBus,
 	}
 	return cpuInstance
 }
 
-func (c *CpuContext) Start() {
-	// Subscribe to interrupt request events
-	interruptChannel := pubsub.PbManager.Subscribe(pubsub.InterruptRequestEvent)
-
-	// Start a goroutine to listen for interrupt requests
-	go func() {
-		for eventBase := range interruptChannel {
-			eventData, ok := eventBase.(pubsub.EventChannelBase)
-			if !ok {
-				log.Println("cpu: Invalid EventChannelBase received")
-				continue
-			}
-
-			interruptType, ok := eventData.Data.(InterruptType)
-			if !ok {
-				log.Println("cpu: Invalid InterruptType received")
-				continue
-			}
-
-			// Queue the interrupt
-			select {
-			case c.interrupts <- interruptType:
-				log.Printf("cpu: Queued interrupt %s", interruptType)
-			default:
-				// Interrupt queue is full; handle accordingly
-				log.Printf("cpu: Interrupt queue full. Dropping interrupt %s", interruptType)
-			}
-		}
-	}()
-
-	// Start a separate goroutine to handle queued interrupts
-	go c.handleInterrupts()
+func CpuCtx() *CpuContext {
+	if cpuInstance == nil {
+		logger.Fatal("Create new Cpu with NewCpuContext")
+		os.Exit(1)
+	}
+	return cpuInstance
 }
 
 func (c *CpuContext) Fetch() {
-	c.CurOpCode = pubsub.BusCtx().BusRead(c.Regs.Pc)
+	c.CurOpCode = c.memoryBus.BusRead(c.Regs.Pc)
 	c.Regs.Pc++
 	c.currentInst = instructionByOpcode(c.CurOpCode)
 }
@@ -164,7 +136,7 @@ func (c *CpuContext) Fetch() {
 func (c *CpuContext) Execute() {
 	var proc = InstGetProccessor(c.currentInst.Type)
 	if proc == nil {
-		log.Warn("No processor for this execution!")
+		logger.Warn("No processor for this execution!")
 		return
 	}
 	proc(c)
@@ -200,14 +172,14 @@ func (c *CpuContext) Step() bool {
 
 		var inst string
 		instToStr(c, &inst)
-		log.Info("%08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
+		logger.Info("%08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X\n",
 			Cm.GetCycleTicks(),
 			pc, inst, c.CurOpCode,
-			pubsub.BusCtx().BusRead(pc+1), pubsub.BusCtx().BusRead(pc+2), c.Regs.A, zf, nf, hf, cf, c.Regs.B, c.Regs.C,
+			c.memoryBus.BusRead(pc+1), c.memoryBus.BusRead(pc+2), c.Regs.A, zf, nf, hf, cf, c.Regs.B, c.Regs.C,
 			c.Regs.D, c.Regs.E, c.Regs.H, c.Regs.L)
 
 		if c.currentInst == nil {
-			log.Warn("Unknown instruction! %02X\n", c.CurOpCode)
+			logger.Warn("Unknown instruction! %02X\n", c.CurOpCode)
 			os.Exit(1)
 		}
 
@@ -235,12 +207,12 @@ func (c *CpuContext) Step() bool {
 	return true
 }
 
-func (c *CpuContext) getIERegister() byte {
+func (c *CpuContext) GetIERegister() byte {
 	return c.iERegister
 }
 
 // Interupt enable register
-func (c *CpuContext) setIERegister(n byte) {
+func (c *CpuContext) SetIERegister(n byte) {
 	c.iERegister = n
 }
 

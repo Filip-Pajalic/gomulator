@@ -5,12 +5,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
-	"pajalic.go.emulator/packages/pubsub"
 	"unsafe"
 
-	log "pajalic.go.emulator/packages/logger"
+	logger "pajalic.go.emulator/packages/logger"
 )
 
 // Cartridge interface defines methods for reading and writing cartridge data
@@ -199,61 +197,59 @@ func (c *CartContext) readNextBytes(file *os.File, number int, offset int64) []b
 
 	_, err := file.ReadAt(bbytes, offset)
 	if err != nil {
-		log.Fatal(err.Error())
+		logger.Fatal(err.Error())
 	}
 	return bbytes
 }
 
 // loadCart loads the ROM data from a file
 func (c *CartContext) loadCart(romName string) {
-	fi, err := os.Open(romName)
+	// Read the entire ROM file into memory
+	data, err := os.ReadFile(romName)
 	if err != nil {
-		fmt.Println(romName, "is an invalid file. Could not open.")
-		panic(err)
-	}
-	defer fi.Close()
-
-	memory := make([]uint8, 0, 65536)
-	buf := make([]byte, 1024)
-	for {
-		bytesRead, err := fi.Read(buf)
-		slice := buf[0:bytesRead]
-		memory = append(memory, slice...) // Expand the slice
-
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err.Error())
-		}
+		logger.Fatal("Could not open ROM file:", err)
 	}
 
-	emptyMemory := make([]uint8, 65536-len(memory)) // Ensure 64KB memory
-	c.romData = append(memory, emptyMemory...)
+	// Assign the data to c.romData
+	c.romData = data
 
-	// Read and parse the ROM header
+	// Check that the ROM data is not empty
+	if len(c.romData) == 0 {
+		logger.Fatal("ROM file is empty.")
+	}
+
+	// Read and parse the ROM header from c.romData
+	headerSize := int(unsafe.Sizeof(romHeader{}))
+	if len(c.romData) < headerOffset+headerSize {
+		logger.Fatal("ROM file is too small to contain a valid header.")
+	}
+
+	headerData := c.romData[headerOffset : headerOffset+headerSize]
+	buffer := bytes.NewBuffer(headerData)
 	rh := romHeader{}
-	data := c.readNextBytes(fi, int(unsafe.Sizeof(rh)), headerOffset)
-	buffer := bytes.NewBuffer(data)
 	err = binary.Read(buffer, binary.LittleEndian, &rh)
 	if err != nil {
-		log.Fatal("binary.Read failed", err)
+		logger.Fatal("binary.Read failed:", err)
 	}
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title
 
-	log.Info("Cartridge Loaded:")
-	log.Info("Title    : %s", string(c.header.Title[:]))
-	log.Info("Operation     : %2.2X (%s)", c.header.CartType, c.cartTypeName())
-	log.Info("ROM Size : %d KB", 32<<c.header.RomSize)
-	log.Info("RAM Size : %2.2X", c.header.RamSize)
-	log.Info("LIC Code : %2.2X (%s)", c.header.LicCode, c.cartLicName())
-	log.Info("ROM Vers : %2.2X", c.header.Version)
-	log.Info(
-		"Checksum : %2.2X (%s)",
+	// Log ROM information
+	logger.Info("Cartridge Loaded:")
+	logger.Info("Title    : %s", string(c.header.Title[:]))
+	logger.Info("Cartridge Type : %02X (%s)", c.header.CartType, c.cartTypeName())
+	logger.Info("ROM Size : %d KB", 32<<c.header.RomSize)
+	logger.Info("RAM Size : %02X", c.header.RamSize)
+	logger.Info("LIC Code : %02X (%s)", c.header.LicCode, c.cartLicName())
+	logger.Info("ROM Vers : %02X", c.header.Version)
+	logger.Info(
+		"Checksum : %02X (%s)",
 		c.header.Checksum,
 		c.checkSumChecker(c.header.Checksum),
 	)
+
+	// Optionally, log the size of the ROM data
+	logger.Info("ROM data length: %d bytes", len(c.romData))
 }
 
 // ProgramLoad loads a program into memory by writing to the bus
@@ -261,8 +257,8 @@ func (c *CartContext) ProgramLoad(program [][2]uint) {
 	for _, v := range program {
 		address := uint16(v[0])
 		data := byte(v[1])
-		log.Info("Loading Program: Writing %02X to %04X", data, address)
-		pubsub.BusCtx().BusWrite(address, data)
+		logger.Info("Loading Program: Writing %02X to %04X", data, address)
+		BusCtx().BusWrite(address, data)
 	}
 }
 
@@ -270,17 +266,13 @@ func (c *CartContext) ProgramLoad(program [][2]uint) {
 func (c *CartContext) CartLoad(cart string) bool {
 	copy(c.filename[:], fmt.Sprintf("%s", cart))
 	c.loadCart(cart)
-
-	// Initialize event processing after loading the cart
-	c.StartCartComponent()
-
 	return true
 }
 
 // CartWrite writes a byte to the ROM data
 func (c *CartContext) CartWrite(address uint16, data byte) {
 	if address >= uint16(len(c.romData)) {
-		log.Warn("Attempted to write outside ROM memory at address %04X", address)
+		logger.Warn("Attempted to write outside ROM memory at address %04X", address)
 		return
 	}
 	c.romData[address] = data
@@ -288,23 +280,11 @@ func (c *CartContext) CartWrite(address uint16, data byte) {
 
 // CartRead reads a byte from the ROM data
 func (c *CartContext) CartRead(address uint16) byte {
-	if address >= uint16(len(c.romData)) {
-		log.Warn("Attempted to read outside ROM memory at address %04X", address)
+
+	if int(address) <= len(c.romData) {
+		return c.romData[address]
+	} else {
+		logger.Warn("Attempted to read outside ROM memory at address %04X", address)
 		return 0xFF
 	}
-	return c.romData[address]
-}
-
-// StartCartComponent initializes and starts event processing for the cartridge
-func (c *CartContext) StartCartComponent() {
-	// Create a ReadWriteConfig for memory read/write
-	config := pubsub.NewReadWriteConfig[uint16, byte](
-		pubsub.MemoryReadEvent,
-		pubsub.MemoryWriteEvent,
-		c.CartRead,
-		c.CartWrite,
-	)
-
-	// Start processing read and write events in a separate goroutine
-	go pubsub.ProcessChannelTransactions(config)
 }

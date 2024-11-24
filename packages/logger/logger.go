@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	log *slog.Logger
+	logger *slog.Logger
 )
 
 func init() {
@@ -15,23 +15,23 @@ func init() {
 		Level: slog.LevelDebug,
 	}
 	handler := slog.NewTextHandler(os.Stdout, opts)
-	log = slog.New(handler)
+	logger = slog.New(handler)
 
 }
 
 func Info(format string, v ...interface{}) {
-	log.Info(fmt.Sprintf(format, v...))
+	logger.Info(fmt.Sprintf(format, v...))
 }
 
 func Warn(format string, v ...interface{}) {
-	log.Warn(fmt.Sprintf(format, v...))
+	logger.Warn(fmt.Sprintf(format, v...))
 }
 
 func Error(format string, v ...interface{}) {
-	log.Error(fmt.Sprintf(format, v...))
+	logger.Error(fmt.Sprintf(format, v...))
 }
 
 func Fatal(format string, v ...interface{}) {
-	log.Error(fmt.Sprintf(format, v...))
+	logger.Error(fmt.Sprintf(format, v...))
 	os.Exit(1)
 }

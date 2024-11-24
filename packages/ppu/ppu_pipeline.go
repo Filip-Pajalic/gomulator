@@ -3,7 +3,7 @@ package ppu
 
 import (
 	"pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/pubsub"
+	"pajalic.go.emulator/packages/memory"
 	"pajalic.go.emulator/packages/ui"
 )
 
@@ -11,8 +11,6 @@ import (
 
 // WindowVisible checks if the window should be visible based on LCDC settings
 func (p *PpuContext) WindowVisible() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
 
 	return ui.LCDCWinEnable() &&
 		ui.LcdCtx().WinX >= 0 &&
@@ -23,8 +21,6 @@ func (p *PpuContext) WindowVisible() bool {
 
 // PixelFifoPush pushes a pixel value onto the FIFO queue
 func (p *PpuContext) PixelFifoPush(value uint32) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	next := &FifoEntry{
 		Next:  nil,
@@ -44,8 +40,6 @@ func (p *PpuContext) PixelFifoPush(value uint32) {
 
 // PixelFifoPop pops a pixel value from the FIFO queue
 func (p *PpuContext) PixelFifoPop() uint32 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if p.Pfc.PixelFifo.size <= 0 {
 		logger.Error("PPU PixelFifoPop: FIFO is empty!")
@@ -63,8 +57,6 @@ func (p *PpuContext) PixelFifoPop() uint32 {
 
 // FetchSpritePixels fetches sprite pixels considering various flags and priorities
 func (p *PpuContext) FetchSpritePixels(bit int, color uint32, bgColor uint8) uint32 {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
 
 	for i := 0; i < int(p.FetchedEntryCount); i++ {
 		spX := (p.FetchedEntries[i].X - 8) + (ui.LcdCtx().ScrollX % 8)
@@ -111,8 +103,6 @@ func (p *PpuContext) FetchSpritePixels(bit int, color uint32, bgColor uint8) uin
 
 // PipelineFifoAdd adds pixels to the FIFO pipeline if there's space
 func (p *PpuContext) PipelineFifoAdd() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if p.Pfc.PixelFifo.size > 8 {
 		return false
@@ -145,8 +135,6 @@ func (p *PpuContext) PipelineFifoAdd() bool {
 
 // PipelineLoadSpriteTile loads sprite tile data into fetched entries
 func (p *PpuContext) PipelineLoadSpriteTile() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	le := p.LineSprites
 
@@ -169,8 +157,6 @@ func (p *PpuContext) PipelineLoadSpriteTile() {
 
 // PipelineLoadSpriteData loads sprite data based on the current fetch offset
 func (p *PpuContext) PipelineLoadSpriteData(offset uint8) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
 
 	curY := ui.LcdCtx().Ly
 	spriteHeight := ui.LCDCObjHeight()
@@ -189,14 +175,12 @@ func (p *PpuContext) PipelineLoadSpriteData(offset uint8) {
 		}
 
 		p.Pfc.FetchEntryData[byte((i*2))+offset] =
-			pubsub.BusCtx().BusRead(0x8000 + (uint16(tileIndex) * 16) + uint16(ty) + uint16(offset))
+			memory.BusCtx().BusRead(0x8000 + (uint16(tileIndex) * 16) + uint16(ty) + uint16(offset))
 	}
 }
 
 // PipelineLoadWindowTile loads window tile data if the window is visible
 func (p *PpuContext) PipelineLoadWindowTile() {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
 
 	if !p.WindowVisible() {
 		return
@@ -216,7 +200,7 @@ func (p *PpuContext) PipelineLoadWindowTile() {
 				addr = ui.LCDCWinMapArea() + uint16((p.Pfc.FetchX+7-ui.LcdCtx().WinX)/8) + uint16(wTileY*32)
 			}
 
-			p.Pfc.BgwFetchData[0] = pubsub.BusCtx().BusRead(addr)
+			p.Pfc.BgwFetchData[0] = memory.BusCtx().BusRead(addr)
 
 			if ui.LCDCWinMapArea() == 0x8800 {
 				p.Pfc.BgwFetchData[0] += 128
@@ -227,8 +211,6 @@ func (p *PpuContext) PipelineLoadWindowTile() {
 
 // PipelineFetch handles the fetch phase of the PPU pipeline
 func (p *PpuContext) PipelineFetch() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	switch p.Pfc.CurFetchState {
 	case FS_TILE:
@@ -264,8 +246,6 @@ func (p *PpuContext) PipelineFetch() {
 
 // PipelinePushPixel pushes a pixel onto the video buffer
 func (p *PpuContext) PipelinePushPixel() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	if p.Pfc.PixelFifo.size > 8 {
 		pixelData := p.PixelFifoPop()
@@ -281,11 +261,10 @@ func (p *PpuContext) PipelinePushPixel() {
 
 // PipelineProcess processes the pipeline fetch and push operations
 func (p *PpuContext) PipelineProcess() {
-	p.mu.Lock()
+
 	p.Pfc.MapY = (p.Pfc.LineX + p.Pfc.LineX)
 	p.Pfc.MapX = (p.Pfc.FetchX + p.Pfc.FetchX)
 	p.Pfc.TileY = ((p.Pfc.LineX + p.Pfc.LineX) % 8) * 2
-	p.mu.Unlock()
 
 	if p.LineTicks&1 == 0 {
 		p.PipelineFetch()
@@ -296,8 +275,6 @@ func (p *PpuContext) PipelineProcess() {
 
 // PipelineFifoReset resets the FIFO queue
 func (p *PpuContext) PipelineFifoReset() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	for p.Pfc.PixelFifo.size > 0 {
 		p.PixelFifoPop()

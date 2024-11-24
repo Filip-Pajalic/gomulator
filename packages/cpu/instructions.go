@@ -2,8 +2,8 @@ package cpu
 
 import (
 	"fmt"
-	"log"
-	"pajalic.go.emulator/packages/pubsub"
+	"pajalic.go.emulator/packages/logger"
+	"pajalic.go.emulator/packages/memory"
 )
 
 /*
@@ -1040,7 +1040,7 @@ func instToStr(ctx *CpuContext, s *string) {
 		return
 
 	case AM_A8_R:
-		fetchedValue := pubsub.BusCtx().BusRead(ctx.Regs.Pc - 1)
+		fetchedValue := memory.BusCtx().BusRead(ctx.Regs.Pc - 1)
 		*s += fmt.Sprintf("$%02X,%s", fetchedValue, rtLookupString[inst.Reg2])
 		return
 
@@ -1065,6 +1065,6 @@ func instToStr(ctx *CpuContext, s *string) {
 		return
 
 	default:
-		log.Fatalf("INVALID Addressing Mode: %d", inst.Mode)
+		logger.Fatal("INVALID Addressing Mode: %d", inst.Mode)
 	}
 }
