@@ -1,9 +1,9 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/common"
-	"pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	"app/internal/common"
+	"app/internal/logger"
+	"app/internal/memory"
 )
 
 func procNone(ctx *CpuContext) {

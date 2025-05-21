@@ -8,7 +8,7 @@ import (
 	"os"
 	"unsafe"
 
-	logger "pajalic.go.emulator/packages/logger"
+	logger "app/internal/logger"
 )
 
 // Cartridge interface defines methods for reading and writing cartridge data

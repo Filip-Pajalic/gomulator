@@ -2,8 +2,8 @@ package main
 
 import (
 	"os"
-	"pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/ui"
+	"app/internal/logger"
+	"app/internal/ui"
 )
 
 func main() {

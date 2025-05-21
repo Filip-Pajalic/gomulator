@@ -1,7 +1,7 @@
 package cpu
 
 import (
-	logger "pajalic.go.emulator/packages/logger"
+	logger "app/internal/logger"
 )
 
 type DMA interface {

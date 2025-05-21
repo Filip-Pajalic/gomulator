@@ -1,8 +1,8 @@
 package cpu
 
 import (
-	logger "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	logger "app/internal/logger"
+	"app/internal/memory"
 )
 
 /*

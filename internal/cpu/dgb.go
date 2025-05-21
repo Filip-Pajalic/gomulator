@@ -1,10 +1,10 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/memory"
+	"app/internal/memory"
 	"strings"
 
-	logger "pajalic.go.emulator/packages/logger"
+	logger "app/internal/logger"
 )
 
 var dbgMsg [1024]byte

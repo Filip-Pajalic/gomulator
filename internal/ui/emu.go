@@ -1,11 +1,10 @@
 package ui
 
 import (
-	"github.com/veandco/go-sdl2/sdl"
-	"pajalic.go.emulator/packages/cpu"
-	"pajalic.go.emulator/packages/input"
-	"pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	"app/internal/cpu"
+	"app/internal/input"
+	"app/internal/logger"
+	"app/internal/memory"
 	"time"
 )
 
@@ -86,7 +85,7 @@ func (e *EmuContext) DelayExecution(ms uint32) {
 
 // DelaySDL pauses execution using SDL's delay (if needed elsewhere)
 func (e *EmuContext) DelaySDL(ms uint32) {
-	sdl.Delay(ms)
+	//sdl.Delay(ms)
 }
 
 // LoadROM loads a ROM file into the cartridge context

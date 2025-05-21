@@ -2,8 +2,8 @@ package cpu
 
 import (
 	"fmt"
-	"pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	"app/internal/logger"
+	"app/internal/memory"
 )
 
 /*

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"logger"
 	"os"
-	gameboypackage "pajalic.go.emulator/packages/cpu"
-	"pajalic.go.emulator/packages/emulator"
-	"pajalic.go.emulator/packages/memory"
-	"pajalic.go.emulator/packages/ppu"
+	gameboypackage "app/internal/cpu"
+	"app/internal/emulator"
+	"app/internal/memory"
+	"app/internal/ppu"
 	"testing"
 )
 

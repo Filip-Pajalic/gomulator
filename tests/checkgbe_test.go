@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	gameboypackage "pajalic.go.emulator/packages/cpu"
+	gameboypackage "app/internal/cpu"
 )
 
 func TestNothing(t *testing.T) {

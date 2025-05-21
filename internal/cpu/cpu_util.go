@@ -1,9 +1,9 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/common"
-	logger "pajalic.go.emulator/packages/logger"
-	"pajalic.go.emulator/packages/memory"
+	"app/internal/common"
+	logger "app/internal/logger"
+	"app/internal/memory"
 )
 
 func CpuFlagZ() bool {

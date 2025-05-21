@@ -2,7 +2,7 @@ package memory
 
 import (
 	"os"
-	logger "pajalic.go.emulator/packages/logger"
+	logger "app/internal/logger"
 )
 
 // RamContext represents the state of WRAM and HRAM

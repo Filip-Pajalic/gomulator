@@ -3,7 +3,7 @@ package ui
 import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"image/color"
-	"pajalic.go.emulator/packages/logger"
+	"app/internal/logger"
 )
 
 const (

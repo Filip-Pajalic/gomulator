@@ -2,7 +2,7 @@ package cpu
 
 import (
 	"os"
-	logger "pajalic.go.emulator/packages/logger"
+	logger "app/internal/logger"
 )
 
 /*

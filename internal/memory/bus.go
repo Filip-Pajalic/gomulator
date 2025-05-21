@@ -1,7 +1,7 @@
 package memory
 
 import (
-	"pajalic.go.emulator/packages/logger"
+	"app/internal/logger"
 )
 
 type Ram interface {

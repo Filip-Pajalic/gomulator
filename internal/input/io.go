@@ -1,8 +1,8 @@
 package input
 
 import (
-	"pajalic.go.emulator/packages/common"
-	"pajalic.go.emulator/packages/logger"
+	"app/internal/common"
+	"app/internal/logger"
 )
 
 var serialData [2]byte

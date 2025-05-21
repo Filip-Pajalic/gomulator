@@ -1,7 +1,7 @@
 package cpu
 
 import (
-	"pajalic.go.emulator/packages/memory"
+	"app/internal/memory"
 )
 
 func StackPush(data byte) {
