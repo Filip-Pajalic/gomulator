@@ -1,9 +1,11 @@
 package ui
 
 import (
-	"github.com/hajimehoshi/ebiten/v2"
-	"image/color"
+	"app/internal/gamepad"
 	"app/internal/logger"
+	"image/color"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
@@ -38,14 +40,8 @@ func (g *Game) Update() error {
 	// Handle input
 	g.handleInput()
 
-	// Update emulator state
-	if !g.EmuCtx.CpuCtx.Step() {
-		g.EmuCtx.Die = true
-		logger.Fatal("CPU has stopped unexpectedly.")
-	}
-
-	// You might need to call ExecuteCycles here if needed
-	// g.EmuCtx.ExecuteCycles(cycles)
+	// Step the emulator for one frame
+	g.EmuCtx.StepFrame()
 
 	return nil
 }
@@ -74,7 +70,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 
 // handleInput processes user input
 func (g *Game) handleInput() {
-	state := GamePadGetState()
+	state := gamepad.GetState()
 
 	state.B = ebiten.IsKeyPressed(ebiten.KeyZ)
 	state.A = ebiten.IsKeyPressed(ebiten.KeyX)
@@ -126,14 +122,35 @@ func (g *Game) updateDebugWindows() {
 
 // displayTile draws a single tile onto the given image
 func (g *Game) displayTile(img *ebiten.Image, startLocation uint16, tileNum uint16, x int, y int) {
-	// Implement tile drawing logic based on your emulator's memory and tile data
-	// For demonstration purposes, we'll draw a simple rectangle
-
-	// Replace this with actual tile rendering logic
+	ppu := g.EmuCtx.PpuCtx
+	tileAddr := startLocation + tileNum*16
+	tileImage := ebiten.NewImage(8*scale, 8*scale)
+	for ty := 0; ty < 8; ty++ {
+		b1 := ppu.WramRead(tileAddr + uint16(ty*2))
+		b2 := ppu.WramRead(tileAddr + uint16(ty*2+1))
+		for tx := 0; tx < 8; tx++ {
+			bit := 7 - tx
+			colorIdx := ((b2>>bit)&1)<<1 | ((b1 >> bit) & 1)
+			var col color.Color
+			switch colorIdx {
+			case 0:
+				col = color.RGBA{0xFF, 0xFF, 0xFF, 0xFF} // White
+			case 1:
+				col = color.RGBA{0xAA, 0xAA, 0xAA, 0xFF} // Light gray
+			case 2:
+				col = color.RGBA{0x55, 0x55, 0x55, 0xFF} // Dark gray
+			case 3:
+				col = color.RGBA{0x00, 0x00, 0x00, 0xFF} // Black
+			}
+			for sy := 0; sy < scale; sy++ {
+				for sx := 0; sx < scale; sx++ {
+					tileImage.Set(tx*scale+sx, ty*scale+sy, col)
+				}
+			}
+		}
+	}
 	rect := &ebiten.DrawImageOptions{}
 	rect.GeoM.Translate(float64(x), float64(y))
-	tileImage := ebiten.NewImage(8*scale, 8*scale)
-	tileImage.Fill(color.RGBA{0xAA, 0xAA, 0xAA, 0xFF})
 	img.DrawImage(tileImage, rect)
 }
 

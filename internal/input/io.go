@@ -2,6 +2,7 @@ package input
 
 import (
 	"app/internal/common"
+	"app/internal/gamepad"
 	"app/internal/logger"
 )
 
@@ -45,6 +46,8 @@ func IoCtx() *Io {
 
 func (i *Io) Read(address uint16) byte {
 	switch address {
+	case 0xFF00:
+		return gamepad.GetOutput()
 	case 0xFF01:
 		return serialData[0]
 	case 0xFF02:

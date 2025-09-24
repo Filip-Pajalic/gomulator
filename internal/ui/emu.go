@@ -70,6 +70,12 @@ func (e *EmuContext) runCPULoop() {
 // ExecuteCycles processes a given number of CPU cycles and handles DMA ticks
 func (e *EmuContext) ExecuteCycles(cpuCycles int) {
 	for i := 0; i < cpuCycles; i++ {
+		// Step the CPU for each cycle
+		if !e.CpuCtx.Step() {
+			e.Die = true
+			logger.Fatal("CPU has stopped unexpectedly.")
+			return
+		}
 		for n := 0; n < 4; n++ { // Assuming 4 ticks per cycle
 			e.Ticks++
 			e.timerCtx.Tick()
@@ -95,6 +101,12 @@ func (e *EmuContext) LoadROM(romFile string) bool {
 		return false
 	}
 	return true
+}
+
+// StepFrame runs enough cycles for one Game Boy frame
+func (e *EmuContext) StepFrame() {
+	logger.Info("StepFrame called")
+	e.ExecuteCycles(100)
 }
 
 // StartEmulator initializes all components, loads the ROM, and starts the emulation
