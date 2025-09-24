@@ -1,8 +1,8 @@
 package cpu
 
 import (
-	"os"
 	logger "app/internal/logger"
+	"os"
 )
 
 /*
@@ -150,6 +150,7 @@ func (c *CpuContext) Step() bool {
 		Cm.IncreaseCycle(1)
 		FetchData()
 
+		// Flag display for logging: Z, N, H, C
 		var zf = "-"
 		var nf = "-"
 		var hf = "-"
@@ -157,15 +158,12 @@ func (c *CpuContext) Step() bool {
 		if (c.Regs.F & (1 << 7)) != 0 {
 			zf = "Z"
 		}
-
 		if c.Regs.F&(1<<6) != 0 {
 			nf = "N"
 		}
-
 		if c.Regs.F&(1<<5) != 0 {
-			cf = "H"
+			hf = "H" // Fix: was cf, should be hf
 		}
-
 		if c.Regs.F&(1<<4) != 0 {
 			cf = "C"
 		}
@@ -187,14 +185,13 @@ func (c *CpuContext) Step() bool {
 		/*	if !DbgPrint() {
 				return false
 			}
-		*/c.Execute()
+		*/
+		c.Execute()
 	} else {
 		Cm.IncreaseCycle(1)
-
 		if c.IntFlags != 0 {
 			c.Halted = false
 		}
-
 	}
 	if c.IntMasterEnabled {
 		CpuHandleInterrupts(c)
@@ -203,7 +200,6 @@ func (c *CpuContext) Step() bool {
 	if c.enablingIme {
 		c.IntMasterEnabled = true
 	}
-
 	return true
 }
 

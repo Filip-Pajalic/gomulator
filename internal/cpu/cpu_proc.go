@@ -30,12 +30,13 @@ func decodeReg(reg byte) regTypes {
 }
 
 func procNop(ctx *CpuContext) {
-
+	// NOP: No operation. Correct.
 }
 
 func procLd(ctx *CpuContext) {
 	if ctx.DestIsMem {
 		if is16bit(ctx.currentInst.Reg2) {
+			// Fault: 16-bit memory writes are rare (only LD (a16),SP). Make sure this is only used for correct instructions.
 			Cm.IncreaseCycle(1)
 			memory.BusCtx().BusWrite16(ctx.MemDest, ctx.FetchedData)
 		} else {
@@ -46,6 +47,7 @@ func procLd(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
+		// LD HL,SP+e8. Correct, but see FetchData for sign extension.
 		value := int8(ctx.FetchedData)
 		sp := CpuRegRead(RT_SP)
 		result := uint16(int32(sp) + int32(value))
@@ -63,6 +65,7 @@ func procLd(ctx *CpuContext) {
 		return
 	}
 
+	// Fault: For 16-bit LD r,nn, FetchedData should be 16 bits. For 8-bit LD, should mask to 8 bits.
 	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
 }
 
@@ -221,7 +224,7 @@ func procAnd(ctx *CpuContext) {
 	ctx.Regs.A &= byte(ctx.FetchedData)
 	var z = ctx.Regs.A == 0
 	var n = false
-	var h = true
+	var h = true // H always set for AND
 	var c = false
 
 	CpuSetFlags(ctx, &z, &n, &h, &c)
@@ -313,8 +316,9 @@ func procOr(ctx *CpuContext) {
 func procCp(ctx *CpuContext) {
 	a := ctx.Regs.A
 	operand := byte(ctx.FetchedData & 0xFF)
+	result := int16(a) - int16(operand)
 
-	z := a == operand
+	z := (byte(result&0xFF) == 0)
 	n := true
 	h := (a & 0x0F) < (operand & 0x0F)
 	c := a < operand
@@ -323,27 +327,31 @@ func procCp(ctx *CpuContext) {
 }
 
 func procDi(ctx *CpuContext) {
+	// DI: Disable interrupts
 	ctx.IntMasterEnabled = false
 }
 
 func procEi(ctx *CpuContext) {
+	// EI: Enable interrupts after next instruction
 	ctx.enablingIme = true
 }
 
 func procPop(ctx *CpuContext) {
+	// POP rr: Pop two bytes from stack into register pair
 	lo := uint16(StackPop())
 	Cm.IncreaseCycle(1)
-
 	hi := uint16(StackPop())
 	Cm.IncreaseCycle(1)
 	n := (hi << 8) | lo
 	CpuSetReg(ctx.currentInst.Reg1, n)
 	if ctx.currentInst.Reg1 == RT_AF {
+		// Lower 4 bits of F always zero
 		CpuSetReg(ctx.currentInst.Reg1, n&0xFFF0)
 	}
 }
 
 func procPush(ctx *CpuContext) {
+	// PUSH rr: Push register pair onto stack (hi first, then lo)
 	value := CpuRegRead(ctx.currentInst.Reg1)
 	lo := byte(value & 0xFF)
 	hi := byte((value >> 8) & 0xFF)
@@ -357,6 +365,7 @@ func procPush(ctx *CpuContext) {
 func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 	if CheckCondition(ctx) {
 		if pushpc {
+			// CALL or RST: push PC before jump
 			Cm.IncreaseCycle(2)
 			StackPush16(ctx.Regs.Pc)
 		}
@@ -366,6 +375,7 @@ func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 }
 
 func procJp(ctx *CpuContext) {
+	// JP nn or JP cc,nn: Jump to address
 	goToAddr(ctx, ctx.FetchedData, false)
 }
 
@@ -377,15 +387,16 @@ func procJr(ctx *CpuContext) {
 }
 
 func procCall(ctx *CpuContext) {
+	// CALL nn or CALL cc,nn: Call subroutine
 	goToAddr(ctx, ctx.FetchedData, true)
 }
 
 // 0000002D problem here with fetched data, why stack push wrong
 func procRet(ctx *CpuContext) {
+	// RET or RET cc: Return from subroutine
 	if ctx.currentInst.Condition != CT_NONE {
 		Cm.IncreaseCycle(1)
 	}
-
 	if CheckCondition(ctx) {
 		lo := uint16(StackPop())
 		Cm.IncreaseCycle(1)
@@ -398,26 +409,30 @@ func procRet(ctx *CpuContext) {
 }
 
 func procRst(ctx *CpuContext) {
+	// RST vec: Call fixed address (push PC, jump to vec)
 	goToAddr(ctx, uint16(ctx.currentInst.Param), true)
 }
 
 func procReti(ctx *CpuContext) {
+	// RETI: Return and enable interrupts
 	procRet(ctx)
 	ctx.IntMasterEnabled = true
 }
 
 func procLdh(ctx *CpuContext) {
+	// LDH (a8),A or LDH A,(a8): High RAM I/O
 	if ctx.currentInst.Reg1 == RT_A {
-		value := memory.BusCtx().BusRead(0xFF00 | ctx.FetchedData)
+		value := memory.BusCtx().BusRead(0xFF00 | (ctx.FetchedData & 0xFF))
 		ctx.Regs.A = value
 	} else {
-		memory.BusCtx().BusWrite(0xFF00|ctx.FetchedData, ctx.Regs.A)
+		memory.BusCtx().BusWrite(0xFF00|(ctx.FetchedData&0xFF), ctx.Regs.A)
 	}
 	Cm.IncreaseCycle(1)
 }
 
 func procInc(ctx *CpuContext) {
 	if is16bit(ctx.currentInst.Reg1) {
+		// INC 16-bit register. Correct.
 		value := CpuRegRead(ctx.currentInst.Reg1) + 1
 		CpuSetReg(ctx.currentInst.Reg1, value)
 		Cm.IncreaseCycle(1)
@@ -425,26 +440,29 @@ func procInc(ctx *CpuContext) {
 	}
 
 	var value uint16
+	var old byte
 	if ctx.currentInst.Mode == AM_MR {
 		addr := CpuRegRead(RT_HL)
-		data := memory.BusCtx().BusRead(addr)
-		value = uint16(data) + 1
+		old = memory.BusCtx().BusRead(addr)
+		value = uint16(old) + 1
 		memory.BusCtx().BusWrite(addr, byte(value&0xFF))
 		Cm.IncreaseCycle(1)
 	} else {
-		value = CpuRegRead(ctx.currentInst.Reg1) + 1
+		old = byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
+		value = uint16(old) + 1
 		CpuSetReg(ctx.currentInst.Reg1, value)
 	}
 
 	z := (value & 0xFF) == 0
 	n := false
-	h := ((value-1)&0x0F)+1 > 0x0F
+	h := ((old & 0x0F) + 1) > 0x0F // H set if lower nibble overflows
 
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
 
 func procDec(ctx *CpuContext) {
 	if is16bit(ctx.currentInst.Reg1) {
+		// DEC 16-bit register. Correct.
 		value := CpuRegRead(ctx.currentInst.Reg1) - 1
 		CpuSetReg(ctx.currentInst.Reg1, value)
 		Cm.IncreaseCycle(1)
@@ -452,20 +470,22 @@ func procDec(ctx *CpuContext) {
 	}
 
 	var value uint16
+	var old byte
 	if ctx.currentInst.Mode == AM_MR {
 		addr := CpuRegRead(RT_HL)
-		data := memory.BusCtx().BusRead(addr)
-		value = uint16(data) - 1
+		old = memory.BusCtx().BusRead(addr)
+		value = uint16(old) - 1
 		memory.BusCtx().BusWrite(addr, byte(value&0xFF))
 		Cm.IncreaseCycle(1)
 	} else {
-		value = CpuRegRead(ctx.currentInst.Reg1) - 1
+		old = byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
+		value = uint16(old) - 1
 		CpuSetReg(ctx.currentInst.Reg1, value)
 	}
 
 	z := (value & 0xFF) == 0
 	n := true
-	h := ((value + 1) & 0x0F) == 0x00
+	h := (old & 0x0F) == 0 // H set if borrow from bit 4
 
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
@@ -473,12 +493,12 @@ func procDec(ctx *CpuContext) {
 func procSub(ctx *CpuContext) {
 	a := ctx.Regs.A
 	operand := byte(ctx.FetchedData & 0xFF)
-	result := uint16(a) - uint16(operand)
+	result := int16(a) - int16(operand)
 	ctx.Regs.A = byte(result & 0xFF)
 
 	z := ctx.Regs.A == 0
 	n := true
-	h := (int(a&0x0F) - int(operand&0x0F)) < 0
+	h := (a & 0x0F) < (operand & 0x0F) // H set if borrow from bit 4
 	c := a < operand
 
 	CpuSetFlags(ctx, &z, &n, &h, &c)
@@ -491,7 +511,7 @@ func procSbc(ctx *CpuContext) {
 	if CpuFlagC() {
 		carry = 1
 	}
-	result := uint16(a) - uint16(operand) - uint16(carry)
+	result := int16(a) - int16(operand) - int16(carry)
 	ctx.Regs.A = byte(result & 0xFF)
 
 	z := ctx.Regs.A == 0
@@ -523,11 +543,12 @@ func procAdc(ctx *CpuContext) {
 // Bool to Int problematik som sker i C men ej i GOlang
 func procAdd(ctx *CpuContext) {
 	if ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Mode == AM_D8 {
+		// ADD SP, e8. Correct, but see FetchData for sign extension.
 		value := int8(ctx.FetchedData)
 		sp := CpuRegRead(RT_SP)
 		result := uint16(int32(sp) + int32(value))
 
-		h := ((sp & 0x0F) + (uint16(value) & 0x0F)) > 0x0F
+		h := ((sp & 0xF) + (uint16(value) & 0xF)) > 0xF
 		c := ((sp & 0xFF) + (uint16(value) & 0xFF)) > 0xFF
 
 		z := false
@@ -540,12 +561,13 @@ func procAdd(ctx *CpuContext) {
 	}
 
 	if is16bit(ctx.currentInst.Reg1) {
+		// ADD HL,rr. Z not affected, N=0, H and C as per spec.
 		val1 := CpuRegRead(ctx.currentInst.Reg1)
 		val2 := CpuRegRead(ctx.currentInst.Reg2)
 		result := val1 + val2
 
 		h := ((val1 & 0x0FFF) + (val2 & 0x0FFF)) > 0x0FFF
-		c := result > 0xFFFF
+		c := (uint32(val1) + uint32(val2)) > 0xFFFF
 
 		n := false
 
@@ -569,10 +591,12 @@ func procAdd(ctx *CpuContext) {
 }
 
 func procStop(ctx *CpuContext) {
+	// STOP: Enter low-power mode (not fully emulated here)
 	logger.Fatal("STOPPING!")
 }
 
 func procDaa(ctx *CpuContext) {
+	// DAA: Decimal adjust accumulator after addition/subtraction
 	var adjust byte = 0
 	a := ctx.Regs.A
 	c := CpuFlagC()
@@ -595,39 +619,39 @@ func procDaa(ctx *CpuContext) {
 		}
 		a -= adjust
 	}
-
 	a &= 0xFF
 	z := a == 0
 	h := false
-
 	ctx.Regs.A = a
 	CpuSetFlags(ctx, &z, nil, &h, &c)
 }
 
 func procCpl(ctx *CpuContext) {
+	// CPL: Complement accumulator
 	ctx.Regs.A = ^ctx.Regs.A
 	n := true
 	h := true
-
 	CpuSetFlags(ctx, nil, &n, &h, nil)
 }
 
 func procScf(ctx *CpuContext) {
+	// SCF: Set carry flag
 	n := false
 	h := false
 	c := true
-
 	CpuSetFlags(ctx, nil, &n, &h, &c)
 }
+
 func procCcf(ctx *CpuContext) {
+	// CCF: Complement carry flag
 	c := !CpuFlagC()
 	n := false
 	h := false
-
 	CpuSetFlags(ctx, nil, &n, &h, &c)
 }
 
 func procHalt(ctx *CpuContext) {
+	// HALT: Enter low-power mode (not fully emulated here)
 	ctx.Halted = true
 }
 

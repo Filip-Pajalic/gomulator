@@ -22,13 +22,13 @@ func CpuFlagC() bool {
 	return common.Bit(cpuInstance.Regs.F, 4)
 }
 
-// Broken here
+// CpuRegRead: Reads 8/16-bit register values. For F, only upper nibble is valid. For AF, lower nibble of F is always zero.
 func CpuRegRead(regType regTypes) uint16 {
 	switch regType {
 	case RT_A:
 		return uint16(cpuInstance.Regs.A)
 	case RT_F:
-		return uint16(cpuInstance.Regs.F & 0xF0)
+		return uint16(cpuInstance.Regs.F & 0xF0) // Only upper nibble is valid
 	case RT_B:
 		return uint16(cpuInstance.Regs.B)
 	case RT_C:
@@ -42,13 +42,14 @@ func CpuRegRead(regType regTypes) uint16 {
 	case RT_L:
 		return uint16(cpuInstance.Regs.L)
 	case RT_AF:
-		return uint16(cpuInstance.Regs.A)<<8 | uint16(cpuInstance.Regs.F&0xF0)
+		// Lower nibble of F is always zero
+		return (uint16(cpuInstance.Regs.A) << 8) | uint16(cpuInstance.Regs.F&0xF0)
 	case RT_BC:
-		return uint16(cpuInstance.Regs.B)<<8 | uint16(cpuInstance.Regs.C)
+		return (uint16(cpuInstance.Regs.B) << 8) | uint16(cpuInstance.Regs.C)
 	case RT_DE:
-		return uint16(cpuInstance.Regs.D)<<8 | uint16(cpuInstance.Regs.E)
+		return (uint16(cpuInstance.Regs.D) << 8) | uint16(cpuInstance.Regs.E)
 	case RT_HL:
-		return uint16(cpuInstance.Regs.H)<<8 | uint16(cpuInstance.Regs.L)
+		return (uint16(cpuInstance.Regs.H) << 8) | uint16(cpuInstance.Regs.L)
 	case RT_PC:
 		return cpuInstance.Regs.Pc
 	case RT_SP:
@@ -58,13 +59,13 @@ func CpuRegRead(regType regTypes) uint16 {
 	}
 }
 
-// could be problem with cast here
+// CpuSetReg: Sets 8/16-bit register values. For F, only upper nibble is set. For AF, lower nibble of F is always zero.
 func CpuSetReg(regType regTypes, val uint16) {
 	switch regType {
 	case RT_A:
 		cpuInstance.Regs.A = byte(val & 0xFF)
 	case RT_F:
-		cpuInstance.Regs.F = byte(val & 0xF0)
+		cpuInstance.Regs.F = byte(val & 0xF0) // Only upper nibble is set
 	case RT_B:
 		cpuInstance.Regs.B = byte(val & 0xFF)
 	case RT_C:
@@ -79,7 +80,7 @@ func CpuSetReg(regType regTypes, val uint16) {
 		cpuInstance.Regs.L = byte(val & 0xFF)
 	case RT_AF:
 		cpuInstance.Regs.A = byte((val >> 8) & 0xFF)
-		cpuInstance.Regs.F = byte(val & 0xF0)
+		cpuInstance.Regs.F = byte(val & 0xF0) // Lower nibble always zero
 	case RT_BC:
 		cpuInstance.Regs.B = byte((val >> 8) & 0xFF)
 		cpuInstance.Regs.C = byte(val & 0xFF)
@@ -98,6 +99,7 @@ func CpuSetReg(regType regTypes, val uint16) {
 	}
 }
 
+// CpuRegRead8: Reads 8-bit register or memory at HL. For F, only upper nibble is valid.
 func CpuRegRead8(rt regTypes) byte {
 	switch rt {
 	case RT_A:
@@ -125,6 +127,7 @@ func CpuRegRead8(rt regTypes) byte {
 	}
 }
 
+// CpuSetReg8: Sets 8-bit register or memory at HL. For F, only upper nibble is set.
 func CpuSetReg8(rt regTypes, val byte) {
 	switch rt {
 	case RT_A:

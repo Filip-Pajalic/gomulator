@@ -1,9 +1,9 @@
 package cpu
 
 import (
-	"fmt"
 	"app/internal/logger"
 	"app/internal/memory"
+	"fmt"
 )
 
 /*
@@ -189,6 +189,36 @@ type Instruction struct {
 var inst [0x100]Instruction
 
 func InitInstructions() {
+	// --- Begin review and comments for spec compliance ---
+	// NOTE: This table should match the official Game Boy CPU instruction set (see Pandocs)
+	// Check for missing, incorrect, or mis-assigned instructions below:
+
+	// 0x08: LD (a16),SP is correct (Reg2: RT_SP)
+	// 0x10: STOP is correct
+	// 0x18: JR r8 (should be signed offset, AM_D8 is used, but AM_D8 is unsigned; see fetch/execute)
+	// 0x20, 0x28, 0x30, 0x38: JR cc,r8 (should be signed offset, AM_D8)
+	// 0x22, 0x2A, 0x32, 0x3A: HL+ and HL- modes are correct
+	// 0x36: LD (HL),d8 is correct
+	// 0x76: HALT is correct
+	// 0xC3: JP a16 (unconditional)
+	// 0xC9: RET (unconditional)
+	// 0xCB: CB prefix (handled in procCb)
+	// 0xCD: CALL a16 (unconditional)
+	// 0xE0: LDH (a8),A (should use AM_A8_R, Reg2: RT_A)
+	// 0xE2: LD (C),A (should use AM_MR_R, Reg1: RT_C, Reg2: RT_A)
+	// 0xEA: LD (a16),A (should use AM_A16_R, Reg2: RT_A)
+	// 0xF0: LDH A,(a8) (should use AM_R_A8, Reg1: RT_A)
+	// 0xF2: LD A,(C) (should use AM_R_MR, Reg1: RT_A, Reg2: RT_C)
+	// 0xF8: LD HL,SP+e8 (should use AM_HL_SPR, Reg1: RT_HL, Reg2: RT_SP)
+	// 0xF9: LD SP,HL (should use AM_R_R, Reg1: RT_SP, Reg2: RT_HL)
+	// 0xFA: LD A,(a16) (should use AM_R_A16, Reg1: RT_A)
+	// 0xFB: EI is correct
+	// 0xFE: CP d8 (should use AM_R_D8, Reg1: RT_A)
+	// 0xFF: RST 38h is correct
+
+	// --- End review ---
+	// If you add new instructions, ensure all 0x00-0xFF opcodes are covered and match the spec.
+	// For CB-prefixed instructions, see procCb and CB decode logic.
 
 	inst[0x00] = Instruction{
 		Type: IN_NOP, Mode: AM_IMP,
