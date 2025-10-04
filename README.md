@@ -1,2 +1,2 @@
 # goemulator
-Gameboy emulator in go
+Gameboy emulator in GO
