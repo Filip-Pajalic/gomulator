@@ -141,7 +141,7 @@ func LcdWrite(address uint16, value uint8) {
 		if address == 0xFF40 {
 			// Special alert when background gets enabled
 			if (value&0x01) != 0 && (lcdContext.Lcdc&0x01) == 0 {
-				logger.Info("*** BACKGROUND ENABLED! *** LCDC: 0x%02X -> 0x%02X", lcdContext.Lcdc, value)
+				logger.Debug("*** BACKGROUND ENABLED! *** LCDC: 0x%02X -> 0x%02X", lcdContext.Lcdc, value)
 			}
 
 			// only when window is actually disabled via LCDC bit 5
@@ -153,7 +153,7 @@ func LcdWrite(address uint16, value uint8) {
 
 			// Only log major changes to reduce spam
 			if (value & 0x81) != (lcdContext.Lcdc & 0x81) {
-				logger.Info("LCD: LCDC write 0x%02X (LCD_EN=%v, BG_EN=%v, OBJ_EN=%v)",
+				logger.Debug("LCD: LCDC write 0x%02X (LCD_EN=%v, BG_EN=%v, OBJ_EN=%v)",
 					value, (value&0x80) != 0, (value&0x01) != 0, (value&0x02) != 0)
 			}
 		}

@@ -2,6 +2,7 @@ package cpu
 
 import (
 	logger "app/internal/logger"
+	"app/internal/memory"
 )
 
 type DMA interface {
@@ -35,7 +36,15 @@ func DmaCtx() *DMAContext {
 }
 
 func (d *DMAContext) RestartDMAContext(start byte) {
-	dmaInstance = NewDMAContext(start)
+	if d == nil {
+		dmaInstance = NewDMAContext(start)
+		return
+	}
+
+	d.active = true
+	d.currentByte = 0
+	d.value = start
+	d.startDelay = 2
 }
 
 func (d *DMAContext) DMATick() {
@@ -48,20 +57,18 @@ func (d *DMAContext) DMATick() {
 	}
 
 	sourceAddr := (uint16(d.value) << 8) | uint16(d.currentByte)
+	destAddr := 0xFE00 + uint16(d.currentByte)
 
-	// Note: This will be properly integrated when we fix the bus access
-	// For now, we'll add a placeholder that can be connected later
-	logger.Debug("DMA transfer: byte %d from address %04X to OAM %02X", d.currentByte, sourceAddr, 0xFE00+uint16(d.currentByte))
+	data := memory.BusCtx().BusRead(sourceAddr)
+	memory.BusCtx().DmaWriteToOam(destAddr, data)
 
-	// TODO: Implement actual memory read/write when bus context is available
-	// data := memory.BusCtx().BusRead(sourceAddr)
-	// ppu.GetPPUContext().OamWrite(0xFE00+uint16(d.currentByte), data)
+	logger.Debug("DMA transfer: byte %d from %04X -> %04X data=%02X", d.currentByte, sourceAddr, destAddr, data)
 
 	d.currentByte++
 
 	if d.currentByte >= 0xA0 {
 		d.active = false
-		logger.Info("DMA transfer complete! Transferred 160 bytes to OAM")
+		logger.Debug("DMA transfer complete! Transferred 160 bytes to OAM")
 	}
 }
 
@@ -70,7 +77,7 @@ func (d *DMAContext) DMATransferring() bool {
 }
 
 func DmaStart(start uint8) {
-	logger.Info("DMA start: source address %02X00", start)
+	logger.Debug("DMA start: source address %02X00", start)
 
 	dmaCtx := DmaCtx()
 	dmaCtx.RestartDMAContext(start)

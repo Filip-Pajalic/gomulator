@@ -65,19 +65,15 @@ func (t *TimerContext) Write(address uint16, value byte) {
 	switch address {
 	case 0xFF04:
 		// DIV
-		logger.Info("Timer write DIV=00 (reset from %04X)", t.div)
 		t.div = 0
 	case 0xFF05:
 		// TIMA
-		logger.Info("Timer write TIMA=%02X", value)
 		t.tima = value
 	case 0xFF06:
 		// TMA
-		logger.Info("Timer write TMA=%02X", value)
 		t.tma = value
 	case 0xFF07:
 		// TAC
-		logger.Info("Timer write TAC=%02X", value)
 		t.tac = value & 0x07 // Only the lower 3 bits are used
 	}
 }

@@ -40,7 +40,7 @@ func (r *RamContext) WramWrite(address uint16, value byte) {
 		return
 	}
 	if address == 0xD807 || address == 0xD808 {
-		logger.Info("WRAM write debug: addr=%04X value=%02X", address, value)
+		logger.Debug("WRAM write debug: addr=%04X value=%02X", address, value)
 	}
 	r.Wram[address-0xC000] = value
 }

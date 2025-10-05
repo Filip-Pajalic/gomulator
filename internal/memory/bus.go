@@ -160,6 +160,15 @@ func (b *Bus) BusWrite(address uint16, data byte) {
 	}
 }
 
+// DmaWriteToOam writes directly to OAM, bypassing CPU access restrictions during DMA
+func (b *Bus) DmaWriteToOam(address uint16, data byte) {
+	if address < 0xFE00 || address >= 0xFEA0 {
+		logger.Warn("DMA OAM write: Invalid address %04X", address)
+		return
+	}
+	b.ppu.OamWrite(address, data)
+}
+
 // BusRead16 reads two bytes from the bus starting at the specified address
 func (b *Bus) BusRead16(address uint16) uint16 {
 	lo := uint16(b.BusRead(address))

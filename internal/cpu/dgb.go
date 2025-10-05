@@ -46,7 +46,7 @@ func DbgPrint() bool {
 		if dbgMsg[msgSize-1] == '\n' {
 			debugmsg := strings.TrimSpace(string(dbgMsg[:msgSize]))
 			if len(debugmsg) == 0 {
-				logger.Info("TEST OUTPUT RAW: % X", dbgMsg[:msgSize])
+				logger.Debug("TEST OUTPUT RAW: % X", dbgMsg[:msgSize])
 
 				// When tests emit a blank line, capture additional context to
 				// identify the currently executing instruction and result code.
@@ -76,7 +76,7 @@ func DbgPrint() bool {
 						bssBytes[i] = bus.BusRead(nextChecksumAddr + uint16(i))
 					}
 
-					logger.Info("TEST CONTEXT: result=%02X instr=%02X %02X %02X PC=%04X SP=%04X SP_ORIG=%04X SP_FINAL=%04X TEST_PTR=%04X BSS=% X", result, op0, op1, op2, pc, sp, origSP, finalSP, testPtr, bssBytes)
+					logger.Debug("TEST CONTEXT: result=%02X instr=%02X %02X %02X PC=%04X SP=%04X SP_ORIG=%04X SP_FINAL=%04X TEST_PTR=%04X BSS=% X", result, op0, op1, op2, pc, sp, origSP, finalSP, testPtr, bssBytes)
 
 					checksum := [4]byte{}
 					for i := 0; i < 4; i++ {
@@ -91,16 +91,16 @@ func DbgPrint() bool {
 					for i := 0; i < 4; i++ {
 						expected[i] = bus.BusRead(nextPtr + uint16(i))
 					}
-					logger.Info("TEST CRC: actual=%02X%02X%02X%02X expected=%02X%02X%02X%02X ptr=%04X raw=%04X", checksum[0], checksum[1], checksum[2], checksum[3], expected[0], expected[1], expected[2], expected[3], nextPtr, nextPtrRaw)
+					logger.Debug("TEST CRC: actual=%02X%02X%02X%02X expected=%02X%02X%02X%02X ptr=%04X raw=%04X", checksum[0], checksum[1], checksum[2], checksum[3], expected[0], expected[1], expected[2], expected[3], nextPtr, nextPtrRaw)
 
 					crcSample := [16]byte{}
 					for i := 0; i < len(crcSample); i++ {
 						crcSample[i] = bus.BusRead(0xD900 + uint16(i))
 					}
-					logger.Info("CRC table sample D900: % X", crcSample)
+					logger.Debug("CRC table sample D900: % X", crcSample)
 				}
 			}
-			logger.Info("TEST OUTPUT: %s", debugmsg)
+			logger.Debug("TEST OUTPUT: %s", debugmsg)
 
 			msgSize = 0 // Reset msgSize after printing
 
@@ -170,7 +170,7 @@ func DbgPrint() bool {
 					for i := 0; i < len(crcSample); i++ {
 						crcSample[i] = bus.BusRead(0xD900 + uint16(i))
 					}
-					logger.Info("CRC table sample D900: % X", crcSample)
+					logger.Debug("CRC table sample D900: % X", crcSample)
 				}
 				logger.Info("*** TEST FAILED ***")
 				return false

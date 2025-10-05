@@ -96,7 +96,7 @@ func procNop(ctx *CpuContext) {
 func procLd(ctx *CpuContext) {
 	if ctx.DestIsMem {
 		if is16bit(ctx.currentInst.Reg2) {
-			logger.Info("LD mem16: opcode=%02X dest=%04X fetched=%04X srcReg=%d spNow=%04X", ctx.CurOpCode, ctx.MemDest, ctx.FetchedData, ctx.currentInst.Reg2, CpuRegRead(RT_SP))
+			logger.Debug("LD mem16: opcode=%02X dest=%04X fetched=%04X srcReg=%d spNow=%04X", ctx.CurOpCode, ctx.MemDest, ctx.FetchedData, ctx.currentInst.Reg2, CpuRegRead(RT_SP))
 			// Fault: 16-bit memory writes are rare (only LD (a16),SP). Make sure this is only used for correct instructions.
 			Cm.IncreaseCycle(1)
 			memory.BusCtx().BusWrite16(ctx.MemDest, ctx.FetchedData)
@@ -134,7 +134,7 @@ func procLd(ctx *CpuContext) {
 		}
 		if offset == -1 && debugLdHlCount < 16 {
 			debugLdHlCount++
-			logger.Info("LD HL,SP+e8 debug: SP=%04X result=%04X H=%t C=%t F=%02X", sp, result, h, c, flags)
+			logger.Debug("LD HL,SP+e8 debug: SP=%04X result=%04X H=%t C=%t F=%02X", sp, result, h, c, flags)
 		}
 		CpuSetReg(RT_HL, result)
 
@@ -148,14 +148,14 @@ func procLd(ctx *CpuContext) {
 
 	// Fault: For 16-bit LD r,nn, FetchedData should be 16 bits. For 8-bit LD, should mask to 8 bits.
 	if ctx.currentInst.Mode == AM_R_MR && ctx.currentInst.Reg1 == RT_A && ctx.currentInst.Reg2 == RT_BC {
-		logger.Info("LD A,(BC) debug: BC=%04X value=%02X", CpuRegRead(RT_BC), byte(ctx.FetchedData))
+		logger.Debug("LD A,(BC) debug: BC=%04X value=%02X", CpuRegRead(RT_BC), byte(ctx.FetchedData))
 	}
 	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
 
 	if ctx.currentInst.Mode == AM_R_R && ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Reg2 == RT_HL {
 		if debugLdSpCount < 32 {
 			debugLdSpCount++
-			logger.Info("LD SP,HL debug: HL=%04X -> SP=%04X", CpuRegRead(RT_HL), CpuRegRead(RT_SP))
+			logger.Debug("LD SP,HL debug: HL=%04X -> SP=%04X", CpuRegRead(RT_HL), CpuRegRead(RT_SP))
 		}
 	}
 }
@@ -564,7 +564,7 @@ func procInc(ctx *CpuContext) {
 		if ctx.currentInst.Reg1 == RT_SP && debugIncSpCount < 32 {
 			debugIncSpCount++
 			regs := CpuGetRegs()
-			logger.Info("INC SP debug: before=%04X after=%04X AF=%02X%02X BC=%02X%02X DE=%02X%02X HL=%02X%02X", before, regs.Sp, regs.A, regs.F, regs.B, regs.C, regs.D, regs.E, regs.H, regs.L)
+			logger.Debug("INC SP debug: before=%04X after=%04X AF=%02X%02X BC=%02X%02X DE=%02X%02X HL=%02X%02X", before, regs.Sp, regs.A, regs.F, regs.B, regs.C, regs.D, regs.E, regs.H, regs.L)
 		}
 		Cm.IncreaseCycle(1)
 		return
@@ -687,7 +687,7 @@ func procAdd(ctx *CpuContext) {
 			flags := CpuRegRead(RT_F)
 			expectedH := ((sp & 0x000F) + (uint16(byte(offset)) & 0x000F)) > 0x000F
 			expectedC := ((sp & 0x00FF) + uint16(byte(offset))) > 0x00FF
-			logger.Info("ADD SP,e8 debug: SP=%04X offset=%d result=%04X H=%t/%t C=%t/%t F=%02X", sp, offset, result, h, expectedH, c, expectedC, flags)
+			logger.Debug("ADD SP,e8 debug: SP=%04X offset=%d result=%04X H=%t/%t C=%t/%t F=%02X", sp, offset, result, h, expectedH, c, expectedC, flags)
 		}
 		Cm.IncreaseCycle(2)
 		return
@@ -725,9 +725,9 @@ func procAdd(ctx *CpuContext) {
 
 func procStop(ctx *CpuContext) {
 	// STOP: Enter low-power mode (not fully emulated here)
-	logger.Info("STOP instruction encountered; halting CPU")
+	logger.Debug("STOP instruction encountered; halting CPU")
 	ctx.Halted = true
-	ctx.Stopped = true
+	//ctx.Stopped = true
 }
 
 func procDaa(ctx *CpuContext) {
@@ -782,7 +782,7 @@ func procDaa(ctx *CpuContext) {
 
 	if debugDaaCount < 64 {
 		debugDaaCount++
-		logger.Info("DAA debug: PC=%04X N=%t H=%t C_in=%t adjust=%02X A_in=%02X -> A_out=%02X C_out=%t F_out=%02X", ctx.Regs.Pc, n, h, c, adjust, origA, ctx.Regs.A, carry, ctx.Regs.F)
+		logger.Debug("DAA debug: PC=%04X N=%t H=%t C_in=%t adjust=%02X A_in=%02X -> A_out=%02X C_out=%t F_out=%02X", ctx.Regs.Pc, n, h, c, adjust, origA, ctx.Regs.A, carry, ctx.Regs.F)
 	}
 
 	if (ctx.Regs.F & 0xF0) != expectedF {

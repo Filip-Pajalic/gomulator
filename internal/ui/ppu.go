@@ -578,7 +578,7 @@ func (p *PpuContext) PushPixelsToFIFO() {
 
 		// This matches reference implementation: if (!LCDC_BGW_ENABLE) color = bg_colors[0];
 		// ALSO: Force disable background for lines 8-15 to hide mohawk hair (DMG-ACID2 test)
-		if !LCDCBGWEnable() || (LcdCtx().Ly >= 8 && LcdCtx().Ly <= 15) {
+		if !LCDCBGWEnable() {
 			pixelColor = LcdCtx().BgColors[0]
 			colorIndex = 0
 		}

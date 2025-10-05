@@ -77,28 +77,42 @@ func (e *EmuContext) ExecuteCycles(cpuCycles int) {
 		return
 	}
 
-	for i := 0; i < cpuCycles; i++ {
-		// Step the CPU for each cycle
+	if e.PpuCtx == nil {
+		logger.Fatal("PPU Context is nil!")
+		return
+	}
+
+	// Convert requested CPU cycles to machine cycles (1 machine cycle = 4 CPU cycles)
+	remainingMachineCycles := int32((cpuCycles + 3) / 4)
+	if remainingMachineCycles <= 0 {
+		return
+	}
+
+	targetTicks := cpu.Cm.GetCycleTicks() + remainingMachineCycles
+
+	for cpu.Cm.GetCycleTicks() < targetTicks {
+		prevTicks := cpu.Cm.GetCycleTicks()
+
 		if !e.CpuCtx.Step() {
 			if e.handleCpuStop() {
 				return
 			}
 			return
 		}
-		// Step the PPU pipeline for each CPU cycle
-		if e.PpuCtx == nil {
-			logger.Fatal("PPU Context is nil!")
-			return
+
+		consumedTicks := cpu.Cm.GetCycleTicks() - prevTicks
+		if consumedTicks <= 0 {
+			consumedTicks = 1
 		}
 
-		e.PpuCtx.PpuTick() // Tick 1
-		e.PpuCtx.PpuTick() // Tick 2
-		e.PpuCtx.PpuTick() // Tick 3
-		e.PpuCtx.PpuTick() // Tick 4
+		cpuSteps := consumedTicks * 4
 
-		// Timer advancement now handled by the CPU cycle manager
-		e.Ticks += 4
-		e.dmaCtx.DMATick() // Handle DMA operations
+		for i := int32(0); i < cpuSteps; i++ {
+			e.PpuCtx.PpuTick()
+			e.dmaCtx.DMATick()
+		}
+
+		e.Ticks += uint64(cpuSteps)
 	}
 }
 

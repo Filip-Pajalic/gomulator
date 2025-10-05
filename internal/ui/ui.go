@@ -40,8 +40,8 @@ func NewGame(emuInstance *EmuContext) *Game {
 		BootAnim:   bootAnim,
 	}
 
-	debugScale := 3                                                  // Increased from 2 for better visibility
-	g.debugImage = ebiten.NewImage(16*8*debugScale, 24*8*debugScale) // 24 rows of tiles
+	//debugScale := 3 // Increased from 2 for better visibility
+	//g.debugImage = ebiten.NewImage(16*8*debugScale, 24*8*debugScale) // 24 rows of tiles
 
 	// Start boot animation and delay boot ROM simulation
 	if bootAnim.Enabled {
@@ -97,10 +97,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(bootImage, opts)
 
 		// Still show debug windows during boot
-		g.updateDebugWindows()
-		debugOpts := &ebiten.DrawImageOptions{}
-		debugOpts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
-		screen.DrawImage(g.debugImage, debugOpts)
+		// g.updateDebugWindows()
+		// debugOpts := &ebiten.DrawImageOptions{}
+		// debugOpts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
+		// screen.DrawImage(g.debugImage, debugOpts)
 		return
 	}
 
@@ -110,16 +110,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawVideoBuffer(screen)
 
 	// Draw debug windows on the right side
-	g.updateDebugWindows()
+	//g.updateDebugWindows()
 	debugOpts := &ebiten.DrawImageOptions{}
 	debugOpts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
-	screen.DrawImage(g.debugImage, debugOpts)
+	//screen.DrawImage(g.debugImage, debugOpts)
 }
 
 // Layout defines the screen dimensions
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	debugScale := 3                                        // Match the debug scale
-	totalWidth := ScreenWidth*scale + 16*8*debugScale + 10 // Main screen + debug window + padding
+	debugScale := 3                   // Match the debug scale
+	totalWidth := ScreenWidth * scale // Main screen + debug window + padding
 	totalHeight := ScreenHeight * scale
 	if debugHeight := 24 * 8 * debugScale; debugHeight > totalHeight {
 		totalHeight = debugHeight
@@ -170,16 +170,8 @@ func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
 	// Clear the video image first
 	g.VideoImage.Clear()
 
-	// Always show test pattern as background
-	for y := 0; y < ScreenHeight; y++ {
-		for x := 0; x < ScreenWidth; x++ {
-			if (x/8+y/8)%2 == 0 {
-				g.VideoImage.Set(x, y, color.RGBA{100, 100, 100, 255}) // Gray squares
-			} else {
-				g.VideoImage.Set(x, y, color.RGBA{200, 200, 200, 255}) // Light gray squares
-			}
-		}
-	}
+	// Clear to fully transparent so game pixels draw exactly as produced
+	g.VideoImage.Fill(color.RGBA{0, 0, 0, 0})
 
 	// Draw actual game content on top if available
 	for y := 0; y < ScreenHeight; y++ {
@@ -213,7 +205,7 @@ func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
 // updateDebugWindows updates and draws the debug window
 func (g *Game) updateDebugWindows() {
 	// Clear the debug image with a lighter background to distinguish it
-	g.debugImage.Fill(color.RGBA{40, 40, 40, 255})
+	//g.debugImage.Fill(color.RGBA{40, 40, 40, 255})
 
 	// Check if PPU context exists
 	if g.EmuCtx == nil || g.EmuCtx.PpuCtx == nil {
@@ -263,7 +255,6 @@ func (g *Game) displayTileWithScale(img *ebiten.Image, startLocation uint16, til
 			case 3:
 				col = color.RGBA{0x00, 0x00, 0x00, 0xFF} // Black
 			}
-
 			tileImage.Set(tx, ty, col)
 		}
 	}
@@ -288,8 +279,8 @@ func convertColor(value uint32) color.RGBA {
 // UiInit initializes the UI and starts the game loop
 func UiInit(emuInstance *EmuContext) {
 	game := NewGame(emuInstance)
-	ebiten.SetWindowSize(ScreenWidth*scale+16*8*scale+10, ScreenHeight*scale)
-	ebiten.SetWindowTitle("Emulator")
+	ebiten.SetWindowSize(ScreenWidth*scale, ScreenHeight*scale)
+	ebiten.SetWindowTitle("Gomulator")
 	if err := ebiten.RunGame(game); err != nil {
 		if errors.Is(err, ErrEmulationStopped) {
 			logger.Info("Emulation stopped")
