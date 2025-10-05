@@ -82,7 +82,7 @@ var rtLookup = []regTypes{
 
 // probably wrong , probably needs to have a byte assigned to each rT
 func decodeReg(reg byte) regTypes {
-	if reg >= 0b111 {
+	if int(reg) >= len(rtLookup) {
 		return RT_NONE
 	}
 	return rtLookup[reg]
