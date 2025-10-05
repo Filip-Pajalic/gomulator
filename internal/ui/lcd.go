@@ -188,6 +188,9 @@ func LcdWrite(address uint16, value uint8) {
 		lcdContext.ObjPalette[1] = value
 	case 10:
 		lcdContext.WinY = value
+		if ppuInstance != nil {
+			ppuInstance.WindowLine = 0
+		}
 	case 11:
 		lcdContext.WinX = value
 		// Add cases for other fields as needed.

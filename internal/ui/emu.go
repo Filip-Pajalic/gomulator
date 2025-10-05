@@ -155,7 +155,7 @@ func (e *EmuContext) handleCpuStop() bool {
 		return true
 	}
 	e.Die = true
-	logger.Fatal("CPU has stopped unexpectedly.")
+	logger.Debug("CPU has stopped unexpectedly.")
 	return false
 }
 
