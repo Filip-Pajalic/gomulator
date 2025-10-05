@@ -6,6 +6,13 @@ import (
 	"app/internal/memory"
 )
 
+var (
+	debugLdHlCount  int
+	debugLdSpCount  int
+	debugAddSpCount int
+	debugIncSpCount int
+)
+
 func (c *CpuContext) ReadRegHL() uint16 {
 	return (uint16(c.Regs.H) << 8) | uint16(c.Regs.L)
 }
@@ -88,6 +95,7 @@ func procNop(ctx *CpuContext) {
 func procLd(ctx *CpuContext) {
 	if ctx.DestIsMem {
 		if is16bit(ctx.currentInst.Reg2) {
+			logger.Info("LD mem16: opcode=%02X dest=%04X fetched=%04X srcReg=%d spNow=%04X", ctx.CurOpCode, ctx.MemDest, ctx.FetchedData, ctx.currentInst.Reg2, CpuRegRead(RT_SP))
 			// Fault: 16-bit memory writes are rare (only LD (a16),SP). Make sure this is only used for correct instructions.
 			Cm.IncreaseCycle(1)
 			memory.BusCtx().BusWrite16(ctx.MemDest, ctx.FetchedData)
@@ -100,19 +108,38 @@ func procLd(ctx *CpuContext) {
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
 		// LD HL,SP+e8: apply signed 8-bit offset fetched during decode.
-		value := int8(ctx.FetchedData)
+		offset := int8(ctx.FetchedData)
 		sp := CpuRegRead(RT_SP)
-		result := uint16(int32(sp) + int32(value))
-		logger.Debug("LD HL,SP+e8 executed: SP=%04X offset=%d result=%04X", sp, value, result)
+		result := uint16(int32(sp) + int32(offset))
+		logger.Debug("LD HL,SP+e8 executed: SP=%04X offset=%d result=%04X", sp, offset, result)
 
-		h := ((sp & 0x0F) + (uint16(value) & 0x0F)) > 0x0F
-		c := ((sp & 0xFF) + (uint16(value) & 0xFF)) > 0xFF
+		offsetSigned := uint16(int16(offset))
+		xorTerm := sp ^ offsetSigned ^ result
+		h := (xorTerm & 0x0010) != 0
+		c := (xorTerm & 0x0100) != 0
+		expectedH := ((sp & 0x000F) + (uint16(byte(offset)) & 0x000F)) > 0x000F
+		expectedC := ((sp & 0x00FF) + uint16(byte(offset))) > 0x00FF
+		if h != expectedH || c != expectedC {
+			logger.Warn("LD HL,SP+e8 flag mismatch: SP=%04X offset=%d result=%04X H=%t/%t C=%t/%t", sp, offset, result, h, expectedH, c, expectedC)
+		}
 
 		z := false
 		n := false
 
 		CpuSetFlags(ctx, &z, &n, &h, &c)
+		flags := CpuRegRead(RT_F)
+		if flags&0xC0 != 0 {
+			logger.Warn("LD HL,SP+e8 unexpected Z/N flags: F=%02X SP=%04X offset=%d result=%04X", flags, sp, offset, result)
+		}
+		if offset == -1 && debugLdHlCount < 16 {
+			debugLdHlCount++
+			logger.Info("LD HL,SP+e8 debug: SP=%04X result=%04X H=%t C=%t F=%02X", sp, result, h, c, flags)
+		}
 		CpuSetReg(RT_HL, result)
+
+		if spAfter := CpuRegRead(RT_SP); spAfter != sp {
+			logger.Warn("LD HL,SP+e8 mutated SP unexpectedly: before=%04X after=%04X offset=%d", sp, spAfter, offset)
+		}
 
 		Cm.IncreaseCycle(1)
 		return
@@ -120,6 +147,13 @@ func procLd(ctx *CpuContext) {
 
 	// Fault: For 16-bit LD r,nn, FetchedData should be 16 bits. For 8-bit LD, should mask to 8 bits.
 	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
+
+	if ctx.currentInst.Mode == AM_R_R && ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Reg2 == RT_HL {
+		if debugLdSpCount < 32 {
+			debugLdSpCount++
+			logger.Info("LD SP,HL debug: HL=%04X -> SP=%04X", CpuRegRead(RT_HL), CpuRegRead(RT_SP))
+		}
+	}
 }
 
 func procCb(ctx *CpuContext) {
@@ -505,9 +539,14 @@ func procLdh(ctx *CpuContext) {
 
 func procInc(ctx *CpuContext) {
 	if is16bit(ctx.currentInst.Reg1) {
-		// INC 16-bit register. Correct.
-		value := CpuRegRead(ctx.currentInst.Reg1) + 1
+		before := CpuRegRead(ctx.currentInst.Reg1)
+		value := before + 1
 		CpuSetReg(ctx.currentInst.Reg1, value)
+		if ctx.currentInst.Reg1 == RT_SP && debugIncSpCount < 32 {
+			debugIncSpCount++
+			regs := CpuGetRegs()
+			logger.Info("INC SP debug: before=%04X after=%04X AF=%02X%02X BC=%02X%02X DE=%02X%02X HL=%02X%02X", before, regs.Sp, regs.A, regs.F, regs.B, regs.C, regs.D, regs.E, regs.H, regs.L)
+		}
 		Cm.IncreaseCycle(1)
 		return
 	}
@@ -615,20 +654,28 @@ func procAdc(ctx *CpuContext) {
 
 // Bool to Int problematik som sker i C men ej i GOlang
 func procAdd(ctx *CpuContext) {
-	if ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Mode == AM_D8 {
-		// ADD SP, e8. Correct, but see FetchData for sign extension.
-		value := int8(ctx.FetchedData)
+	if ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Mode == AM_R_D8 {
+		// ADD SP, e8
+		offset := int8(ctx.FetchedData)
 		sp := CpuRegRead(RT_SP)
-		result := uint16(int32(sp) + int32(value))
-
-		h := ((sp & 0xF) + (uint16(value) & 0xF)) > 0xF
-		c := ((sp & 0xFF) + (uint16(value) & 0xFF)) > 0xFF
+		result := uint16(int32(sp) + int32(offset))
+		offsetSigned := uint16(int16(offset))
+		xorTerm := sp ^ offsetSigned ^ result
+		h := (xorTerm & 0x0010) != 0
+		c := (xorTerm & 0x0100) != 0
 
 		z := false
 		n := false
 
 		CpuSetReg(RT_SP, result)
 		CpuSetFlags(ctx, &z, &n, &h, &c)
+		if debugAddSpCount < 32 {
+			debugAddSpCount++
+			flags := CpuRegRead(RT_F)
+			expectedH := ((sp & 0x000F) + (uint16(byte(offset)) & 0x000F)) > 0x000F
+			expectedC := ((sp & 0x00FF) + uint16(byte(offset))) > 0x00FF
+			logger.Info("ADD SP,e8 debug: SP=%04X offset=%d result=%04X H=%t/%t C=%t/%t F=%02X", sp, offset, result, h, expectedH, c, expectedC, flags)
+		}
 		Cm.IncreaseCycle(2)
 		return
 	}
@@ -665,7 +712,9 @@ func procAdd(ctx *CpuContext) {
 
 func procStop(ctx *CpuContext) {
 	// STOP: Enter low-power mode (not fully emulated here)
-	logger.Fatal("STOPPING!")
+	logger.Info("STOP instruction encountered; halting CPU")
+	ctx.Halted = true
+	ctx.Stopped = true
 }
 
 func procDaa(ctx *CpuContext) {

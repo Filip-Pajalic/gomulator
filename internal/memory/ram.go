@@ -35,6 +35,9 @@ func (r *RamContext) WramWrite(address uint16, value byte) {
 		logger.Warn("WRAM Write: Invalid address %04X", address)
 		return
 	}
+	if address == 0xD807 || address == 0xD808 {
+		logger.Info("WRAM write debug: addr=%04X value=%02X", address, value)
+	}
 	r.Wram[address-0xC000] = value
 }
 
@@ -51,6 +54,9 @@ func (r *RamContext) HramWrite(address uint16, value byte) {
 	if address < 0xFF80 || address > 0xFFFE {
 		logger.Warn("HRAM Write: Invalid address %04X", address)
 		return // Just return instead of exiting for better error recovery
+	}
+	if address >= 0xFF80 && address <= 0xFF83 {
+		logger.Info("HRAM write debug: addr=%04X value=%02X", address, value)
 	}
 	r.Hram[address-0xFF80] = value
 }

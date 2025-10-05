@@ -5,6 +5,7 @@ import (
 	"app/internal/input"
 	"app/internal/logger"
 	"app/internal/memory"
+	"errors"
 	"time"
 )
 
@@ -34,6 +35,8 @@ type EmuContext struct {
 
 var emuInstance *EmuContext
 
+var ErrEmulationStopped = errors.New("emulation stopped")
+
 func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext, dmaCtx cpu.DMA, ppuCtx PPU, busCtx *memory.Bus) *EmuContext {
 	return &EmuContext{
 		Paused:   false,
@@ -61,18 +64,25 @@ func (e *EmuContext) runCPULoop() {
 		}
 
 		if !e.CpuCtx.Step() {
-			e.Die = true
-			logger.Fatal("CPU has stopped unexpectedly.")
+			if e.handleCpuStop() {
+				break
+			}
+			return
 		}
 	}
 }
 
 func (e *EmuContext) ExecuteCycles(cpuCycles int) {
+	if !e.Running {
+		return
+	}
+
 	for i := 0; i < cpuCycles; i++ {
 		// Step the CPU for each cycle
 		if !e.CpuCtx.Step() {
-			e.Die = true
-			logger.Fatal("CPU has stopped unexpectedly.")
+			if e.handleCpuStop() {
+				return
+			}
 			return
 		}
 		// Step the PPU pipeline for each CPU cycle
@@ -115,7 +125,24 @@ func (e *EmuContext) StepFrame() {
 	const TICKS_PER_LINE = 456
 	frameCycles := LINES_PER_FRAME * TICKS_PER_LINE
 	logger.Debug("StepFrame: executing %d cycles for complete frame", frameCycles)
+	if !e.Running {
+		return
+	}
 	e.ExecuteCycles(frameCycles)
+}
+
+func (e *EmuContext) handleCpuStop() bool {
+	if e.CpuCtx.IsStopped() {
+		if e.Running {
+			e.Running = false
+			e.Die = false
+			logger.Info("CPU STOP encountered; ending emulation loop")
+		}
+		return true
+	}
+	e.Die = true
+	logger.Fatal("CPU has stopped unexpectedly.")
+	return false
 }
 
 func StartEmulator(romFile string) *EmuContext {

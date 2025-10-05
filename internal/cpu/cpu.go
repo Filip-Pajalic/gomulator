@@ -44,6 +44,7 @@ type CPU interface {
 	Execute()
 	SetIERegister(b byte)
 	GetIERegister() byte
+	IsStopped() bool
 }
 
 type ExternalPins interface {
@@ -74,6 +75,7 @@ type CpuContext struct {
 	currentInst *Instruction
 
 	Halted   bool
+	Stopped  bool
 	Stepping bool
 
 	IntMasterEnabled bool
@@ -109,6 +111,7 @@ func NewCpuContext(memoryBus Bus) *CpuContext {
 		CurOpCode:        0,
 		currentInst:      nil,
 		Halted:           false,
+		Stopped:          false,
 		Stepping:         false,
 		IntMasterEnabled: false,
 		enablingIme:      false,
@@ -144,6 +147,10 @@ func (c *CpuContext) Execute() {
 
 // This should probably not call the emulator
 func (c *CpuContext) Step() bool {
+	if c.Stopped {
+		return false
+	}
+
 	if !c.Halted {
 		c.Fetch()
 		Cm.IncreaseCycle(1)
@@ -168,6 +175,10 @@ func (c *CpuContext) Step() bool {
 		if c.IntFlags != 0 {
 			c.Halted = false
 		}
+	}
+
+	if c.Stopped {
+		return false
 	}
 
 	// Handle interrupts AFTER instruction execution (reference implementation order)
@@ -196,4 +207,8 @@ func (c *CpuContext) SetIERegister(n byte) {
 
 func (c *CpuContext) RequestInterrupt(t InterruptType) {
 	c.IntFlags |= byte(t)
+}
+
+func (c *CpuContext) IsStopped() bool {
+	return c.Stopped
 }

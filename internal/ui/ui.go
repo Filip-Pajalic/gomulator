@@ -4,6 +4,7 @@ import (
 	"app/internal/cpu"
 	"app/internal/input"
 	"app/internal/logger"
+	"errors"
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -68,9 +69,17 @@ func (g *Game) Update() error {
 		return nil
 	}
 
+	if !g.EmuCtx.Running {
+		return ErrEmulationStopped
+	}
+
 	// Normal game operation
 	g.handleInput()
 	g.EmuCtx.StepFrame()
+
+	if !g.EmuCtx.Running {
+		return ErrEmulationStopped
+	}
 
 	return nil
 }
@@ -282,6 +291,10 @@ func UiInit(emuInstance *EmuContext) {
 	ebiten.SetWindowSize(ScreenWidth*scale+16*8*scale+10, ScreenHeight*scale)
 	ebiten.SetWindowTitle("Emulator")
 	if err := ebiten.RunGame(game); err != nil {
+		if errors.Is(err, ErrEmulationStopped) {
+			logger.Info("Emulation stopped")
+			return
+		}
 		logger.Fatal("Failed to run game: %v", err)
 	}
 }

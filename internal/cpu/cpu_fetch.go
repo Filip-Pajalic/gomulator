@@ -122,7 +122,11 @@ func FetchData() {
 		cpuInstance.Regs.Pc += 2
 		cpuInstance.MemDest = lo | (hi << 8)
 		cpuInstance.DestIsMem = true
-		cpuInstance.FetchedData = CpuRegRead(cpuInstance.currentInst.Reg2) & 0xFF
+		value := CpuRegRead(cpuInstance.currentInst.Reg2)
+		if !is16bit(cpuInstance.currentInst.Reg2) {
+			value &= 0x00FF
+		}
+		cpuInstance.FetchedData = value
 		return
 	case AM_MR_D8:
 		// LD (reg),d8. FetchedData = d8, MemDest = reg.
