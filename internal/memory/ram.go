@@ -4,6 +4,10 @@ import (
 	logger "app/internal/logger"
 )
 
+const (
+	enableHramDebug = false
+)
+
 // RamContext represents the state of WRAM and HRAM
 type RamContext struct {
 	Wram [0x2000]byte // 8KB WRAM (0xC000 - 0xDFFF)
@@ -55,7 +59,7 @@ func (r *RamContext) HramWrite(address uint16, value byte) {
 		logger.Warn("HRAM Write: Invalid address %04X", address)
 		return // Just return instead of exiting for better error recovery
 	}
-	if address >= 0xFF80 && address <= 0xFF83 {
+	if enableHramDebug && address >= 0xFF80 && address <= 0xFF83 {
 		logger.Info("HRAM write debug: addr=%04X value=%02X", address, value)
 	}
 	r.Hram[address-0xFF80] = value

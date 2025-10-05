@@ -11,6 +11,7 @@ var (
 	debugLdSpCount  int
 	debugAddSpCount int
 	debugIncSpCount int
+	debugDaaCount   int
 )
 
 func (c *CpuContext) ReadRegHL() uint16 {
@@ -146,6 +147,9 @@ func procLd(ctx *CpuContext) {
 	}
 
 	// Fault: For 16-bit LD r,nn, FetchedData should be 16 bits. For 8-bit LD, should mask to 8 bits.
+	if ctx.currentInst.Mode == AM_R_MR && ctx.currentInst.Reg1 == RT_A && ctx.currentInst.Reg2 == RT_BC {
+		logger.Info("LD A,(BC) debug: BC=%04X value=%02X", CpuRegRead(RT_BC), byte(ctx.FetchedData))
+	}
 	CpuSetReg(ctx.currentInst.Reg1, ctx.FetchedData)
 
 	if ctx.currentInst.Mode == AM_R_R && ctx.currentInst.Reg1 == RT_SP && ctx.currentInst.Reg2 == RT_HL {
@@ -538,6 +542,21 @@ func procLdh(ctx *CpuContext) {
 }
 
 func procInc(ctx *CpuContext) {
+	if ctx.currentInst.Mode == AM_MR {
+		addr := CpuRegRead(RT_HL)
+		old := memory.BusCtx().BusRead(addr)
+		value := uint16(old) + 1
+		memory.BusCtx().BusWrite(addr, byte(value&0xFF))
+		Cm.IncreaseCycle(1)
+
+		z := (value & 0xFF) == 0
+		n := false
+		h := ((old & 0x0F) + 1) > 0x0F
+
+		CpuSetFlags(ctx, &z, &n, &h, nil)
+		return
+	}
+
 	if is16bit(ctx.currentInst.Reg1) {
 		before := CpuRegRead(ctx.currentInst.Reg1)
 		value := before + 1
@@ -551,53 +570,47 @@ func procInc(ctx *CpuContext) {
 		return
 	}
 
-	var value uint16
-	var old byte
-	if ctx.currentInst.Mode == AM_MR {
-		addr := CpuRegRead(RT_HL)
-		old = memory.BusCtx().BusRead(addr)
-		value = uint16(old) + 1
-		memory.BusCtx().BusWrite(addr, byte(value&0xFF))
-		Cm.IncreaseCycle(1)
-	} else {
-		old = byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
-		value = uint16(old) + 1
-		CpuSetReg(ctx.currentInst.Reg1, value)
-	}
+	old := byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
+	value := uint16(old) + 1
+	CpuSetReg(ctx.currentInst.Reg1, value)
 
 	z := (value & 0xFF) == 0
 	n := false
-	h := ((old & 0x0F) + 1) > 0x0F // H set if lower nibble overflows
+	h := ((old & 0x0F) + 1) > 0x0F
 
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
 
 func procDec(ctx *CpuContext) {
+	if ctx.currentInst.Mode == AM_MR {
+		addr := CpuRegRead(RT_HL)
+		old := memory.BusCtx().BusRead(addr)
+		value := uint16(old) - 1
+		memory.BusCtx().BusWrite(addr, byte(value&0xFF))
+		Cm.IncreaseCycle(1)
+
+		z := (value & 0xFF) == 0
+		n := true
+		h := (old & 0x0F) == 0
+
+		CpuSetFlags(ctx, &z, &n, &h, nil)
+		return
+	}
+
 	if is16bit(ctx.currentInst.Reg1) {
-		// DEC 16-bit register. Correct.
 		value := CpuRegRead(ctx.currentInst.Reg1) - 1
 		CpuSetReg(ctx.currentInst.Reg1, value)
 		Cm.IncreaseCycle(1)
 		return
 	}
 
-	var value uint16
-	var old byte
-	if ctx.currentInst.Mode == AM_MR {
-		addr := CpuRegRead(RT_HL)
-		old = memory.BusCtx().BusRead(addr)
-		value = uint16(old) - 1
-		memory.BusCtx().BusWrite(addr, byte(value&0xFF))
-		Cm.IncreaseCycle(1)
-	} else {
-		old = byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
-		value = uint16(old) - 1
-		CpuSetReg(ctx.currentInst.Reg1, value)
-	}
+	old := byte(CpuRegRead(ctx.currentInst.Reg1) & 0xFF)
+	value := uint16(old) - 1
+	CpuSetReg(ctx.currentInst.Reg1, value)
 
 	z := (value & 0xFF) == 0
 	n := true
-	h := (old & 0x0F) == 0 // H set if borrow from bit 4
+	h := (old & 0x0F) == 0
 
 	CpuSetFlags(ctx, &z, &n, &h, nil)
 }
@@ -719,33 +732,62 @@ func procStop(ctx *CpuContext) {
 
 func procDaa(ctx *CpuContext) {
 	// DAA: Decimal adjust accumulator after addition/subtraction
-	var adjust byte = 0
-	a := ctx.Regs.A
+	origA := ctx.Regs.A
+	origF := ctx.Regs.F
+
+	a := origA
+	n := CpuFlagN()
+	h := CpuFlagH()
 	c := CpuFlagC()
 
-	if !CpuFlagN() {
-		if CpuFlagH() || (a&0x0F) > 0x09 {
-			adjust |= 0x06
-		}
+	carry := c
+	var adjust byte
+
+	if !n {
 		if c || a > 0x99 {
 			adjust |= 0x60
-			c = true
+			carry = true
 		}
-		a += adjust
-	} else {
-		if CpuFlagH() {
+		if h || (a&0x0F) > 0x09 {
 			adjust |= 0x06
 		}
+		a = byte(uint16(a) + uint16(adjust))
+	} else {
 		if c {
 			adjust |= 0x60
 		}
-		a -= adjust
+		if h {
+			adjust |= 0x06
+		}
+		a = byte(uint16(a) - uint16(adjust))
 	}
+
 	a &= 0xFF
 	z := a == 0
-	h := false
+	hClear := false
+
 	ctx.Regs.A = a
-	CpuSetFlags(ctx, &z, nil, &h, &c)
+	CpuSetFlags(ctx, &z, nil, &hClear, &carry)
+
+	expectedF := byte(0)
+	if z {
+		expectedF |= 0x80
+	}
+	if (origF & 0x40) != 0 {
+		expectedF |= 0x40
+	}
+	if carry {
+		expectedF |= 0x10
+	}
+
+	if debugDaaCount < 64 {
+		debugDaaCount++
+		logger.Info("DAA debug: PC=%04X N=%t H=%t C_in=%t adjust=%02X A_in=%02X -> A_out=%02X C_out=%t F_out=%02X", ctx.Regs.Pc, n, h, c, adjust, origA, ctx.Regs.A, carry, ctx.Regs.F)
+	}
+
+	if (ctx.Regs.F & 0xF0) != expectedF {
+		logger.Warn("DAA flag mismatch: A_in=%02X F_in=%02X -> A_out=%02X F_out=%02X expectedF=%02X", origA, origF, ctx.Regs.A, ctx.Regs.F, expectedF)
+	}
 }
 
 func procCpl(ctx *CpuContext) {
