@@ -145,51 +145,23 @@ func (c *CpuContext) Execute() {
 // This should probably not call the emulator
 func (c *CpuContext) Step() bool {
 	if !c.Halted {
-		pc := c.Regs.Pc
 		c.Fetch()
 		Cm.IncreaseCycle(1)
 		FetchData()
 
-		// Flag display for logging: Z, N, H, C
-		var zf = "-"
-		var nf = "-"
-		var hf = "-"
-		var cf = "-"
-		if (c.Regs.F & (1 << 7)) != 0 {
-			zf = "Z"
-		}
-		if c.Regs.F&(1<<6) != 0 {
-			nf = "N"
-		}
-		if c.Regs.F&(1<<5) != 0 {
-			hf = "H" // Fix: was cf, should be hf
-		}
-		if c.Regs.F&(1<<4) != 0 {
-			cf = "C"
-		}
-
 		var inst string
 		instToStr(c, &inst)
-
-		// Only log very occasionally to avoid spam during normal operation
-		if pc > 0xC080 && pc < 0xC100 { // Log right after LCD enable
-			logger.Info("CPU: %08X - %04X: %-12s (%02X %02X %02X) A: %02X  F: %s%s%s%s BC: %02X%02X DE: %02X%02X HL: %02X%02X",
-				Cm.GetCycleTicks(),
-				pc, inst, c.CurOpCode,
-				c.memoryBus.BusRead(pc+1), c.memoryBus.BusRead(pc+2), c.Regs.A, zf, nf, hf, cf, c.Regs.B, c.Regs.C,
-				c.Regs.D, c.Regs.E, c.Regs.H, c.Regs.L)
-		}
 
 		if c.currentInst == nil {
 			logger.Warn("Unknown instruction! %02X\n", c.CurOpCode)
 			os.Exit(1)
 		}
 
-		//DbgUpdate()
-		/*	if !DbgPrint() {
-				return false
-			}
-		*/
+		DbgUpdate()
+		if !DbgPrint() {
+			return false
+		}
+
 		c.Execute()
 	} else {
 		Cm.IncreaseCycle(1)
@@ -197,13 +169,18 @@ func (c *CpuContext) Step() bool {
 			c.Halted = false
 		}
 	}
+
+	// Handle interrupts AFTER instruction execution (reference implementation order)
 	if c.IntMasterEnabled {
 		CpuHandleInterrupts(c)
 		c.enablingIme = false
 	}
+
+	// Handle EI instruction: enable interrupts now if EI was executed
 	if c.enablingIme {
 		c.IntMasterEnabled = true
 	}
+
 	return true
 }
 

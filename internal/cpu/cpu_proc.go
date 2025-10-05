@@ -390,11 +390,8 @@ func procEi(ctx *CpuContext) {
 
 func procPop(ctx *CpuContext) {
 	// POP rr: Pop two bytes from stack into register pair
-	lo := uint16(StackPop())
-	Cm.IncreaseCycle(1)
-	hi := uint16(StackPop())
-	Cm.IncreaseCycle(1)
-	n := (hi << 8) | lo
+	n := StackPop16()
+	Cm.IncreaseCycle(2) // StackPop16 already handles the memory accesses
 	CpuSetReg(ctx.currentInst.Reg1, n)
 	if ctx.currentInst.Reg1 == RT_AF {
 		// Lower 4 bits of F always zero
@@ -403,14 +400,10 @@ func procPop(ctx *CpuContext) {
 }
 
 func procPush(ctx *CpuContext) {
-	// PUSH rr: Push register pair onto stack (hi first, then lo)
+	// PUSH rr: Push register pair onto stack
 	value := CpuRegRead(ctx.currentInst.Reg1)
-	lo := byte(value & 0xFF)
-	hi := byte((value >> 8) & 0xFF)
 	Cm.IncreaseCycle(1)
-	StackPush(hi)
-	Cm.IncreaseCycle(1)
-	StackPush(lo)
+	StackPush16(value)
 	Cm.IncreaseCycle(1)
 }
 
@@ -418,8 +411,14 @@ func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 	if CheckCondition(ctx) {
 		if pushpc {
 			// CALL or RST: push PC before jump
-			Cm.IncreaseCycle(2)
-			StackPush16(ctx.Regs.Pc)
+			// Stack is LIFO: push HIGH byte first, then LOW byte
+			value := ctx.Regs.Pc
+			hi := byte((value >> 8) & 0xFF)
+			lo := byte(value & 0xFF)
+			Cm.IncreaseCycle(1)
+			StackPush(hi)
+			Cm.IncreaseCycle(1)
+			StackPush(lo)
 		}
 		ctx.Regs.Pc = addr
 		Cm.IncreaseCycle(1)
@@ -428,47 +427,64 @@ func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
 
 func procJp(ctx *CpuContext) {
 	// JP nn or JP cc,nn: Jump to address
-	goToAddr(ctx, ctx.FetchedData, false)
+	if CheckCondition(ctx) {
+		ctx.Regs.Pc = ctx.FetchedData
+		Cm.IncreaseCycle(1) // Jump cycle
+	}
 }
 
 // Jump relative
 func procJr(ctx *CpuContext) {
-	rel := int8(ctx.FetchedData)
-	addr := uint16(int32(ctx.Regs.Pc) + int32(rel))
-	goToAddr(ctx, addr, false)
+	if CheckCondition(ctx) {
+		rel := int8(ctx.FetchedData)
+		addr := uint16(int32(ctx.Regs.Pc) + int32(rel))
+		ctx.Regs.Pc = addr
+		Cm.IncreaseCycle(1) // Jump cycle
+	}
 }
 
 func procCall(ctx *CpuContext) {
 	// CALL nn or CALL cc,nn: Call subroutine
-	goToAddr(ctx, ctx.FetchedData, true)
+	if CheckCondition(ctx) {
+		// Push current PC to stack
+		Cm.IncreaseCycle(1)
+		StackPush16(ctx.Regs.Pc)
+		// Jump to new address
+		ctx.Regs.Pc = ctx.FetchedData
+		Cm.IncreaseCycle(1)
+	}
 }
 
 // 0000002D problem here with fetched data, why stack push wrong
 func procRet(ctx *CpuContext) {
 	// RET or RET cc: Return from subroutine
 	if ctx.currentInst.Condition != CT_NONE {
-		Cm.IncreaseCycle(1)
+		Cm.IncreaseCycle(1) // Conditional check takes 1 cycle
+		if !CheckCondition(ctx) {
+			return // Condition not met, don't return
+		}
 	}
-	if CheckCondition(ctx) {
-		lo := uint16(StackPop())
-		Cm.IncreaseCycle(1)
-		hi := uint16(StackPop())
-		Cm.IncreaseCycle(1)
-		n := (hi << 8) | lo
-		ctx.Regs.Pc = n
-		Cm.IncreaseCycle(1)
-	}
+	
+	// Pop return address from stack
+	ctx.Regs.Pc = StackPop16()
+	Cm.IncreaseCycle(2) // StackPop16 handles memory access cycles
+	Cm.IncreaseCycle(1) // Jump cycle
 }
 
 func procRst(ctx *CpuContext) {
 	// RST vec: Call fixed address (push PC, jump to vec)
-	goToAddr(ctx, uint16(ctx.currentInst.Param), true)
+	// Push current PC to stack  
+	Cm.IncreaseCycle(1)
+	StackPush16(ctx.Regs.Pc)
+	// Jump to RST vector
+	ctx.Regs.Pc = uint16(ctx.currentInst.Param)
+	Cm.IncreaseCycle(1)
 }
 
 func procReti(ctx *CpuContext) {
-	// RETI: Return and enable interrupts
-	procRet(ctx)
+	// RETI: Return and enable interrupts (enable FIRST like reference implementation)
 	ctx.IntMasterEnabled = true
+	procRet(ctx)
 }
 
 func procLdh(ctx *CpuContext) {

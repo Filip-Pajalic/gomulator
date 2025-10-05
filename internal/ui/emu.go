@@ -29,11 +29,12 @@ type EmuContext struct {
 	PpuCtx   PPU
 	timerCtx *cpu.TimerContext
 	dmaCtx   cpu.DMA
+	BusCtx   *memory.Bus
 }
 
 var emuInstance *EmuContext
 
-func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext, dmaCtx cpu.DMA, ppuCtx PPU) *EmuContext {
+func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext, dmaCtx cpu.DMA, ppuCtx PPU, busCtx *memory.Bus) *EmuContext {
 	return &EmuContext{
 		Paused:   false,
 		Running:  true,
@@ -44,6 +45,7 @@ func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext
 		dmaCtx:   dmaCtx,
 		timerCtx: timerCtx,
 		PpuCtx:   ppuCtx,
+		BusCtx:   busCtx,
 	}
 }
 
@@ -138,12 +140,8 @@ func StartEmulator(romFile string) *EmuContext {
 
 	cpuContext = cpu.NewCpuContext(busContext)
 
-	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext)
-
-	// Note: Boot ROM simulation will be done in UI initialization
-	// after LCD function pointers are set up
+	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext, busContext)
 
 	return emuInstance
-	//emuInstance.Start()
 
 }

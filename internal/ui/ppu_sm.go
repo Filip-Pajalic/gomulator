@@ -16,20 +16,20 @@ func (p *PpuContext) IncrementLY() {
 	lcdCtx.Ly++
 
 	if lcdCtx.Ly <= 20 {
-		logger.Info("PPU: LY incremented to %d, LYC=%d, LCDC=0x%02X", lcdCtx.Ly, lcdCtx.LyCompare, lcdCtx.Lcdc)
+		logger.Debug("PPU: LY incremented to %d, LYC=%d, LCDC=0x%02X", lcdCtx.Ly, lcdCtx.LyCompare, lcdCtx.Lcdc)
 	}
 
 	if lcdCtx.Ly == lcdCtx.LyCompare {
 		LCDSLycSet(true)
 
-		logger.Info("PPU: LY=LYC match! LY=%d, LYC=%d, STAT=0x%02X", lcdCtx.Ly, lcdCtx.LyCompare, lcdCtx.Lcds)
+		logger.Debug("PPU: LY=LYC match! LY=%d, LYC=%d, STAT=0x%02X", lcdCtx.Ly, lcdCtx.LyCompare, lcdCtx.Lcds)
 
 		if LCDSStatInt(SSLyc) {
 			// Request LCD STAT interrupt (like reference)
 			cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
-			logger.Info("PPU: *** LY=LYC INTERRUPT REQUESTED *** (LY=%d)", lcdCtx.Ly)
+			logger.Debug("PPU: *** LY=LYC INTERRUPT REQUESTED *** (LY=%d)", lcdCtx.Ly)
 		} else {
-			logger.Info("PPU: LY=LYC match but STAT interrupt not enabled")
+			logger.Debug("PPU: LY=LYC match but STAT interrupt not enabled")
 		}
 	} else {
 		LCDSLycSet(false)

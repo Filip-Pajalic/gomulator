@@ -12,7 +12,7 @@ var (
 
 func init() {
 	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo, // Changed from LevelDebug to LevelInfo to hide debug messages
+		Level: slog.LevelInfo, // Back to Info level to see test results
 	}
 	handler := slog.NewTextHandler(os.Stdout, opts)
 	logger = slog.New(handler)

@@ -18,6 +18,7 @@ const (
 type Game struct {
 	EmuCtx     *EmuContext
 	VideoImage *ebiten.Image
+	BootAnim   *BootAnimation
 	// Debug variables
 	debugImage   *ebiten.Image
 	frameCounter int
@@ -29,29 +30,72 @@ func NewGame(emuInstance *EmuContext) *Game {
 	input.LcdReadFunc = LcdRead
 	input.LcdWriteFunc = LcdWrite
 
-	// This must be done after LCD functions are set up
-	bootRomContext := cpu.BootRomCtx()
-	bootRomContext.SimulateBootSequence()
+	// Initialize boot animation
+	bootAnim := NewBootAnimation(emuInstance.BusCtx)
 
 	g := &Game{
 		EmuCtx:     emuInstance,
 		VideoImage: ebiten.NewImage(ScreenWidth, ScreenHeight),
+		BootAnim:   bootAnim,
 	}
 
 	debugScale := 3                                                  // Increased from 2 for better visibility
 	g.debugImage = ebiten.NewImage(16*8*debugScale, 24*8*debugScale) // 24 rows of tiles
+
+	// Start boot animation and delay boot ROM simulation
+	if bootAnim.Enabled {
+		bootAnim.Start()
+	} else {
+		// If animation is disabled, run boot sequence immediately
+		bootRomContext := cpu.BootRomCtx()
+		bootRomContext.SimulateBootSequence()
+	}
+
 	return g
 }
 
 func (g *Game) Update() error {
-	g.handleInput()
+	// Handle boot animation first
+	if !g.BootAnim.IsComplete() {
+		g.BootAnim.Update()
+		g.handleBootInput() // Special input handling during boot
 
+		// When boot animation completes, run the boot ROM sequence
+		if g.BootAnim.IsComplete() && g.BootAnim.Enabled {
+			bootRomContext := cpu.BootRomCtx()
+			bootRomContext.SimulateBootSequence()
+		}
+		return nil
+	}
+
+	// Normal game operation
+	g.handleInput()
 	g.EmuCtx.StepFrame()
 
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	// If boot animation is active, draw it in the main game area
+	if !g.BootAnim.IsComplete() {
+		// Create a temporary image for the boot animation
+		bootImage := ebiten.NewImage(ScreenWidth, ScreenHeight)
+		g.BootAnim.Draw(bootImage)
+
+		// Draw the boot animation scaled up in the main game area
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Scale(float64(scale), float64(scale))
+		screen.DrawImage(bootImage, opts)
+
+		// Still show debug windows during boot
+		g.updateDebugWindows()
+		debugOpts := &ebiten.DrawImageOptions{}
+		debugOpts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
+		screen.DrawImage(g.debugImage, debugOpts)
+		return
+	}
+
+	// Normal game drawing
 	screen.Fill(color.RGBA{20, 20, 20, 255})
 
 	g.drawVideoBuffer(screen)
@@ -72,6 +116,15 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 		totalHeight = debugHeight
 	}
 	return totalWidth, totalHeight
+}
+
+func (g *Game) handleBootInput() {
+	// Allow skipping boot animation with any key press
+	if ebiten.IsKeyPressed(ebiten.KeySpace) ||
+		ebiten.IsKeyPressed(ebiten.KeyEnter) ||
+		ebiten.IsKeyPressed(ebiten.KeyEscape) {
+		g.BootAnim.Skip()
+	}
 }
 
 func (g *Game) handleInput() {

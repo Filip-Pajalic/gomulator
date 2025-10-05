@@ -234,9 +234,9 @@ func (b *BootRomContext) initializeTimerRegisters() {
 func (b *BootRomContext) initializeInterruptRegisters() {
 	logger.Debug("Boot ROM: Initializing interrupt registers")
 
-	// Interrupt registers
-	memory.BusCtx().BusWrite(0xFF0F, 0xE1) // IF - interrupt flag
-	memory.BusCtx().BusWrite(0xFFFF, 0x00) // IE - interrupt enable
+	// Interrupt registers - clear both IF and IE initially
+	memory.BusCtx().BusWrite(0xFF0F, 0x00) // IF - no interrupt flags set
+	memory.BusCtx().BusWrite(0xFFFF, 0x00) // IE - no interrupts enabled
 
 	logger.Debug("Boot ROM: Interrupt registers initialized")
 }

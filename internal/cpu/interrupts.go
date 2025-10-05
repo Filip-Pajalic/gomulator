@@ -10,17 +10,33 @@ const (
 	IT_JOYPAD                             // 0x10
 )
 
-func IntHandle(ctx *CpuContext, address uint16) {
+func IntHandle(ctx *CpuContext, address uint16, it InterruptType) {
+	// Disable interrupts (IME = 0)
+	ctx.IntMasterEnabled = false
+
+	// Clear the corresponding interrupt flag
+	ctx.IntFlags &= ^byte(it)
+
+	// Push current PC to stack
 	StackPush16(ctx.Regs.Pc)
+
+	// Jump to interrupt vector
 	ctx.Regs.Pc = address
 }
 
 func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
-	if (ctx.IntFlags&byte(it)) != 0 && (ctx.iERegister&byte(it)) != 0 {
-		IntHandle(ctx, address)
-		ctx.IntFlags &= ^byte(it) // Clear the interrupt flag
+	if !ctx.IntMasterEnabled {
+		return false
+	}
+
+	ieRegister := ctx.memoryBus.BusRead(0xFFFF) // Read IE from bus, not cached copy
+
+	ifFlag := (ctx.IntFlags & byte(it)) != 0
+	ieFlag := (ieRegister & byte(it)) != 0
+
+	if ifFlag && ieFlag {
+		IntHandle(ctx, address, it)
 		ctx.Halted = false
-		ctx.IntMasterEnabled = false
 		Cm.IncreaseCycle(2) // Interrupt handling takes additional cycles
 		return true
 	}
@@ -29,14 +45,14 @@ func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
 
 func CpuHandleInterrupts(ctx *CpuContext) {
 	if IntCheck(ctx, 0x40, IT_VBLANK) {
-		// VBLANK interrupt handled
+		return
 	} else if IntCheck(ctx, 0x48, IT_LCD_STAT) {
-		// LCD STAT interrupt handled
+		return
 	} else if IntCheck(ctx, 0x50, IT_TIMER) {
-		// TIMER interrupt handled
+		return
 	} else if IntCheck(ctx, 0x58, IT_SERIAL) {
-		// SERIAL interrupt handled
+		return
 	} else if IntCheck(ctx, 0x60, IT_JOYPAD) {
-		// JOYPAD interrupt handled
+		return
 	}
 }
