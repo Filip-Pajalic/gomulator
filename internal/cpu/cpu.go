@@ -178,6 +178,7 @@ func (c *CpuContext) Step() bool {
 
 	// Handle EI instruction: enable interrupts now if EI was executed
 	if c.enablingIme {
+		logger.Debug("IME enabled at PC=%04X", c.Regs.Pc)
 		c.IntMasterEnabled = true
 	}
 

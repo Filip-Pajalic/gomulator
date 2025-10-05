@@ -45,6 +45,25 @@ func DbgPrint() bool {
 			// Check for common test failure indicators
 			if strings.Contains(debugmsg, "Failed") || strings.Contains(debugmsg, "FAILED") ||
 				strings.Contains(debugmsg, "Error") || strings.Contains(debugmsg, "ERROR") {
+				if cpuInstance != nil {
+					regs := cpuInstance.Regs
+					sp := regs.Sp
+					low := memory.BusCtx().BusRead(sp - 2)
+					high := memory.BusCtx().BusRead(sp - 1)
+					logger.Info("CPU STATE -> PC:%04X SP:%04X AF:%02X%02X BC:%02X%02X DE:%02X%02X HL:%02X%02X IF:%02X IE:%02X IME:%t EI_DEFER:%t STACK[%04X]=%02X STACK[%04X]=%02X",
+						regs.Pc, regs.Sp,
+						regs.A, regs.F,
+						regs.B, regs.C,
+						regs.D, regs.E,
+						regs.H, regs.L,
+						cpuInstance.IntFlags,
+						memory.BusCtx().GetInterruptEnable(),
+						cpuInstance.IntMasterEnabled,
+						cpuInstance.enablingIme,
+						sp-2, low,
+						sp-1, high,
+					)
+				}
 				logger.Info("*** TEST FAILED ***")
 				return false
 			}

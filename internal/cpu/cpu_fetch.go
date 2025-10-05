@@ -107,11 +107,11 @@ func FetchData() {
 		cpuInstance.Regs.Pc++
 		return
 	case AM_HL_SPR:
-		// LD HL,SP+e8. FetchedData = SP+signed offset. OK, but must ensure e8 is signed.
-		e8 := int8(memory.BusCtx().BusRead(cpuInstance.Regs.Pc))
+		// LD HL,SP+e8. Fetch raw signed offset byte; actual addition is handled in processor.
+		offset := memory.BusCtx().BusRead(cpuInstance.Regs.Pc)
 		Cm.IncreaseCycle(1)
 		cpuInstance.Regs.Pc++
-		cpuInstance.FetchedData = uint16(int32(cpuInstance.Regs.Sp) + int32(e8))
+		cpuInstance.FetchedData = uint16(offset)
 		return
 	case AM_A16_R, AM_D16_R:
 		// LD (a16),r. FetchedData = r, MemDest = a16.

@@ -86,10 +86,8 @@ func (e *EmuContext) ExecuteCycles(cpuCycles int) {
 		e.PpuCtx.PpuTick() // Tick 3
 		e.PpuCtx.PpuTick() // Tick 4
 
-		for n := 0; n < 4; n++ { // Assuming 4 ticks per cycle
-			e.Ticks++
-			e.timerCtx.Tick()
-		}
+		// Timer advancement now handled by the CPU cycle manager
+		e.Ticks += 4
 		e.dmaCtx.DMATick() // Handle DMA operations
 	}
 }

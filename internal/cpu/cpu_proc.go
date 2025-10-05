@@ -99,10 +99,11 @@ func procLd(ctx *CpuContext) {
 	}
 
 	if ctx.currentInst.Mode == AM_HL_SPR {
-		// LD HL,SP+e8. Correct, but see FetchData for sign extension.
+		// LD HL,SP+e8: apply signed 8-bit offset fetched during decode.
 		value := int8(ctx.FetchedData)
 		sp := CpuRegRead(RT_SP)
 		result := uint16(int32(sp) + int32(value))
+		logger.Debug("LD HL,SP+e8 executed: SP=%04X offset=%d result=%04X", sp, value, result)
 
 		h := ((sp & 0x0F) + (uint16(value) & 0x0F)) > 0x0F
 		c := ((sp & 0xFF) + (uint16(value) & 0xFF)) > 0xFF
@@ -385,6 +386,7 @@ func procDi(ctx *CpuContext) {
 
 func procEi(ctx *CpuContext) {
 	// EI: Enable interrupts after next instruction
+	logger.Debug("procEi invoked at PC=%04X", ctx.Regs.Pc)
 	ctx.enablingIme = true
 }
 
@@ -464,7 +466,7 @@ func procRet(ctx *CpuContext) {
 			return // Condition not met, don't return
 		}
 	}
-	
+
 	// Pop return address from stack
 	ctx.Regs.Pc = StackPop16()
 	Cm.IncreaseCycle(2) // StackPop16 handles memory access cycles
@@ -473,7 +475,7 @@ func procRet(ctx *CpuContext) {
 
 func procRst(ctx *CpuContext) {
 	// RST vec: Call fixed address (push PC, jump to vec)
-	// Push current PC to stack  
+	// Push current PC to stack
 	Cm.IncreaseCycle(1)
 	StackPush16(ctx.Regs.Pc)
 	// Jump to RST vector

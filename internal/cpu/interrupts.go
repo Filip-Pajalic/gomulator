@@ -1,5 +1,9 @@
 package cpu
 
+import (
+	logger "app/internal/logger"
+)
+
 type InterruptType byte
 
 const (
@@ -13,6 +17,7 @@ const (
 func IntHandle(ctx *CpuContext, address uint16, it InterruptType) {
 	// Disable interrupts (IME = 0)
 	ctx.IntMasterEnabled = false
+	logger.Debug("Handling interrupt %v at PC=%04X -> jumping to %04X", it, ctx.Regs.Pc, address)
 
 	// Clear the corresponding interrupt flag
 	ctx.IntFlags &= ^byte(it)

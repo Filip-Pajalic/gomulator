@@ -169,6 +169,7 @@ func CpuGetIntFlags() byte {
 }
 
 func CpuSetIntFlags(value byte) {
+	logger.Info("CpuSetIntFlags: value=%02X", value)
 	cpuInstance.IntFlags = value
 }
 

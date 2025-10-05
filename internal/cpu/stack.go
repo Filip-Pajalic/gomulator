@@ -1,6 +1,7 @@
 package cpu
 
 import (
+	logger "app/internal/logger"
 	"app/internal/memory"
 )
 
@@ -8,7 +9,9 @@ import (
 func StackPush(data byte) {
 	regs := CpuGetRegs()
 	regs.Sp--
-	memory.BusCtx().BusWrite(regs.Sp, data)
+	addr := regs.Sp
+	memory.BusCtx().BusWrite(addr, data)
+	logger.Debug("StackPush: wrote %02X to %04X (SP now %04X)", data, addr, regs.Sp)
 }
 
 // StackPush16: Pushes a 16-bit value onto the stack (high byte first, then low byte)
