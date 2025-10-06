@@ -1,0 +1,126 @@
+name: Test Suite
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-roms:
+    name: GB Test ROMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Clone GB Test ROMs
+      run: |
+        git clone https://github.com/retrio/gb-test-roms.git
+        echo "✅ Test ROMs cloned successfully"
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build test runner
+      run: |
+        go build -tags testrunner -o test_runner ./cmd/test_runner.go
+        chmod +x test_runner
+    
+    - name: Test CPU Instructions (cpu_instrs.gb)
+      id: cpu_instrs
+      continue-on-error: true
+      run: |
+        echo "::group::CPU Instructions Test"
+        ./test_runner -rom "gb-test-roms/cpu_instrs/cpu_instrs.gb" -timeout 120 -expect "Passed"
+        echo "::endgroup::"
+    
+    - name: Test Individual CPU Instructions (if main test failed)
+      if: steps.cpu_instrs.outcome == 'failure'
+      run: |
+        echo "::group::Individual CPU Instruction Tests"
+        FAILED_TESTS=""
+        EXIT_CODE=0
+        
+        for rom in gb-test-roms/cpu_instrs/individual/*.gb; do
+          rom_name=$(basename "$rom")
+          echo "::group::Testing $rom_name"
+          
+          if ./test_runner -rom "$rom" -timeout 60 -expect "Passed"; then
+            echo "✅ $rom_name PASSED"
+          else
+            echo "❌ $rom_name FAILED"
+            FAILED_TESTS="$FAILED_TESTS\n  - $rom_name"
+            EXIT_CODE=1
+          fi
+          
+          echo "::endgroup::"
+        done
+        
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Failed CPU instruction tests:$FAILED_TESTS"
+          exit 1
+        fi
+        echo "::endgroup::"
+    
+    - name: Test Instruction Timing (instr_timing.gb)
+      run: |
+        echo "::group::Instruction Timing Test"
+        ./test_runner -rom "gb-test-roms/instr_timing/instr_timing.gb" -timeout 60 -expect "Passed"
+        echo "::endgroup::"
+    
+    - name: Test Summary
+      if: success()
+      run: |
+        echo "::notice::✅ All GB test ROMs passed!"
+        echo "Tests completed:"
+        echo "  ✅ CPU Instructions (cpu_instrs.gb)"
+        echo "  ✅ Instruction Timing (instr_timing.gb)"
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Run unit tests
+      run: |
+        go test ./... -v
+
+  build-check:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    needs: [test-roms, unit-tests]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build native
+      run: |
+        go build -o gomulator ./cmd
+    
+    - name: Build WASM
+      run: |
+        GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o gomulator.wasm ./cmd
+    
+    - name: All checks passed
+      run: |
+        echo "✅ All tests and builds successful!"
