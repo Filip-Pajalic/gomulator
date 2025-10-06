@@ -1,3 +1,5 @@
+//go:build !js || !wasm
+
 package main
 
 import (
@@ -9,6 +11,8 @@ import (
 )
 
 func main() {
+	// WASM mode is handled in main_wasm.go with build tags
+	
 	// Parse command line flags
 	var skipBootAnim = flag.Bool("skip-boot", false, "Skip the Nintendo logo boot animation")
 	var debugMode = flag.Bool("debug", false, "Enable debug mode")

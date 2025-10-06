@@ -4,15 +4,25 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 )
 
 var (
-	logger *slog.Logger
+	logger     *slog.Logger
+	debugEnabled bool
 )
 
 func init() {
+	// Use higher log level for WASM to reduce console overhead
+	logLevel := slog.LevelInfo
+	if runtime.GOARCH == "wasm" {
+		logLevel = slog.LevelWarn // Only show warnings and errors in WASM
+	}
+	
+	debugEnabled = logLevel <= slog.LevelDebug
+	
 	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo, // Back to Info level to see test results
+		Level: logLevel,
 	}
 	handler := slog.NewTextHandler(os.Stdout, opts)
 	logger = slog.New(handler)
@@ -24,6 +34,10 @@ func Info(format string, v ...interface{}) {
 }
 
 func Debug(format string, v ...interface{}) {
+	// Skip formatting entirely if debug is disabled
+	if !debugEnabled {
+		return
+	}
 	logger.Debug(fmt.Sprintf(format, v...))
 }
 

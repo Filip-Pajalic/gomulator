@@ -13,9 +13,13 @@
 
 *.gb
 
+# Test ROMs - cloned during test run, not part of repo
+gb-test-roms/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
 roms/
+!internal/memory/roms/
+!internal/memory/roms/Tetris (World) (Rev A).gb
 .vscode/
 .idea/

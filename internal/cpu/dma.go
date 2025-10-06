@@ -7,6 +7,7 @@ import (
 
 type DMA interface {
 	DMATick()
+	DMATickBatch(ticks int32)
 	DMATransferring() bool
 }
 
@@ -69,6 +70,17 @@ func (d *DMAContext) DMATick() {
 	if d.currentByte >= 0xA0 {
 		d.active = false
 		logger.Debug("DMA transfer complete! Transferred 160 bytes to OAM")
+	}
+}
+
+// DMATickBatch processes multiple DMA ticks at once for better performance
+func (d *DMAContext) DMATickBatch(ticks int32) {
+	for i := int32(0); i < ticks; i++ {
+		d.DMATick()
+		// Early exit if DMA completes
+		if !d.active && d.startDelay == 0 {
+			return
+		}
 	}
 }
 

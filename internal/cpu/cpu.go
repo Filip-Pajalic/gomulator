@@ -156,18 +156,16 @@ func (c *CpuContext) Step() bool {
 		Cm.IncreaseCycle(1)
 		FetchData()
 
-		var inst string
-		instToStr(c, &inst)
-
 		if c.currentInst == nil {
 			logger.Warn("Unknown instruction! %02X\n", c.CurOpCode)
 			os.Exit(1)
 		}
 
-		DbgUpdate()
-		if !DbgPrint() {
-			return false
-		}
+		// OPTIMIZED: Remove debug code in production builds
+		// DbgUpdate()
+		// if !DbgPrint() {
+		// 	return false
+		// }
 
 		c.Execute()
 	} else {
