@@ -86,7 +86,7 @@ internal/
 make test
 ```
 
-Runs official GB test ROMs from https://github.com/retrio/gb-test-roms
+Runs GB test ROMs from https://github.com/retrio/gb-test-roms
 
 ## CI/CD
 
