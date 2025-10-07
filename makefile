@@ -11,12 +11,17 @@ native:
 	@set GOOS=& set GOARCH=& go build -o gomulator.exe ./cmd
 	@echo Native build complete: gomulator.exe
 
-# Build WASM version
+# Build WASM version with package
 .PHONY: wasm
 wasm:
-	@echo Building WASM version...
+	@echo Building WASM package...
 	@set GOOS=js& set GOARCH=wasm& go build -ldflags="-s -w" -o gomulator.wasm ./cmd
 	@echo WASM build complete: gomulator.wasm
+	@echo Downloading wasm_exec.js...
+	@powershell -Command "$$ver = (go version) -replace '.*go(\d+\.\d+\.\d+).*', 'go$$1'; $$url = \"https://raw.githubusercontent.com/golang/go/refs/tags/$$ver/lib/wasm/wasm_exec.js\"; Write-Host \"Downloading from $$url\"; Invoke-WebRequest -Uri $$url -OutFile wasm_exec.js; Write-Host \"Downloaded wasm_exec.js for $$ver\""
+	@echo Creating WASM package...
+	@powershell -Command "Compress-Archive -Force -Path gomulator.wasm,wasm_exec.js,index.html -DestinationPath gomulator-wasm.zip"
+	@echo WASM package created: gomulator-wasm.zip
 
 # Clean build artifacts
 .PHONY: clean
@@ -24,33 +29,28 @@ clean:
 	@echo Cleaning build artifacts...
 	@if exist gomulator.exe del gomulator.exe
 	@if exist gomulator.wasm del gomulator.wasm
-	@if exist test_runner.exe del test_runner.exe
+	@if exist gomulator-wasm.zip del gomulator-wasm.zip
+	@if exist wasm_exec.js del wasm_exec.js
 	@echo Clean complete
 
-# Run native version with Tetris
+# Run native version (requires ROM file path)
 .PHONY: run
 run: native
-	@echo Running Tetris...
-	@gomulator.exe "Tetris (World) (Rev A).gb"
+	@echo Usage: gomulator.exe path\to\rom.gb
+	@echo Example: gomulator.exe myrom.gb
 
 # Start HTTP server for WASM version
 .PHONY: serve
 serve: wasm
 	@echo Starting HTTP server on http://localhost:8080
+	@echo Serving WASM files...
 	@python -m http.server 8080
-
-# Build test runner
-.PHONY: test-runner
-test-runner:
-	@echo Building test runner...
-	@go build -tags testrunner -o test_runner.exe ./cmd/test_runner.go
-	@echo Test runner build complete: test_runner.exe
 
 # Run GB test ROMs
 .PHONY: test
-test: test-runner
+test: native
 	@echo Running GB test ROM suite...
-	@powershell -ExecutionPolicy Bypass -File run-tests.ps1
+	@bash run-tests.sh
 
 # Help target
 .PHONY: help
@@ -58,12 +58,11 @@ help:
 	@echo Gomulator Build System
 	@echo.
 	@echo Available targets:
-	@echo   all          - Build both native and WASM versions (default)
-	@echo   native       - Build native Windows executable
-	@echo   wasm         - Build WASM version for browsers
-	@echo   test-runner  - Build headless test runner
-	@echo   test         - Run GB test ROM suite
-	@echo   clean        - Remove build artifacts
-	@echo   run          - Build and run native version with Tetris
-	@echo   serve        - Build WASM and start HTTP server
-	@echo   help         - Show this help message
+	@echo   all     - Build both native and WASM versions (default)
+	@echo   native  - Build native Windows executable
+	@echo   wasm    - Build WASM version and create deployment package (zip)
+	@echo   test    - Run GB test ROM suite (requires bash)
+	@echo   clean   - Remove build artifacts
+	@echo   run     - Show usage for running emulator
+	@echo   serve   - Build WASM and start HTTP server
+	@echo   help    - Show this help message

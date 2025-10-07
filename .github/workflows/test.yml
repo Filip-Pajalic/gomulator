@@ -27,17 +27,25 @@ jobs:
       with:
         go-version: '1.24'
     
-    - name: Build test runner
+    - name: Build emulator
       run: |
-        go build -tags testrunner -o test_runner ./cmd/test_runner.go
-        chmod +x test_runner
+        go build -o gomulator ./cmd
+        chmod +x gomulator
     
     - name: Test CPU Instructions (cpu_instrs.gb)
       id: cpu_instrs
       continue-on-error: true
+      timeout-minutes: 3
       run: |
         echo "::group::CPU Instructions Test"
-        ./test_runner -rom "gb-test-roms/cpu_instrs/cpu_instrs.gb" -timeout 120 -expect "Passed"
+        timeout 120s ./gomulator -skip-boot "gb-test-roms/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
+        if grep -q "Passed" test_output.txt; then
+          echo "✅ CPU Instructions PASSED"
+          exit 0
+        else
+          echo "❌ CPU Instructions FAILED"
+          exit 1
+        fi
         echo "::endgroup::"
     
     - name: Test Individual CPU Instructions (if main test failed)
@@ -51,10 +59,12 @@ jobs:
           rom_name=$(basename "$rom")
           echo "::group::Testing $rom_name"
           
-          if ./test_runner -rom "$rom" -timeout 60 -expect "Passed"; then
+          timeout 60s ./gomulator -skip-boot "$rom" 2>&1 | tee test_output_individual.txt
+          if grep -q "Passed" test_output_individual.txt; then
             echo "✅ $rom_name PASSED"
           else
             echo "❌ $rom_name FAILED"
+            cat test_output_individual.txt
             FAILED_TESTS="$FAILED_TESTS\n  - $rom_name"
             EXIT_CODE=1
           fi
@@ -69,9 +79,17 @@ jobs:
         echo "::endgroup::"
     
     - name: Test Instruction Timing (instr_timing.gb)
+      timeout-minutes: 2
       run: |
         echo "::group::Instruction Timing Test"
-        ./test_runner -rom "gb-test-roms/instr_timing/instr_timing.gb" -timeout 60 -expect "Passed"
+        timeout 60s ./gomulator -skip-boot "gb-test-roms/instr_timing/instr_timing.gb" 2>&1 | tee test_timing.txt
+        if grep -q "Passed" test_timing.txt; then
+          echo "✅ Instruction Timing PASSED"
+        else
+          echo "❌ Instruction Timing FAILED"
+          cat test_timing.txt
+          exit 1
+        fi
         echo "::endgroup::"
     
     - name: Test Summary

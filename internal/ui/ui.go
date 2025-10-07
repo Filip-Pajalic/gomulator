@@ -20,9 +20,10 @@ const (
 type Game struct {
 	EmuCtx       *EmuContext
 	VideoImage   *ebiten.Image
-	BootAnim     *BootAnimation
 	pixelBuffer  []byte // Reusable buffer for WritePixels
 	lastFrameTime time.Time // For frame rate limiting
+	showDebugInfo bool // Toggle FPS display
+	f3Pressed    bool // Track F3 key state for debouncing
 	// Debug variables
 	debugImage   *ebiten.Image
 	frameCounter int
@@ -34,50 +35,25 @@ func NewGame(emuInstance *EmuContext) *Game {
 	input.LcdReadFunc = LcdRead
 	input.LcdWriteFunc = LcdWrite
 
-	// Initialize boot animation
-	bootAnim := NewBootAnimation(emuInstance.BusCtx)
-
 	g := &Game{
 		EmuCtx:      emuInstance,
 		VideoImage:  ebiten.NewImage(ScreenWidth, ScreenHeight),
-		BootAnim:    bootAnim,
 		pixelBuffer: make([]byte, ScreenWidth*ScreenHeight*4),
+		showDebugInfo: false, // FPS display off by default
 	}
 
-	//debugScale := 3 // Increased from 2 for better visibility
-	//g.debugImage = ebiten.NewImage(16*8*debugScale, 24*8*debugScale) // 24 rows of tiles
-
-	// Start boot animation and delay boot ROM simulation
-	if bootAnim.Enabled {
-		bootAnim.Start()
-	} else {
-		// If animation is disabled, run boot sequence immediately
-		bootRomContext := cpu.BootRomCtx()
-		bootRomContext.SimulateBootSequence()
-	}
+	// Run boot ROM simulation immediately
+	bootRomContext := cpu.BootRomCtx()
+	bootRomContext.SimulateBootSequence()
 
 	return g
 }
 
 func (g *Game) Update() error {
-	// Handle boot animation first
-	if !g.BootAnim.IsComplete() {
-		g.BootAnim.Update()
-		g.handleBootInput() // Special input handling during boot
-
-		// When boot animation completes, run the boot ROM sequence
-		if g.BootAnim.IsComplete() && g.BootAnim.Enabled {
-			bootRomContext := cpu.BootRomCtx()
-			bootRomContext.SimulateBootSequence()
-		}
-		return nil
-	}
-
 	if !g.EmuCtx.Running {
 		return ErrEmulationStopped
 	}
 
-	// Normal game operation
 	g.handleInput()
 	g.EmuCtx.StepFrame()
 
@@ -98,62 +74,32 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 	g.lastFrameTime = time.Now()
 
-	// If boot animation is active, draw it in the main game area
-	if !g.BootAnim.IsComplete() {
-		// Create a temporary image for the boot animation
-		bootImage := ebiten.NewImage(ScreenWidth, ScreenHeight)
-		g.BootAnim.Draw(bootImage)
-
-		// Draw the boot animation scaled up in the main game area
-		opts := &ebiten.DrawImageOptions{}
-		opts.GeoM.Scale(float64(scale), float64(scale))
-		screen.DrawImage(bootImage, opts)
-
-		// Still show debug windows during boot
-		// g.updateDebugWindows()
-		// debugOpts := &ebiten.DrawImageOptions{}
-		// debugOpts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
-		// screen.DrawImage(g.debugImage, debugOpts)
-		return
-	}
-
 	// Normal game drawing
 	screen.Fill(color.RGBA{20, 20, 20, 255})
 
 	g.drawVideoBuffer(screen)
 	
-	// Display FPS in top-left corner (disabled in WASM for performance)
-	drawDebugInfo(screen)
-
-	// Draw debug windows on the right side
-	//g.updateDebugWindows()
-	debugOpts := &ebiten.DrawImageOptions{}
-	debugOpts.GeoM.Translate(float64(ScreenWidth*scale+10), 0)
-	//screen.DrawImage(g.debugImage, debugOpts)
+	// Display FPS in top-left corner (if enabled)
+	if g.showDebugInfo {
+		drawDebugInfo(screen)
+	}
 }
 
 // Layout defines the screen dimensions
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	debugScale := 3                   // Match the debug scale
-	totalWidth := ScreenWidth * scale // Main screen + debug window + padding
-	totalHeight := ScreenHeight * scale
-	if debugHeight := 24 * 8 * debugScale; debugHeight > totalHeight {
-		totalHeight = debugHeight
-	}
-	return totalWidth, totalHeight
-}
-
-func (g *Game) handleBootInput() {
-	// Allow skipping boot animation with any key press
-	if ebiten.IsKeyPressed(ebiten.KeySpace) ||
-		ebiten.IsKeyPressed(ebiten.KeyEnter) ||
-		ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		g.BootAnim.Skip()
-	}
+	return ScreenWidth * scale, ScreenHeight * scale
 }
 
 func (g *Game) handleInput() {
 	state := input.GetState()
+
+	// Toggle FPS display with F3 key (debounced)
+	f3Current := ebiten.IsKeyPressed(ebiten.KeyF3)
+	if f3Current && !g.f3Pressed {
+		g.showDebugInfo = !g.showDebugInfo
+		logger.Info("FPS display: %v", g.showDebugInfo)
+	}
+	g.f3Pressed = f3Current
 
 	state.B = ebiten.IsKeyPressed(ebiten.KeyZ)
 	state.A = ebiten.IsKeyPressed(ebiten.KeyX)
@@ -263,8 +209,10 @@ func convertColor(value uint32) color.RGBA {
 }
 
 // UiInit initializes the UI and starts the game loop
-func UiInit(emuInstance *EmuContext) {
+func UiInit(emuInstance *EmuContext, showFPS bool) {
 	game := NewGame(emuInstance)
+	game.showDebugInfo = showFPS // Set initial FPS display state
+	
 	ebiten.SetWindowSize(ScreenWidth*scale, ScreenHeight*scale)
 	ebiten.SetWindowTitle("Gomulator")
 	ebiten.SetTPS(60)            // Cap at 60 ticks per second (Game Boy native speed)

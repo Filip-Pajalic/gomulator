@@ -11,15 +11,23 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Game Boy ROMs (don't commit copyrighted content)
 *.gb
+*.gbc
+*.sav
 
-# Test ROMs - cloned during test run, not part of repo
+# GB Test ROMs - cloned during test run, not part of repo
 gb-test-roms/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
 roms/
-!internal/memory/roms/
-!internal/memory/roms/Tetris (World) (Rev A).gb
 .vscode/
 .idea/
+
+# Build artifacts
+gomulator.exe
+gomulator.wasm
+gomulator-wasm.zip
+wasm_exec.js
+test_output*.txt

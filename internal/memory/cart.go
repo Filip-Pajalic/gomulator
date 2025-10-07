@@ -3,9 +3,9 @@ package memory
 
 import (
 	"bytes"
-	"embed"
 	"encoding/binary"
 	"log/slog"
+	"os"
 	"unsafe"
 
 	logger "app/internal/logger"
@@ -154,11 +154,6 @@ var LIC_CODE = map[int][]byte{
 
 var cartInstance *CartContext
 
-//go:embed "roms/Tetris (World) (Rev A).gb"
-var embeddedROMFS embed.FS
-
-const fallbackROMName = "roms/Tetris (World) (Rev A).gb"
-
 // CartCtx returns the singleton CartContext
 func CartCtx() *CartContext {
 	if cartInstance == nil {
@@ -207,19 +202,13 @@ func (c *CartContext) checkSumChecker(checksum byte) string {
 }
 
 func (c *CartContext) loadCart(romName string) {
-	//data, err := os.ReadFile(romName)
+	data, err := os.ReadFile(romName)
 	slog.Info("Loading ROM file:", slog.String("filename", romName))
-	//if err != nil {
-
-	embeddedData, embedErr := embeddedROMFS.ReadFile(fallbackROMName)
-	if embedErr != nil {
-		logger.Fatal("Failed to load embedded fallback ROM: %v", embedErr)
+	if err != nil {
+		logger.Fatal("Failed to load ROM file: %v", err)
 	}
-	romName = fallbackROMName
-	data := append([]byte(nil), embeddedData...)
-	slog.Info("Using embedded ROM file", slog.String("filename", romName))
+	
 	copy(c.filename[:], romName)
-	//}
 
 	c.romData = data
 
@@ -236,9 +225,9 @@ func (c *CartContext) loadCart(romName string) {
 	headerData := c.romData[headerOffset : headerOffset+headerSize]
 	buffer := bytes.NewBuffer(headerData)
 	rh := romHeader{}
-	err := binary.Read(buffer, binary.LittleEndian, &rh)
-	if err != nil {
-		logger.Fatal("binary.Read failed: %v", err)
+	readErr := binary.Read(buffer, binary.LittleEndian, &rh)
+	if readErr != nil {
+		logger.Fatal("binary.Read failed: %v", readErr)
 	}
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title

@@ -45,22 +45,33 @@ jobs:
       with:
         go-version: '1.24'
     
+    - name: Get Go version
+      id: go-version
+      run: |
+        GO_VERSION=$(go version | grep -oP 'go\d+\.\d+\.\d+')
+        echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
+        echo "Detected Go version: $GO_VERSION"
+    
     - name: Build WASM
       run: |
         GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o gomulator.wasm ./cmd
     
-    - name: Copy wasm_exec.js
+    - name: Download wasm_exec.js
       run: |
-        cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" .
+        WASM_EXEC_URL="https://raw.githubusercontent.com/golang/go/refs/tags/${{ steps.go-version.outputs.version }}/lib/wasm/wasm_exec.js"
+        echo "Downloading from: $WASM_EXEC_URL"
+        curl -L -o wasm_exec.js "$WASM_EXEC_URL"
     
-    - name: Upload WASM artifacts
+    - name: Create WASM package
+      run: |
+        zip gomulator-wasm.zip gomulator.wasm wasm_exec.js index.html
+        echo "✅ WASM package created"
+    
+    - name: Upload WASM package
       uses: actions/upload-artifact@v4
       with:
         name: gomulator-wasm
-        path: |
-          gomulator.wasm
-          wasm_exec.js
-          index.html
+        path: gomulator-wasm.zip
         retention-days: 30
 
   build-all:
