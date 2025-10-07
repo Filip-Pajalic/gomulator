@@ -207,7 +207,7 @@ func (c *CartContext) loadCart(romName string) {
 	if err != nil {
 		logger.Fatal("Failed to load ROM file: %v", err)
 	}
-	
+
 	copy(c.filename[:], romName)
 
 	c.romData = data

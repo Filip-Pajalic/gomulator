@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	logger     *slog.Logger
+	logger       *slog.Logger
 	debugEnabled bool
 )
 
@@ -18,9 +18,9 @@ func init() {
 	if runtime.GOARCH == "wasm" {
 		logLevel = slog.LevelWarn // Only show warnings and errors in WASM
 	}
-	
+
 	debugEnabled = logLevel <= slog.LevelDebug
-	
+
 	opts := &slog.HandlerOptions{
 		Level: logLevel,
 	}

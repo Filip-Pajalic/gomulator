@@ -620,10 +620,10 @@ func (p *PpuContext) PixelFifoPushWithIndex(value uint32, colorIndex uint8) {
 		logger.Warn("PPU: FIFO overflow, size=%d", p.Pfc.PixelFifo.size)
 		return
 	}
-	
+
 	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].Value = value
 	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].ColorIndex = colorIndex
-	
+
 	p.Pfc.PixelFifo.tail = (p.Pfc.PixelFifo.tail + 1) % 16
 	p.Pfc.PixelFifo.size++
 }

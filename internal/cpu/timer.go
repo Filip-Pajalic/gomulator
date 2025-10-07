@@ -66,13 +66,13 @@ func (t *TimerContext) TickBatch(ticks int32) {
 	if ticks <= 0 {
 		return
 	}
-	
+
 	// Fast path: if timer is disabled, just update div
 	if t.tac&(1<<2) == 0 {
 		t.div += uint16(ticks)
 		return
 	}
-	
+
 	// Timer is enabled - need to check for overflows
 	// We still need to process each tick to detect falling edges correctly
 	for i := int32(0); i < ticks; i++ {

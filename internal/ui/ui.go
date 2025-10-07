@@ -18,12 +18,12 @@ const (
 )
 
 type Game struct {
-	EmuCtx       *EmuContext
-	VideoImage   *ebiten.Image
-	pixelBuffer  []byte // Reusable buffer for WritePixels
+	EmuCtx        *EmuContext
+	VideoImage    *ebiten.Image
+	pixelBuffer   []byte    // Reusable buffer for WritePixels
 	lastFrameTime time.Time // For frame rate limiting
-	showDebugInfo bool // Toggle FPS display
-	f3Pressed    bool // Track F3 key state for debouncing
+	showDebugInfo bool      // Toggle FPS display
+	f3Pressed     bool      // Track F3 key state for debouncing
 	// Debug variables
 	debugImage   *ebiten.Image
 	frameCounter int
@@ -36,9 +36,9 @@ func NewGame(emuInstance *EmuContext) *Game {
 	input.LcdWriteFunc = LcdWrite
 
 	g := &Game{
-		EmuCtx:      emuInstance,
-		VideoImage:  ebiten.NewImage(ScreenWidth, ScreenHeight),
-		pixelBuffer: make([]byte, ScreenWidth*ScreenHeight*4),
+		EmuCtx:        emuInstance,
+		VideoImage:    ebiten.NewImage(ScreenWidth, ScreenHeight),
+		pixelBuffer:   make([]byte, ScreenWidth*ScreenHeight*4),
 		showDebugInfo: false, // FPS display off by default
 	}
 
@@ -78,7 +78,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{20, 20, 20, 255})
 
 	g.drawVideoBuffer(screen)
-	
+
 	// Display FPS in top-left corner (if enabled)
 	if g.showDebugInfo {
 		drawDebugInfo(screen)
@@ -123,7 +123,7 @@ func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
 		g.pixelBuffer[i*4+2] = byte(argb & 0xFF)         // B
 		g.pixelBuffer[i*4+3] = 0xFF                      // A (always opaque)
 	}
-	
+
 	g.VideoImage.WritePixels(g.pixelBuffer)
 
 	// Draw the scaled game image
@@ -212,7 +212,7 @@ func convertColor(value uint32) color.RGBA {
 func UiInit(emuInstance *EmuContext, showFPS bool) {
 	game := NewGame(emuInstance)
 	game.showDebugInfo = showFPS // Set initial FPS display state
-	
+
 	ebiten.SetWindowSize(ScreenWidth*scale, ScreenHeight*scale)
 	ebiten.SetWindowTitle("Gomulator")
 	ebiten.SetTPS(60)            // Cap at 60 ticks per second (Game Boy native speed)

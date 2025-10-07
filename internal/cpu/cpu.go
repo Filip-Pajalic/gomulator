@@ -161,11 +161,10 @@ func (c *CpuContext) Step() bool {
 			os.Exit(1)
 		}
 
-		// OPTIMIZED: Remove debug code in production builds
-		// DbgUpdate()
-		// if !DbgPrint() {
-		// 	return false
-		// }
+		// Debug hook (only active when built with -tags debug)
+		if !stepDebugHook() {
+			return false
+		}
 
 		c.Execute()
 	} else {
