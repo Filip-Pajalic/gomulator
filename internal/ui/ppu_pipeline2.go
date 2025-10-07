@@ -24,8 +24,8 @@ func (p *PpuContext) PipelineReset() {
 
 	// Clear FIFO
 	p.Pfc.PixelFifo.size = 0
-	p.Pfc.PixelFifo.head = nil
-	p.Pfc.PixelFifo.tail = nil
+	p.Pfc.PixelFifo.head = 0
+	p.Pfc.PixelFifo.tail = 0
 
 	logger.Debug("Pipeline reset for line %d", LcdCtx().Ly)
 }

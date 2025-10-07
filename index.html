@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Gomulator - Game Boy Emulator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        #controls {
+            margin-bottom: 20px;
+        }
+        #romfile {
+            padding: 10px;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input type="file" id="romfile" accept=".gb,.gbc" />
+    </div>
+    <script src="wasm_exec.js"></script>
+<script>
+const go = new Go();
+let romData = null;
+
+// File upload handler
+const romInput = document.getElementById('romfile');
+romInput.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    romData = await file.arrayBuffer();
+    console.log('ROM loaded:', file.name, romData.byteLength, 'bytes');
+    
+    // Convert ArrayBuffer to Uint8Array and pass to Go
+    const romBytes = new Uint8Array(romData);
+    console.log('Calling Go function startEmulatorWithROM...');
+    if (window.startEmulatorWithROM) {
+        window.startEmulatorWithROM(romBytes);
+    } else {
+        console.error('Go function startEmulatorWithROM not available yet. Waiting...');
+        setTimeout(() => {
+            if (window.startEmulatorWithROM) {
+                window.startEmulatorWithROM(romBytes);
+            } else {
+                console.error('Go function still not available');
+            }
+        }, 1000);
+    }
+});
+
+WebAssembly.instantiateStreaming(fetch("gomulator.wasm"), go.importObject).then(result => {
+    go.run(result.instance);
+});
+</script>
+</body>
+</html>

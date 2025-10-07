@@ -60,7 +60,7 @@ func (r *RamContext) HramWrite(address uint16, value byte) {
 		return // Just return instead of exiting for better error recovery
 	}
 	if enableHramDebug && address >= 0xFF80 && address <= 0xFF83 {
-		logger.Info("HRAM write debug: addr=%04X value=%02X", address, value)
+		logger.Debug("HRAM write debug: addr=%04X value=%02X", address, value)
 	}
 	r.Hram[address-0xFF80] = value
 }

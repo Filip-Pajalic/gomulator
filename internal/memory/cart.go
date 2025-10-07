@@ -4,7 +4,7 @@ package memory
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"log/slog"
 	"os"
 	"unsafe"
 
@@ -21,7 +21,6 @@ type Cartridge interface {
 // CartContext holds the state and data of the cartridge
 type CartContext struct {
 	filename [1024]byte
-	romSize  uint32
 	romData  []byte
 	header   *romHeader
 
@@ -202,22 +201,14 @@ func (c *CartContext) checkSumChecker(checksum byte) string {
 	return result
 }
 
-// readNextBytes reads a specific number of bytes from a file at a given offset
-func (c *CartContext) readNextBytes(file *os.File, number int, offset int64) []byte {
-	bbytes := make([]byte, number)
-
-	_, err := file.ReadAt(bbytes, offset)
-	if err != nil {
-		logger.Fatal(err.Error())
-	}
-	return bbytes
-}
-
 func (c *CartContext) loadCart(romName string) {
 	data, err := os.ReadFile(romName)
+	slog.Info("Loading ROM file:", slog.String("filename", romName))
 	if err != nil {
-		logger.Fatal("Could not open ROM file:", err)
+		logger.Fatal("Failed to load ROM file: %v", err)
 	}
+
+	copy(c.filename[:], romName)
 
 	c.romData = data
 
@@ -234,9 +225,9 @@ func (c *CartContext) loadCart(romName string) {
 	headerData := c.romData[headerOffset : headerOffset+headerSize]
 	buffer := bytes.NewBuffer(headerData)
 	rh := romHeader{}
-	err = binary.Read(buffer, binary.LittleEndian, &rh)
-	if err != nil {
-		logger.Fatal("binary.Read failed:", err)
+	readErr := binary.Read(buffer, binary.LittleEndian, &rh)
+	if readErr != nil {
+		logger.Fatal("binary.Read failed: %v", readErr)
 	}
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title
@@ -298,8 +289,43 @@ func (c *CartContext) ProgramLoad(program [][2]uint) {
 
 // CartLoad loads a cartridge from a file and initializes event processing
 func (c *CartContext) CartLoad(cart string) bool {
-	copy(c.filename[:], fmt.Sprintf("%s", cart))
+	copy(c.filename[:], cart)
 	c.loadCart(cart)
+	return true
+}
+
+// LoadROMFromBytes loads a ROM directly from a byte slice (for WASM/JS)
+func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
+	c.romData = append([]byte(nil), romBytes...)
+	if len(c.romData) == 0 {
+		logger.Fatal("ROM data is empty.")
+		return false
+	}
+	// Read and parse the ROM header from c.romData
+	headerSize := int(unsafe.Sizeof(romHeader{}))
+	if len(c.romData) < headerOffset+headerSize {
+		logger.Fatal("ROM data is too small to contain a valid header.")
+		return false
+	}
+	headerData := c.romData[headerOffset : headerOffset+headerSize]
+	buffer := bytes.NewBuffer(headerData)
+	rh := romHeader{}
+	err := binary.Read(buffer, binary.LittleEndian, &rh)
+	if err != nil {
+		logger.Fatal("binary.Read failed: %v", err)
+		return false
+	}
+	c.header = &rh
+	c.header.Title[15] = 0 // Null-terminate the title
+	logger.Info("Cartridge Loaded from bytes:")
+	logger.Info("Title    : %s", string(c.header.Title[:]))
+	logger.Info("Cartridge Type : %02X", c.header.CartType)
+	logger.Info("ROM Size : %d KB", 32<<c.header.RomSize)
+	logger.Info("RAM Size : %02X", c.header.RamSize)
+	logger.Info("LIC Code : %02X", c.header.LicCode)
+	logger.Info("ROM Vers : %02X", c.header.Version)
+	logger.Info("ROM data length: %d bytes", len(c.romData))
+	c.initializeRAM()
 	return true
 }
 

@@ -67,7 +67,7 @@ func ProcADD_HL(cpu *CpuContext, value uint16) {
 }
 
 func procNone(ctx *CpuContext) {
-	logger.Fatal("Invalid Instruction!")
+	logger.Warn("Invalid Instruction!")
 }
 
 var rtLookup = []regTypes{

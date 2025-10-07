@@ -9,13 +9,11 @@ var Cm = &CycleManager{}
 func (c *CycleManager) IncreaseCycle(tickAmount int32) {
 	c.ticks += tickAmount
 
-	// Advance the timer for each CPU clock cycle (4 clocks per machine cycle)
+	// Batch advance the timer for better performance
 	if tickAmount > 0 {
 		timer := TimerCtx()
 		totalTicks := tickAmount * 4
-		for i := int32(0); i < totalTicks; i++ {
-			timer.Tick()
-		}
+		timer.TickBatch(totalTicks)
 	}
 }
 

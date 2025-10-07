@@ -26,6 +26,7 @@ type PPU interface {
 	OamRead(address uint16) byte
 	VideBuffer() []uint32
 	PpuTick()
+	PpuTickBatch(ticks int32)
 }
 
 type PpuContext struct {
@@ -97,11 +98,12 @@ type FifoEntry struct {
 	ColorIndex uint8  // Original color index (0-3)
 }
 
-// Fifo represents a FIFO queue
+// Fifo represents a FIFO queue using a ring buffer for better performance
 type Fifo struct {
-	head *FifoEntry
-	tail *FifoEntry
-	size uint32
+	entries [16]FifoEntry // Fixed-size ring buffer (max 8 pixels needed, 16 for safety)
+	head    int
+	tail    int
+	size    uint32
 }
 
 // NewPpuContext initializes a new PPU context
@@ -217,8 +219,19 @@ func (p *PpuContext) OamRead(address uint16) byte {
 			return 0xFF
 		}
 
-		entryBytes := EncodeToBytes(p.OamRam[entryIndex])
-		return entryBytes[fieldOffset]
+		// OPTIMIZED: Direct field access instead of binary encoding
+		entry := &p.OamRam[entryIndex]
+		switch fieldOffset {
+		case 0:
+			return entry.Y
+		case 1:
+			return entry.X
+		case 2:
+			return entry.Tile
+		case 3:
+			// Reconstruct attributes byte
+			return byte(entry.FBgp<<7 | entry.FYFlip<<6 | entry.FXFlip<<5 | entry.FPn<<4 | entry.FCgbVramBank<<3 | (entry.FCgbPn & 0x07))
+		}
 	}
 	logger.Warn("PPU OamRead: Invalid address %04X", address)
 	return 0xFF
@@ -275,14 +288,8 @@ func (p *PpuContext) PpuTick() {
 	// Increment line ticks FIRST like reference
 	p.LineTicks++
 
-	// Debug: Log mode changes occasionally
-	currentMode := LCDSMode()
-	if p.LineTicks%100 == 0 && LcdCtx().Ly < 5 {
-		logger.Debug("PPU: Tick - Mode=%d LY=%d LineTicks=%d", currentMode, LcdCtx().Ly, p.LineTicks)
-	}
-
 	// Execute the current LCD mode - EXACTLY like reference ppu_tick()
-	switch currentMode {
+	switch LCDSMode() {
 	case ModeOam:
 		p.ModeOAM()
 	case ModeXfer:
@@ -291,6 +298,13 @@ func (p *PpuContext) PpuTick() {
 		p.ModeHBlank()
 	case ModeVBlank:
 		p.ModeVBlank()
+	}
+}
+
+// PpuTickBatch processes multiple PPU ticks at once for better performance
+func (p *PpuContext) PpuTickBatch(ticks int32) {
+	for i := int32(0); i < ticks; i++ {
+		p.PpuTick()
 	}
 }
 
@@ -369,11 +383,10 @@ func (p *PpuContext) PipelineProcess() {
 }
 
 func (p *PpuContext) PipelineFifoReset() {
-	for p.Pfc.PixelFifo.size > 0 {
-		p.PixelFifoPop()
-	}
-	p.Pfc.PixelFifo.head = nil
-	p.Pfc.PixelFifo.tail = nil
+	// Ring buffer - just reset pointers
+	p.Pfc.PixelFifo.head = 0
+	p.Pfc.PixelFifo.tail = 0
+	p.Pfc.PixelFifo.size = 0
 }
 
 func (p *PpuContext) ModeHBlank() {
@@ -431,8 +444,8 @@ func (p *PpuContext) ResetPipelineState() {
 	p.Pfc.CurFetchState = FS_TILE
 
 	// Clear the pixel FIFO
-	p.Pfc.PixelFifo.head = nil
-	p.Pfc.PixelFifo.tail = nil
+	p.Pfc.PixelFifo.head = 0
+	p.Pfc.PixelFifo.tail = 0
 	p.Pfc.PixelFifo.size = 0
 }
 
@@ -602,20 +615,16 @@ func (p *PpuContext) PixelFifoPush(value uint32) {
 
 // PixelFifoPushWithIndex adds a pixel with color index to the pixel FIFO
 func (p *PpuContext) PixelFifoPushWithIndex(value uint32, colorIndex uint8) {
-	entry := &FifoEntry{
-		Value:      value,
-		ColorIndex: colorIndex,
-		Next:       nil,
+	// Ring buffer implementation - no allocations!
+	if p.Pfc.PixelFifo.size >= 16 {
+		logger.Warn("PPU: FIFO overflow, size=%d", p.Pfc.PixelFifo.size)
+		return
 	}
 
-	if p.Pfc.PixelFifo.tail == nil {
-		p.Pfc.PixelFifo.head = entry
-		p.Pfc.PixelFifo.tail = entry
-	} else {
-		p.Pfc.PixelFifo.tail.Next = entry
-		p.Pfc.PixelFifo.tail = entry
-	}
+	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].Value = value
+	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].ColorIndex = colorIndex
 
+	p.Pfc.PixelFifo.tail = (p.Pfc.PixelFifo.tail + 1) % 16
 	p.Pfc.PixelFifo.size++
 }
 
@@ -628,20 +637,15 @@ type PixelData struct {
 
 // PixelFifoPop removes and returns a pixel from the pixel FIFO
 func (p *PpuContext) PixelFifoPop() PixelData {
-	if p.Pfc.PixelFifo.head == nil {
+	if p.Pfc.PixelFifo.size == 0 {
 		return PixelData{Color: LcdCtx().BgColors[0], ColorIndex: 0, IsBgColor0: true}
 	}
 
-	entry := p.Pfc.PixelFifo.head
+	entry := &p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.head]
 	value := entry.Value
 	colorIndex := entry.ColorIndex
 
-	p.Pfc.PixelFifo.head = p.Pfc.PixelFifo.head.Next
-
-	if p.Pfc.PixelFifo.head == nil {
-		p.Pfc.PixelFifo.tail = nil
-	}
-
+	p.Pfc.PixelFifo.head = (p.Pfc.PixelFifo.head + 1) % 16
 	p.Pfc.PixelFifo.size--
 
 	return PixelData{

@@ -107,10 +107,9 @@ func (e *EmuContext) ExecuteCycles(cpuCycles int) {
 
 		cpuSteps := consumedTicks * 4
 
-		for i := int32(0); i < cpuSteps; i++ {
-			e.PpuCtx.PpuTick()
-			e.dmaCtx.DMATick()
-		}
+		// OPTIMIZED: Batch tick the PPU and DMA instead of looping
+		e.PpuCtx.PpuTickBatch(cpuSteps)
+		e.dmaCtx.DMATickBatch(cpuSteps)
 
 		e.Ticks += uint64(cpuSteps)
 	}
@@ -155,7 +154,7 @@ func (e *EmuContext) handleCpuStop() bool {
 		return true
 	}
 	e.Die = true
-	logger.Fatal("CPU has stopped unexpectedly.")
+	logger.Debug("CPU has stopped unexpectedly.")
 	return false
 }
 
@@ -183,4 +182,27 @@ func StartEmulator(romFile string) *EmuContext {
 
 	return emuInstance
 
+}
+
+// StartEmulatorFromBytes initializes the emulator from a ROM byte slice (for WASM/JS)
+func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
+	cartContext := memory.CartCtx()
+	cartContext.LoadROMFromBytes(romBytes)
+
+	// Continue initializing other components
+	timerContext := cpu.TimerCtx()
+	dmaContext := cpu.DmaCtx()
+	ppuContext := PpuCtx()
+	ramContext := memory.RamCtx()
+
+	ioContext := input.NewIo(nil, timerContext, dmaContext)
+
+	cpuContext := cpu.NewCpuContext(nil) // Bus will be set later
+	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext, ioContext, cpuContext)
+
+	cpuContext = cpu.NewCpuContext(busContext)
+
+	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext, busContext)
+
+	return emuInstance
 }

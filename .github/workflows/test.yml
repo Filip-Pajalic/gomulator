@@ -1,0 +1,144 @@
+name: Test Suite
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-roms:
+    name: GB Test ROMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Clone GB Test ROMs
+      run: |
+        git clone https://github.com/retrio/gb-test-roms.git
+        echo "✅ Test ROMs cloned successfully"
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build emulator
+      run: |
+        go build -o gomulator ./cmd
+        chmod +x gomulator
+    
+    - name: Test CPU Instructions (cpu_instrs.gb)
+      id: cpu_instrs
+      continue-on-error: true
+      timeout-minutes: 3
+      run: |
+        echo "::group::CPU Instructions Test"
+        timeout 120s ./gomulator -skip-boot "gb-test-roms/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
+        if grep -q "Passed" test_output.txt; then
+          echo "✅ CPU Instructions PASSED"
+          exit 0
+        else
+          echo "❌ CPU Instructions FAILED"
+          exit 1
+        fi
+        echo "::endgroup::"
+    
+    - name: Test Individual CPU Instructions (if main test failed)
+      if: steps.cpu_instrs.outcome == 'failure'
+      run: |
+        echo "::group::Individual CPU Instruction Tests"
+        FAILED_TESTS=""
+        EXIT_CODE=0
+        
+        for rom in gb-test-roms/cpu_instrs/individual/*.gb; do
+          rom_name=$(basename "$rom")
+          echo "::group::Testing $rom_name"
+          
+          timeout 60s ./gomulator -skip-boot "$rom" 2>&1 | tee test_output_individual.txt
+          if grep -q "Passed" test_output_individual.txt; then
+            echo "✅ $rom_name PASSED"
+          else
+            echo "❌ $rom_name FAILED"
+            cat test_output_individual.txt
+            FAILED_TESTS="$FAILED_TESTS\n  - $rom_name"
+            EXIT_CODE=1
+          fi
+          
+          echo "::endgroup::"
+        done
+        
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "::error::Failed CPU instruction tests:$FAILED_TESTS"
+          exit 1
+        fi
+        echo "::endgroup::"
+    
+    - name: Test Instruction Timing (instr_timing.gb)
+      timeout-minutes: 2
+      run: |
+        echo "::group::Instruction Timing Test"
+        timeout 60s ./gomulator -skip-boot "gb-test-roms/instr_timing/instr_timing.gb" 2>&1 | tee test_timing.txt
+        if grep -q "Passed" test_timing.txt; then
+          echo "✅ Instruction Timing PASSED"
+        else
+          echo "❌ Instruction Timing FAILED"
+          cat test_timing.txt
+          exit 1
+        fi
+        echo "::endgroup::"
+    
+    - name: Test Summary
+      if: success()
+      run: |
+        echo "::notice::✅ All GB test ROMs passed!"
+        echo "Tests completed:"
+        echo "  ✅ CPU Instructions (cpu_instrs.gb)"
+        echo "  ✅ Instruction Timing (instr_timing.gb)"
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Run unit tests
+      run: |
+        go test ./... -v
+
+  build-check:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    needs: [test-roms, unit-tests]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build native
+      run: |
+        go build -o gomulator ./cmd
+    
+    - name: Build WASM
+      run: |
+        GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o gomulator.wasm ./cmd
+    
+    - name: All checks passed
+      run: |
+        echo "✅ All tests and builds successful!"

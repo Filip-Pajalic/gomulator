@@ -1,0 +1,87 @@
+name: Build Gomulator
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    name: Build Native Windows
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Build native Windows executable
+      run: |
+        go build -o gomulator.exe ./cmd
+    
+    - name: Upload Windows executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: gomulator-windows
+        path: gomulator.exe
+        retention-days: 30
+
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Get Go version
+      id: go-version
+      run: |
+        GO_VERSION=$(go version | grep -oP 'go\d+\.\d+\.\d+')
+        echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
+        echo "Detected Go version: $GO_VERSION"
+    
+    - name: Build WASM
+      run: |
+        GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o gomulator.wasm ./cmd
+    
+    - name: Download wasm_exec.js
+      run: |
+        WASM_EXEC_URL="https://raw.githubusercontent.com/golang/go/refs/tags/${{ steps.go-version.outputs.version }}/lib/wasm/wasm_exec.js"
+        echo "Downloading from: $WASM_EXEC_URL"
+        curl -L -o wasm_exec.js "$WASM_EXEC_URL"
+    
+    - name: Create WASM package
+      run: |
+        zip gomulator-wasm.zip gomulator.wasm wasm_exec.js index.html
+        echo "✅ WASM package created"
+    
+    - name: Upload WASM package
+      uses: actions/upload-artifact@v4
+      with:
+        name: gomulator-wasm
+        path: gomulator-wasm.zip
+        retention-days: 30
+
+  build-all:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-native, build-wasm]
+    
+    steps:
+    - name: Build Summary
+      run: |
+        echo "✅ Native Windows build completed"
+        echo "✅ WASM build completed"
+        echo "All builds successful!"
