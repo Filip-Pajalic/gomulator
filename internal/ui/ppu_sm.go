@@ -6,10 +6,23 @@ import (
 )
 
 func (p *PpuContext) IncrementLY() {
-	// Window is visible if enabled AND current line is within window bounds AND WX is on-screen
-	if LCDCWinEnable() && LcdCtx().Ly >= LcdCtx().WinY && LcdCtx().Ly < LcdCtx().WinY+YRES && LcdCtx().WinX < 167 {
+	currentLy := LcdCtx().Ly
+	windowEnabled := LCDCWinEnable()
+	windowOnScreen := LcdCtx().WinX < 167
+
+	switch {
+	case !windowEnabled || !windowOnScreen:
+		p.WindowLine = 0
+	case currentLy < LcdCtx().WinY:
+		p.WindowLine = 0
+	case currentLy < YRES:
+		if currentLy == LcdCtx().WinY && p.WindowLine != 0 {
+			p.WindowLine = 0
+		}
 		p.WindowLine++
-		logger.Debug("PPU: Window line incremented to %d at scanline %d", p.WindowLine, LcdCtx().Ly)
+		if p.WindowLine <= 20 {
+			logger.Debug("PPU: Window line advanced to %d after scanline %d", p.WindowLine, currentLy)
+		}
 	}
 
 	lcdCtx := LcdCtx()

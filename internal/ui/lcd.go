@@ -84,7 +84,10 @@ func LcdRead(address uint16) uint8 {
 	switch offset {
 	case 0:
 		return lcdContext.Lcdc
-	case 1:
+		if ppuInstance != nil {
+			ppuInstance.WindowLine = 0
+		}
+		// Add cases for other fields as needed.
 		return lcdContext.Lcds
 	case 2:
 		return lcdContext.ScrollY
