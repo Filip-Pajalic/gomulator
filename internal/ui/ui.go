@@ -101,14 +101,29 @@ func (g *Game) handleInput() {
 	}
 	g.f3Pressed = f3Current
 
-	state.B = ebiten.IsKeyPressed(ebiten.KeyZ)
-	state.A = ebiten.IsKeyPressed(ebiten.KeyX)
-	state.Start = ebiten.IsKeyPressed(ebiten.KeyEnter)
-	state.Select = ebiten.IsKeyPressed(ebiten.KeyTab)
-	state.Up = ebiten.IsKeyPressed(ebiten.KeyArrowUp)
-	state.Down = ebiten.IsKeyPressed(ebiten.KeyArrowDown)
-	state.Left = ebiten.IsKeyPressed(ebiten.KeyArrowLeft)
-	state.Right = ebiten.IsKeyPressed(ebiten.KeyArrowRight)
+	// Preserve any input set externally (e.g., via JS postMessage). Only
+	// combine keyboard input with the existing state so host-sent events are
+	// not clobbered each frame.
+	jsB, jsA, jsStart, jsSelect := state.B, state.A, state.Start, state.Select
+	jsUp, jsDown, jsLeft, jsRight := state.Up, state.Down, state.Left, state.Right
+
+	kbB := ebiten.IsKeyPressed(ebiten.KeyZ)
+	kbA := ebiten.IsKeyPressed(ebiten.KeyX)
+	kbStart := ebiten.IsKeyPressed(ebiten.KeyEnter)
+	kbSelect := ebiten.IsKeyPressed(ebiten.KeyTab)
+	kbUp := ebiten.IsKeyPressed(ebiten.KeyArrowUp)
+	kbDown := ebiten.IsKeyPressed(ebiten.KeyArrowDown)
+	kbLeft := ebiten.IsKeyPressed(ebiten.KeyArrowLeft)
+	kbRight := ebiten.IsKeyPressed(ebiten.KeyArrowRight)
+
+	state.B = jsB || kbB
+	state.A = jsA || kbA
+	state.Start = jsStart || kbStart
+	state.Select = jsSelect || kbSelect
+	state.Up = jsUp || kbUp
+	state.Down = jsDown || kbDown
+	state.Left = jsLeft || kbLeft
+	state.Right = jsRight || kbRight
 }
 
 func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
