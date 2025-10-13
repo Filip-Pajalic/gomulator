@@ -55,7 +55,18 @@ func platformMain() {
 		btn := args[0].String()
 		pressed := args[1].Bool()
 
+		// Safety check: only process input if emulator is running
+		if currentEmu == nil || !currentEmu.Running {
+			js.Global().Get("console").Call("warn", "emuInput: emulator not running, ignoring input")
+			return nil
+		}
+
 		st := input.GetState()
+		if st == nil {
+			js.Global().Get("console").Call("warn", "emuInput: input state not initialized")
+			return nil
+		}
+
 		switch btn {
 		case "up":
 			st.Up = pressed
@@ -93,13 +104,25 @@ func platformMain() {
 			return nil
 		}
 		if data.Get("type").String() == "emu-input" {
+			// Safety check: only process input if emulator is running
+			if currentEmu == nil || !currentEmu.Running {
+				js.Global().Get("console").Call("warn", "postMessage: emulator not running, ignoring input")
+				return nil
+			}
+
 			btn := data.Get("button").String()
 			pressed := false
 			if p := data.Get("pressed"); !p.IsUndefined() {
 				pressed = p.Bool()
 			}
 			js.Global().Get("console").Call("log", "emu-input payload:", btn, pressed)
+
 			st := input.GetState()
+			if st == nil {
+				js.Global().Get("console").Call("warn", "postMessage: input state not initialized")
+				return nil
+			}
+
 			switch btn {
 			case "up":
 				st.Up = pressed

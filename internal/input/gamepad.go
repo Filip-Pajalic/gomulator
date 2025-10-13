@@ -39,8 +39,8 @@ func SetSel(value uint8) {
 	// Joypad register uses active-low selection bits: when bit is 0 the group
 	// is selected. SetSel receives the written byte and stores booleans that
 	// are true when the corresponding group is selected.
-	Ctx.ButtonSel = (value & 0x20) == 0
-	Ctx.DirSel = (value & 0x10) == 0
+	Ctx.ButtonSel = (value & 0x20) != 0
+	Ctx.DirSel = (value & 0x10) != 0
 }
 func GetState() *State {
 	return &Ctx.Controller
@@ -51,7 +51,7 @@ func GetOutput() uint8 {
 
 	// When a group is selected (ButtonSel/DirSel true), clear the
 	// corresponding bits for pressed buttons (active-low logic on the port).
-	if ButtonSel() {
+	if !ButtonSel() {
 		if GetState().Start {
 			output &= ^(uint8(1) << 3)
 		}
@@ -66,7 +66,7 @@ func GetOutput() uint8 {
 		}
 	}
 
-	if DirSel() {
+	if !DirSel() {
 		if GetState().Left {
 			output &= ^(uint8(1) << 1)
 		}

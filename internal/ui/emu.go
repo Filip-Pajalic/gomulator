@@ -173,10 +173,37 @@ func StartEmulator(romFile string) *EmuContext {
 
 	ioContext := input.NewIo(nil, timerContext, dmaContext)
 
+	// Wire up GBC function pointers to avoid import cycles
+	input.LcdReadFunc = LcdRead
+	input.LcdWriteFunc = LcdWrite
+	input.VramBankReadFunc = ReadVramBank
+	input.VramBankWriteFunc = WriteVramBank
+	input.WramBankReadFunc = memory.ReadWramBank
+	input.WramBankWriteFunc = memory.WriteWramBank
+	input.BgcpIndexReadFunc = ReadBGCPIndex
+	input.BgcpIndexWriteFunc = WriteBGCPIndex
+	input.BgcpDataReadFunc = ReadBGCP
+	input.BgcpDataWriteFunc = WriteBGCP
+	input.ObcpIndexReadFunc = ReadOBCPIndex
+	input.ObcpIndexWriteFunc = WriteOBCPIndex
+	input.ObcpDataReadFunc = ReadOBCP
+	input.ObcpDataWriteFunc = WriteOBCP
+
 	cpuContext := cpu.NewCpuContext(nil) // Bus will be set later
 	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext, ioContext, cpuContext)
 
 	cpuContext = cpu.NewCpuContext(busContext)
+
+	// Enable GBC mode if this is a GBC cartridge
+	if cartContext.IsGBCCart() {
+		EnableGBCMode()
+	}
+
+	// Apply DMG color palette BEFORE creating emu instance if flag is set
+	if !cartContext.IsGBCCart() && GetDMGColorsPaletteType() != "" {
+		title := cartContext.GetTitle()
+		EnableDMGGBCColors(GetDMGColorsPaletteType(), title)
+	}
 
 	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext, busContext)
 
@@ -197,10 +224,37 @@ func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
 
 	ioContext := input.NewIo(nil, timerContext, dmaContext)
 
+	// Wire up GBC function pointers to avoid import cycles
+	input.LcdReadFunc = LcdRead
+	input.LcdWriteFunc = LcdWrite
+	input.VramBankReadFunc = ReadVramBank
+	input.VramBankWriteFunc = WriteVramBank
+	input.WramBankReadFunc = memory.ReadWramBank
+	input.WramBankWriteFunc = memory.WriteWramBank
+	input.BgcpIndexReadFunc = ReadBGCPIndex
+	input.BgcpIndexWriteFunc = WriteBGCPIndex
+	input.BgcpDataReadFunc = ReadBGCP
+	input.BgcpDataWriteFunc = WriteBGCP
+	input.ObcpIndexReadFunc = ReadOBCPIndex
+	input.ObcpIndexWriteFunc = WriteOBCPIndex
+	input.ObcpDataReadFunc = ReadOBCP
+	input.ObcpDataWriteFunc = WriteOBCP
+
 	cpuContext := cpu.NewCpuContext(nil) // Bus will be set later
 	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext, ioContext, cpuContext)
 
 	cpuContext = cpu.NewCpuContext(busContext)
+
+	// Enable GBC mode if this is a GBC cartridge
+	if cartContext.IsGBCCart() {
+		EnableGBCMode()
+		logger.Info("EMU: GBC mode enabled for GBC cartridge")
+	} else if GetDMGColorsPaletteType() != "" {
+		// DMG-only cartridge with DMG colors enabled
+		logger.Info("EMU: Applying DMG color palette for DMG-only cartridge (WASM)")
+		title := cartContext.GetTitle()
+		EnableDMGGBCColors(GetDMGColorsPaletteType(), title)
+	}
 
 	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext, busContext)
 

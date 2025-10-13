@@ -40,7 +40,19 @@ func (b *BootRomContext) SimulateBootSequence() {
 	b.loadNintendoLogoToVRAM()
 
 	cpu := CpuCtx()
-	cpu.Regs.A = 0x01 // DMG boot ROM sets A=01
+
+	// Check if cartridge is GBC
+	cart := memory.CartCtx()
+	isGBC := cart.IsGBCCart()
+
+	if isGBC {
+		cpu.Regs.A = 0x11 // GBC boot ROM sets A=11 for GBC mode
+		logger.Info("Boot ROM: Detected GBC cartridge - setting A=0x11 (GBC mode)")
+	} else {
+		cpu.Regs.A = 0x01 // DMG boot ROM sets A=01
+		logger.Info("Boot ROM: Detected DMG cartridge - setting A=0x01 (DMG mode)")
+	}
+
 	cpu.Regs.F = 0xB0 // Z=1, N=0, H=1, C=1
 	cpu.Regs.B = 0x00
 	cpu.Regs.C = 0x13
@@ -64,6 +76,11 @@ func (b *BootRomContext) SimulateBootSequence() {
 	b.initializeSoundRegisters()
 
 	b.initializeLCDRegisters()
+
+	// GBC: Initialize color palettes if this is a GBC cartridge
+	if isGBC {
+		b.initializeGBCPalettes()
+	}
 
 	b.initializeTimerRegisters()
 
@@ -239,6 +256,61 @@ func (b *BootRomContext) initializeInterruptRegisters() {
 	memory.BusCtx().BusWrite(0xFFFF, 0x00) // IE - no interrupts enabled
 
 	logger.Debug("Boot ROM: Interrupt registers initialized")
+}
+
+func (b *BootRomContext) initializeGBCPalettes() {
+	logger.Debug("Boot ROM: Initializing GBC color palettes")
+
+	// GBC boot ROM initializes palettes to a grayscale for DMG compatibility
+	// Palette 0: white, light gray, dark gray, black (standard DMG palette)
+	grayscalePalette := []uint16{
+		0x7FFF, // White:      RGB555 = 11111 11111 11111
+		0x56B5, // Light gray: RGB555 = 10101 10101 10101 (approx)
+		0x294A, // Dark gray:  RGB555 = 01010 01010 01010 (approx)
+		0x0000, // Black:      RGB555 = 00000 00000 00000
+	}
+
+	// Initialize all background palettes
+	for pal := 0; pal < 8; pal++ {
+		for col := 0; col < 4; col++ {
+			rgb555 := grayscalePalette[col]
+			low := byte(rgb555 & 0xFF)
+			high := byte((rgb555 >> 8) & 0xFF)
+
+			// Write low byte
+			memory.BusCtx().BusWrite(0xFF68, byte(pal*8+col*2)|0x80) // Auto-increment
+			memory.BusCtx().BusWrite(0xFF69, low)
+
+			// Write high byte (auto-increments to next byte)
+			memory.BusCtx().BusWrite(0xFF69, high)
+		}
+	}
+
+	// Initialize all sprite palettes to same grayscale
+	for pal := 0; pal < 8; pal++ {
+		for col := 0; col < 4; col++ {
+			rgb555 := grayscalePalette[col]
+			low := byte(rgb555 & 0xFF)
+			high := byte((rgb555 >> 8) & 0xFF)
+
+			// Write low byte
+			memory.BusCtx().BusWrite(0xFF6A, byte(pal*8+col*2)|0x80) // Auto-increment
+			memory.BusCtx().BusWrite(0xFF6B, low)
+
+			// Write high byte (auto-increments to next byte)
+			memory.BusCtx().BusWrite(0xFF6B, high)
+		}
+	}
+
+	logger.Info("Boot ROM: GBC color palettes initialized to grayscale")
+
+	// Debug: Print first color of palette 0 to verify it's working
+	// Read back the data we just wrote
+	memory.BusCtx().BusWrite(0xFF68, 0x00) // Set index to palette 0, color 0
+	low := memory.BusCtx().BusRead(0xFF69)
+	memory.BusCtx().BusWrite(0xFF68, 0x01)
+	high := memory.BusCtx().BusRead(0xFF69)
+	logger.Info("Boot ROM: Verification - Palette 0 Color 0: low=0x%02X high=0x%02X (should be 0xFF 0x7F)", low, high)
 }
 
 func (b *BootRomContext) ReadBootRom(address uint16) byte {

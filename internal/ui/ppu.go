@@ -31,7 +31,7 @@ type PPU interface {
 
 type PpuContext struct {
 	OamRam [40]OamEntry
-	Vram   [8192]byte
+	Vram   [16384]byte // GBC: 2 banks × 8KB = 16KB
 
 	LineSpriteCount   uint
 	Pfc               PixelFifoContext
@@ -43,9 +43,13 @@ type PpuContext struct {
 	CurrentFrame      uint32
 	LineTicks         uint32
 	VideoBuffer       []uint32
+	CurrentVramBank   byte // GBC: Current VRAM bank (0 or 1)
 }
 
 var ppuInstance *PpuContext
+
+// Global GBC mode flag
+var gbcModeEnabled bool
 
 type OamLineEntry struct {
 	Entry OamEntry
@@ -79,6 +83,14 @@ type PixelFifoContext struct {
 	MapY           byte
 	TileY          byte
 	FifoX          byte
+
+	// GBC Tile Attributes
+	TileAttr       byte // Current tile attributes (from VRAM bank 1)
+	TilePalette    byte // Palette number (0-7)
+	TileVramBank   byte // VRAM bank (0-1)
+	TileFlipX      bool // Horizontal flip
+	TileFlipY      bool // Vertical flip
+	TileBgPriority bool // BG-to-OAM priority
 }
 
 type FetchState int
@@ -144,11 +156,15 @@ func PpuCtx() *PpuContext {
 // VramWrite writes a byte to VRAM
 func (p *PpuContext) VramWrite(address uint16, value byte) {
 	if address >= 0x8000 && address < 0xA000 {
-		p.Vram[address-0x8000] = value
+		// GBC: Use current VRAM bank
+		offset := address - 0x8000
+		bankOffset := uint16(p.CurrentVramBank) * 0x2000
+		actualIndex := bankOffset + offset
+		p.Vram[actualIndex] = value
 		// Log writes to tile data area more frequently during early frames
 		if address >= 0x8000 && address < 0x9800 && p != nil && PpuCtx().CurrentFrame < 100 {
 			if address%64 == 0 || value != 0 { // Log every 64th address or any non-zero write
-				logger.Debug("VRAM WRITE: Tile data at %04X = %02X (frame %d)", address, value, PpuCtx().CurrentFrame)
+				logger.Debug("VRAM WRITE: Tile data at %04X = %02X bank=%d (frame %d)", address, value, p.CurrentVramBank, PpuCtx().CurrentFrame)
 			}
 		}
 	} else {
@@ -156,19 +172,34 @@ func (p *PpuContext) VramWrite(address uint16, value byte) {
 	}
 }
 
-// VramRead reads a byte from VRAM
+// VramRead reads a byte from VRAM using the current bank
 func (p *PpuContext) VramRead(address uint16) byte {
 	if address >= 0x8000 && address < 0xA000 {
-		val := p.Vram[address-0x8000]
+		// GBC: Use current VRAM bank
+		offset := address - 0x8000
+		bankOffset := uint16(p.CurrentVramBank) * 0x2000
+		actualIndex := bankOffset + offset
+		val := p.Vram[actualIndex]
 		// Debug: log tile data access occasionally
 		if address < 0x8100 && address%64 == 0 {
-			logger.Debug("VRAM READ: %04X = %02X", address, val)
+			logger.Debug("VRAM READ: %04X = %02X bank=%d", address, val, p.CurrentVramBank)
 		}
 		return val
 	}
 	// Reduce warning spam - only log occasionally for invalid addresses
 	if address%256 == 0 {
 		logger.Debug("PPU VramRead: Invalid address %04X", address)
+	}
+	return 0xFF
+}
+
+// VramReadBank reads a byte from a specific VRAM bank (for tile attributes in GBC mode)
+func (p *PpuContext) VramReadBank(address uint16, bank byte) byte {
+	if address >= 0x8000 && address < 0xA000 {
+		offset := address - 0x8000
+		bankOffset := uint16(bank&1) * 0x2000
+		actualIndex := bankOffset + offset
+		return p.Vram[actualIndex]
 	}
 	return 0xFF
 }
@@ -520,10 +551,18 @@ func (p *PpuContext) FetchTileNumber() {
 	// Fetch the tile number
 	p.Pfc.BgwFetchData[0] = p.VramRead(mapAddr + uint16(tileMapIndex))
 
+	// GBC: Fetch tile attributes from VRAM bank 1
+	p.Pfc.TileAttr = p.VramReadBank(mapAddr+uint16(tileMapIndex), 1)
+	p.Pfc.TilePalette = p.Pfc.TileAttr & 0x07       // Bits 0-2: Palette number
+	p.Pfc.TileVramBank = (p.Pfc.TileAttr >> 3) & 1  // Bit 3: VRAM bank
+	p.Pfc.TileFlipX = (p.Pfc.TileAttr & 0x20) != 0  // Bit 5: Horizontal flip
+	p.Pfc.TileFlipY = (p.Pfc.TileAttr & 0x40) != 0  // Bit 6: Vertical flip
+	p.Pfc.TileBgPriority = (p.Pfc.TileAttr & 0x80) != 0 // Bit 7: BG-to-OAM priority
+
 	// Debug: Log tile numbers very occasionally
 	if p.Pfc.FetchX <= 24 && LcdCtx().Ly == 0 && p.LineTicks%1000 == 0 {
-		logger.Debug("PPU: Fetching tile - FetchX=%d tileMapIndex=%d tileNum=0x%02X mapAddr=0x%04X",
-			p.Pfc.FetchX, tileMapIndex, p.Pfc.BgwFetchData[0], mapAddr)
+		logger.Debug("PPU: Fetching tile - FetchX=%d tileMapIndex=%d tileNum=0x%02X mapAddr=0x%04X attr=0x%02X pal=%d",
+			p.Pfc.FetchX, tileMapIndex, p.Pfc.BgwFetchData[0], mapAddr, p.Pfc.TileAttr, p.Pfc.TilePalette)
 	}
 
 	// CRITICAL: Handle signed tile numbers (like reference implementation)
@@ -541,11 +580,18 @@ func (p *PpuContext) FetchTileNumber() {
 func (p *PpuContext) FetchTileData0() {
 	tileNum := p.Pfc.BgwFetchData[0]
 
-	// Use the same logic as reference implementation
-	tileDataAddr := LCDCBGWDataArea() + uint16(tileNum)*16 + uint16(p.Pfc.TileY)
+	// GBC: Handle vertical flip
+	tileY := p.Pfc.TileY
+	if p.Pfc.TileFlipY {
+		// Flip vertically: invert the Y position within the tile
+		tileY = 14 - tileY // 14 because TileY is already *2 (each row is 2 bytes)
+	}
 
-	// Fetch the first byte of tile data for this row
-	p.Pfc.BgwFetchData[1] = p.VramRead(tileDataAddr)
+	// Use the same logic as reference implementation
+	tileDataAddr := LCDCBGWDataArea() + uint16(tileNum)*16 + uint16(tileY)
+
+	// GBC: Fetch the first byte of tile data from the correct VRAM bank
+	p.Pfc.BgwFetchData[1] = p.VramReadBank(tileDataAddr, p.Pfc.TileVramBank)
 
 	// Move to next fetch state
 	p.Pfc.CurFetchState = FS_DATA1
@@ -555,11 +601,18 @@ func (p *PpuContext) FetchTileData0() {
 func (p *PpuContext) FetchTileData1() {
 	tileNum := p.Pfc.BgwFetchData[0]
 
-	// Use the same logic as reference implementation
-	tileDataAddr := LCDCBGWDataArea() + uint16(tileNum)*16 + uint16(p.Pfc.TileY) + 1
+	// GBC: Handle vertical flip
+	tileY := p.Pfc.TileY
+	if p.Pfc.TileFlipY {
+		// Flip vertically: invert the Y position within the tile
+		tileY = 14 - tileY // 14 because TileY is already *2 (each row is 2 bytes)
+	}
 
-	// Fetch the second byte of tile data for this row
-	p.Pfc.BgwFetchData[2] = p.VramRead(tileDataAddr)
+	// Use the same logic as reference implementation
+	tileDataAddr := LCDCBGWDataArea() + uint16(tileNum)*16 + uint16(tileY) + 1
+
+	// GBC: Fetch the second byte of tile data from the correct VRAM bank
+	p.Pfc.BgwFetchData[2] = p.VramReadBank(tileDataAddr, p.Pfc.TileVramBank)
 
 	// Move to push state
 	p.Pfc.CurFetchState = FS_PUSH
@@ -580,24 +633,35 @@ func (p *PpuContext) PushPixelsToFIFO() {
 
 	// Extract 8 pixels from the tile data
 	for i := 0; i < 8; i++ {
+		// GBC: Handle horizontal flip
 		bit := 7 - i
+		if p.Pfc.TileFlipX {
+			bit = i
+		}
+
 		// Match reference implementation exactly
 		hi := (byte1 >> bit) & 1
 		lo := ((byte2 >> bit) & 1) << 1
 		colorIndex := hi | lo
 
-		// Convert to actual color using background palette
-		pixelColor := LcdCtx().BgColors[colorIndex]
+		// GBC: Use color palette from tile attributes, fallback to DMG palette
+		var pixelColor uint32
+		if IsGBCMode() {
+			// GBC mode: use color from palette cache
+			pixelColor = LcdCtx().BgColorCache[p.Pfc.TilePalette][colorIndex]
+		} else {
+			// DMG mode: use standard palette
+			pixelColor = LcdCtx().BgColors[colorIndex]
+		}
 
 		// This matches reference implementation: if (!LCDC_BGW_ENABLE) color = bg_colors[0];
-		// ALSO: Force disable background for lines 8-15 to hide mohawk hair (DMG-ACID2 test)
 		if !LCDCBGWEnable() {
 			pixelColor = LcdCtx().BgColors[0]
 			colorIndex = 0
 		}
 
 		if x >= 0 {
-			p.PixelFifoPushWithIndex(uint32(pixelColor), colorIndex)
+			p.PixelFifoPushWithIndex(pixelColor, colorIndex)
 			p.Pfc.FifoX++
 		}
 
@@ -763,9 +827,9 @@ func (p *PpuContext) GetSpritePixel(x uint8, y uint8) SpritePixel {
 				// Calculate tile data address (sprites always use 0x8000 method)
 				tileDataAddr := 0x8000 + uint16(tileNum)*16 + uint16(spriteY)*2
 
-				// Get the two bytes that define this row of the sprite
-				byte1 := p.VramRead(tileDataAddr)
-				byte2 := p.VramRead(tileDataAddr + 1)
+				// GBC: Fetch sprite tile data from the correct VRAM bank
+				byte1 := p.VramReadBank(tileDataAddr, byte(entry.FCgbVramBank))
+				byte2 := p.VramReadBank(tileDataAddr+1, byte(entry.FCgbVramBank))
 
 				// Extract the pixel from the sprite data
 				bitPosition := 7 - spriteX
@@ -775,16 +839,25 @@ func (p *PpuContext) GetSpritePixel(x uint8, y uint8) SpritePixel {
 
 				// Color index 0 is transparent for sprites
 				if colorIndex != 0 {
-					// Get sprite palette
-					var paletteColors [4]uint32
-					if entry.FPn != 0 {
-						paletteColors = LcdCtx().Sp2Colors
+					// GBC: Use GBC sprite palette if available, fallback to DMG
+					var pixelColor uint32
+					if IsGBCMode() {
+						// GBC mode: use GBC sprite palette
+						gbcPaletteNum := int(entry.FCgbPn)
+						pixelColor = LcdCtx().ObColorCache[gbcPaletteNum][colorIndex]
 					} else {
-						paletteColors = LcdCtx().Sp1Colors
+						// DMG mode: use DMG sprite palettes
+						var paletteColors [4]uint32
+						if entry.FPn != 0 {
+							paletteColors = LcdCtx().Sp2Colors
+						} else {
+							paletteColors = LcdCtx().Sp1Colors
+						}
+						pixelColor = paletteColors[colorIndex]
 					}
 
 					return SpritePixel{
-						Color:    uint32(paletteColors[colorIndex]),
+						Color:    pixelColor,
 						Priority: entry.FBgp == 0, // Priority when FBgp = 0
 						Present:  true,
 					}
@@ -871,5 +944,37 @@ func (p *PpuContext) RenderLine() {
 	// Debug: Log occasionally to see if we're rendering
 	if currentY%32 == 0 {
 		logger.Debug("PPU: Rendered line %d with scroll (%d,%d)", currentY, scrollX, scrollY)
+	}
+}
+
+// ReadVramBank returns the current VRAM bank register value (0xFF4F)
+func ReadVramBank() byte {
+	return PpuCtx().CurrentVramBank
+}
+
+// WriteVramBank sets the VRAM bank register (0xFF4F)
+func WriteVramBank(value byte) {
+	PpuCtx().CurrentVramBank = value & 0x01 // Only bit 0 is used
+}
+
+// EnableGBCMode enables GBC rendering mode
+func EnableGBCMode() {
+	gbcModeEnabled = true
+	logger.Info("PPU: GBC mode enabled")
+}
+
+// IsGBCMode returns whether GBC mode is enabled
+func IsGBCMode() bool {
+	return gbcModeEnabled
+}
+
+// Debug: Print palette state
+func DumpPaletteState() {
+	logger.Info("=== GBC Palette State ===")
+	for pal := 0; pal < 2; pal++ {
+		logger.Info("BG Palette %d:", pal)
+		for col := 0; col < 4; col++ {
+			logger.Info("  Color %d: RGB888=0x%08X", col, LcdCtx().BgColorCache[pal][col])
+		}
 	}
 }
