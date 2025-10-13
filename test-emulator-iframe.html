@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Test Emulator</title>
+</head>
+<body>
+<script src="/assets/js/wasm_exec.js"></script>
+<script>
+  const wasmUrl = "/assets/wasm/gomulator.wasm";
+
+  async function initEmulator() {
+    try {
+      console.log("1. Starting WASM initialization...");
+      const go = new Go();
+      console.log("2. Go runtime created");
+
+      const res = await fetch(wasmUrl);
+      console.log("3. WASM fetched, size:", res.headers.get('content-length'));
+
+      const result = await WebAssembly.instantiateStreaming(res, go.importObject);
+      console.log("4. WASM instantiated");
+
+      go.run(result.instance);
+      console.log("5. Go runtime started");
+
+      // Check if functions exist
+      console.log("6. Checking for Go functions:");
+      console.log("   - startEmulatorWithROM:", typeof window.startEmulatorWithROM);
+      console.log("   - stopEmulator:", typeof window.stopEmulator);
+      console.log("   - emuInput:", typeof window.emuInput);
+
+      console.log("✅ Emulator initialized successfully");
+    } catch (err) {
+      console.error("❌ initEmulator failed:", err);
+    }
+  }
+
+  // Test function
+  window.testColorMode = () => {
+    console.log("Testing color mode with dummy ROM data...");
+    const dummyRom = new Uint8Array(32768); // 32KB empty ROM
+
+    if (typeof window.startEmulatorWithROM === "function") {
+      console.log("Calling startEmulatorWithROM with 'green' color mode");
+      window.startEmulatorWithROM(dummyRom, "green");
+    } else {
+      console.error("startEmulatorWithROM function not found!");
+    }
+  };
+
+  initEmulator();
+</script>
+</body>
+</html>

@@ -13,16 +13,25 @@ import (
 // can access the bus for ad-hoc reads.
 var currentEmu *ui.EmuContext
 
+// ROMStartConfig holds configuration for starting a ROM
+type ROMStartConfig struct {
+	ROMBytes   []byte
+	ColorMode  string // "auto", "green", "grayscale", "brown", "red", "blue", or "" for default
+}
+
 func platformInit() {
 	// WASM-specific initialization
 	logger.Info("Running in WASM/browser mode")
+
+	// Also log directly to JS console to verify logging works
+	js.Global().Get("console").Call("log", "🔧 Go platformInit called - WASM is running!")
 }
 
 func platformMain() {
 	logger.Info("Waiting for ROM from JavaScript...")
-	// Channel used to send ROM bytes to the main goroutine so UiInit runs
+	// Channel used to send ROM configuration to the main goroutine so UiInit runs
 	// on the main thread (required by some windowing/JS interactions).
-	romStartCh := make(chan []byte, 1)
+	romStartCh := make(chan ROMStartConfig, 1)
 
 	js.Global().Set("startEmulatorWithROM", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		if len(args) < 1 {
@@ -35,10 +44,17 @@ func platformMain() {
 		romBytes := make([]byte, romData.Get("length").Int())
 		js.CopyBytesToGo(romBytes, romData)
 
+		// Optional second parameter: color mode
+		colorMode := "auto" // Default to auto palette detection
+		if len(args) >= 2 && !args[1].IsUndefined() && !args[1].IsNull() {
+			colorMode = args[1].String()
+			logger.Info("ROM: Color mode specified from JS: %s", colorMode)
+		}
+
 		logger.Info("ROM received from JS (%d bytes), enqueuing for start...", len(romBytes))
-		// Enqueue the ROM for the main goroutine to pick up and start the UI
+		// Enqueue the ROM configuration for the main goroutine to pick up and start the UI
 		select {
-		case romStartCh <- romBytes:
+		case romStartCh <- ROMStartConfig{ROMBytes: romBytes, ColorMode: colorMode}:
 		default:
 			// If channel already has a pending startup, drop or log
 			logger.Warn("startEmulatorWithROM: previous ROM start pending, ignoring new request")
@@ -149,12 +165,38 @@ func platformMain() {
 	js.Global().Set("emuMessageHandler", msgHandler)
 	js.Global().Call("addEventListener", "message", msgHandler)
 
+	// Expose stopEmulator function to allow JS to stop the running emulator
+	stopEmulator := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		if currentEmu != nil && currentEmu.Running {
+			logger.Info("stopEmulator called from JS - stopping emulator")
+			currentEmu.Running = false
+			return true
+		}
+		logger.Warn("stopEmulator called but no emulator is running")
+		return false
+	})
+	js.Global().Set("stopEmulator", stopEmulator)
+
 	// Main loop: wait for ROMs to start. This keeps the main goroutine alive
 	// and ensures UiInit (which calls ebiten.RunGame) runs on the main thread.
 	for {
-		rom := <-romStartCh
-		logger.Info("Starting emulator from enqueued ROM (%d bytes)", len(rom))
-		emuInstance := ui.StartEmulatorFromBytes(rom)
+		romConfig := <-romStartCh
+		logger.Info("Starting emulator from enqueued ROM (%d bytes)", len(romConfig.ROMBytes))
+		js.Global().Get("console").Call("log", "🎮 ROM received, size:", len(romConfig.ROMBytes))
+
+		// Set the DMG color palette type before starting the emulator
+		// Default to "auto" if not specified (enables GBC colorization for DMG games)
+		colorMode := romConfig.ColorMode
+		if colorMode == "" {
+			colorMode = "auto"
+		}
+		ui.SetDMGColorsPaletteType(colorMode)
+		logger.Info("Set color mode to: %s", colorMode)
+		js.Global().Get("console").Call("log", "🎨 Color mode set to:", colorMode)
+
+		emuInstance := ui.StartEmulatorFromBytes(romConfig.ROMBytes)
+		js.Global().Get("console").Call("log", "✅ Emulator instance created")
+
 		// Save the current emu instance for debug reads
 		currentEmu = emuInstance
 		// Run the UI (blocks until the emulator stops)

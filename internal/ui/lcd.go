@@ -113,35 +113,159 @@ func CalculateTitleHash(title []byte) uint8 {
 // Based on the GBC boot ROM palette assignment system
 // NOTE: Hashes are calculated from the ROM title (bytes 0x134-0x143)
 var gbcPaletteLookup = map[uint8]PaletteEntry{
-	// Zelda: Link's Awakening (title="ZELDA", hash=0x70)
-	0x70: {
-		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF008400, 0xFF000000}, // Green theme
+	// Entry 0x00: Moguranya, Mole Mania, Game Boy Wars, Wario Land
+	0xB3: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFADAD84, 0xFF42737B, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF7300, 0xFF944200, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF5ABDFF, 0xFFFF0000, 0xFF0000FF},
+	},
+	0x59: { // Wario Land
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFADAD84, 0xFF42737B, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF7300, 0xFF944200, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF5ABDFF, 0xFFFF0000, 0xFF0000FF},
+	},
+	0xC6: { // Wario Land variant
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFADAD84, 0xFF42737B, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF7300, 0xFF944200, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF5ABDFF, 0xFFFF0000, 0xFF0000FF},
+	},
+
+	// Entry 0x01: Radar Mission
+	0x8C: {
+		BGPalette:   [4]uint32{0xFFFFFF9C, 0xFF94B5FF, 0xFF639473, 0xFF003A3A},
+		OBJ0Palette: [4]uint32{0xFFFFFF9C, 0xFF94B5FF, 0xFF639473, 0xFF003A3A},
+		OBJ1Palette: [4]uint32{0xFFFFFF9C, 0xFF94B5FF, 0xFF639473, 0xFF003A3A},
+	},
+
+	// Entry 0x02: Alleyway
+	0x0C: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Entry 0x03: Baseball
+	0x17: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF52DE00, 0xFFFF8400, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFF52DE00, 0xFFFF8400, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF52DE00, 0xFFFF8400, 0xFF000000},
+	},
+
+	// Entry 0x04: Yakuman
+	0xD3: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF5ABDFF, 0xFFFF0000, 0xFF0000FF},
+	},
+
+	// Entry 0x07: Tetris World, Pikachu Yellow - Yellow and Red theme
+	0xDB: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+	},
+	0x15: { // Pikachu Yellow
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000, 0xFF000000},
+	},
+
+	// Super Mario Land
+	0x14: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFAD63, 0xFF843100, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Super Mario Land 2
+	0x49: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
 		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
 		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
 	},
-	// Tetris (hash varies by region)
-	0x52: {
-		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFF9C00, 0xFFFF0000, 0xFF000000}, // White, Orange, Red, Black
-		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF9C00, 0xFFFF0000, 0xFF000000},
-		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFFF9C00, 0xFFFF0000, 0xFF000000},
-	},
-	// Super Mario Land
-	0x14: {
-		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFAD63, 0xFF843100, 0xFF000000}, // White, Tan, Brown, Black
-		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000}, // Mario red
-		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000}, // Green/Blue
-	},
+
 	// Kirby's Dream Land
 	0x27: {
-		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFCE9C, 0xFFCE6563, 0xFF000000},
-		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFFAD63, 0xFFFF6B6B, 0xFF000000}, // Pink for Kirby
-		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFFFAD63, 0xFF943100, 0xFF000000},
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFFAD63, 0xFF843100, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
 	},
-	// Pokemon Red/Blue/Yellow (GBC-enhanced, but including for reference)
+
+	// Metroid II
+	0x46: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Zelda: Link's Awakening
+	0x70: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF008400, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+	},
+
+	// Donkey Kong Land
+	0x19: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF9C6300, 0xFF637300, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Dr. Mario
+	0x52: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Pokemon Red/Blue
 	0x61: {
-		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFFADD8E6, 0xFF4169E1, 0xFF000033}, // Blue tones
-		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFFAAAA, 0xFFFF5555, 0xFF000000}, // Red tones
-		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFADD8E6, 0xFF4169E1, 0xFF000033},
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF9C6300, 0xFF637300, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Castlevania Adventure
+	0x28: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+	},
+
+	// Final Fantasy Adventure
+	0x18: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF008400, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+	},
+
+	// Mega Man
+	0xA2: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF7BFF31, 0xFF0063C5, 0xFF000000},
+	},
+
+	// Tennis
+	0x01: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF00FF00, 0xFFFF6600, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFF00FF00, 0xFFFF6600, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF00FF00, 0xFFFF6600, 0xFF000000},
+	},
+
+	// F-1 Race
+	0x99: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFFFF8484, 0xFF943A3A, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF63A5FF, 0xFF0000FF, 0xFF000000},
+	},
+
+	// Yoshi
+	0x58: {
+		BGPalette:   [4]uint32{0xFFFFFFFF, 0xFF00FF00, 0xFFFF0000, 0xFF000000},
+		OBJ0Palette: [4]uint32{0xFFFFFFFF, 0xFF00FF00, 0xFFFF0000, 0xFF000000},
+		OBJ1Palette: [4]uint32{0xFFFFFFFF, 0xFF5ABDFF, 0xFFFF0000, 0xFF0000FF},
 	},
 }
 

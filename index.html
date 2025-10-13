@@ -21,6 +21,12 @@
             border: 1px solid #3a3a3a;
             border-radius: 4px;
         }
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #2a2a2a;
+            border-radius: 4px;
+        }
         canvas {
             display: block;
             margin: 0 auto;
@@ -32,32 +38,60 @@
 <body>
     <div id="controls">
         <input type="file" id="romfile" accept=".gb,.gbc" />
+        <div id="status">No ROM loaded</div>
     </div>
     <script src="wasm_exec.js"></script>
 <script>
 const go = new Go();
-let romData = null;
+let isRomLoaded = false;
+let currentRomName = null;
+
+const romInput = document.getElementById('romfile');
+const statusEl = document.getElementById('status');
 
 // File upload handler
-const romInput = document.getElementById('romfile');
 romInput.addEventListener('change', async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    romData = await file.arrayBuffer();
-    console.log('ROM loaded:', file.name, romData.byteLength, 'bytes');
-    
-    // Convert ArrayBuffer to Uint8Array and pass to Go
+
+    statusEl.textContent = `⏳ Loading: ${file.name}`;
+
+    const romData = await file.arrayBuffer();
     const romBytes = new Uint8Array(romData);
-    console.log('Calling Go function startEmulatorWithROM...');
+    console.log('ROM loaded:', file.name, romData.byteLength, 'bytes');
+
+    // If a ROM is already running, stop it first
+    if (isRomLoaded && window.stopEmulator) {
+        console.log('Stopping current ROM:', currentRomName);
+        statusEl.textContent = `🔄 Stopping ${currentRomName}...`;
+
+        const stopped = window.stopEmulator();
+        console.log('Emulator stopped:', stopped);
+
+        // Wait a bit for clean shutdown
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // Load the new ROM with auto color mode
+    console.log('Starting emulator with ROM:', file.name);
     if (window.startEmulatorWithROM) {
-        window.startEmulatorWithROM(romBytes);
+        window.startEmulatorWithROM(romBytes, "auto");
+        isRomLoaded = true;
+        currentRomName = file.name;
+        statusEl.textContent = `🎮 Playing: ${file.name}`;
     } else {
         console.error('Go function startEmulatorWithROM not available yet. Waiting...');
+        statusEl.textContent = '❌ Emulator not ready, retrying...';
+
         setTimeout(() => {
             if (window.startEmulatorWithROM) {
-                window.startEmulatorWithROM(romBytes);
+                window.startEmulatorWithROM(romBytes, "auto");
+                isRomLoaded = true;
+                currentRomName = file.name;
+                statusEl.textContent = `🎮 Playing: ${file.name}`;
             } else {
                 console.error('Go function still not available');
+                statusEl.textContent = '❌ Emulator failed to initialize';
             }
         }, 1000);
     }
@@ -65,6 +99,13 @@ romInput.addEventListener('change', async (event) => {
 
 WebAssembly.instantiateStreaming(fetch("gomulator.wasm"), go.importObject).then(result => {
     go.run(result.instance);
+    statusEl.textContent = '✅ Emulator ready - Load a ROM to start';
+    console.log('🔧 Emulator initialized');
+    console.log('Available functions:', {
+        startEmulatorWithROM: typeof window.startEmulatorWithROM,
+        stopEmulator: typeof window.stopEmulator,
+        emuInput: typeof window.emuInput
+    });
 });
 </script>
 </body>

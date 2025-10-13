@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"runtime"
+	// "runtime" // Temporarily commented out for WASM debugging
 )
 
 var (
@@ -15,9 +15,10 @@ var (
 func init() {
 	// Use higher log level for WASM to reduce console overhead
 	logLevel := slog.LevelInfo
-	if runtime.GOARCH == "wasm" {
-		logLevel = slog.LevelWarn // Only show warnings and errors in WASM
-	}
+	// Temporarily enable Info logs for WASM to debug color mode
+	// if runtime.GOARCH == "wasm" {
+	// 	logLevel = slog.LevelWarn // Only show warnings and errors in WASM
+	// }
 
 	debugEnabled = logLevel <= slog.LevelDebug
 
