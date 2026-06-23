@@ -29,6 +29,7 @@ type CartContext struct {
 	ramBank    int    // Current RAM bank (0-3)
 	ramEnabled bool   // RAM enable flag
 	bankMode   int    // Banking mode (0=ROM, 1=RAM)
+	cgbFlag    byte   // GBC compatibility flag (0x00=DMG, 0x80=GBC compatible, 0xC0=GBC only)
 }
 
 // romHeader represents the header structure of a Game Boy ROM
@@ -185,6 +186,39 @@ func (c *CartContext) cartTypeName() []byte {
 	return nil
 }
 
+// cgbModeName returns the CGB mode name based on the CGB flag
+func (c *CartContext) cgbModeName() string {
+	switch c.cgbFlag {
+	case 0x80:
+		return "GBC Compatible"
+	case 0xC0:
+		return "GBC Only"
+	default:
+		return "DMG Only"
+	}
+}
+
+// IsGBCCart returns true if this cartridge supports Game Boy Color
+func (c *CartContext) IsGBCCart() bool {
+	return c.cgbFlag == 0x80 || c.cgbFlag == 0xC0
+}
+
+// IsGBCOnly returns true if this cartridge requires Game Boy Color
+func (c *CartContext) IsGBCOnly() bool {
+	return c.cgbFlag == 0xC0
+}
+
+// GetTitle returns the game title from the ROM header
+func (c *CartContext) GetTitle() []byte {
+	if c.header != nil {
+		// Return a copy of the title to avoid external modification
+		title := make([]byte, len(c.header.Title))
+		copy(title, c.header.Title[:])
+		return title
+	}
+	return nil
+}
+
 // checkSumChecker verifies the checksum of the ROM
 func (c *CartContext) checkSumChecker(checksum byte) string {
 	var x uint16 = 0
@@ -232,6 +266,13 @@ func (c *CartContext) loadCart(romName string) {
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title
 
+	// Read CGB flag at 0x0143
+	if len(c.romData) > 0x0143 {
+		c.cgbFlag = c.romData[0x0143]
+	} else {
+		c.cgbFlag = 0x00
+	}
+
 	// Log ROM information
 	logger.Info("Cartridge Loaded:")
 	logger.Info("Title    : %s", string(c.header.Title[:]))
@@ -240,6 +281,7 @@ func (c *CartContext) loadCart(romName string) {
 	logger.Info("RAM Size : %02X", c.header.RamSize)
 	logger.Info("LIC Code : %02X (%s)", c.header.LicCode, c.cartLicName())
 	logger.Info("ROM Vers : %02X", c.header.Version)
+	logger.Info("CGB Flag : %02X (%s)", c.cgbFlag, c.cgbModeName())
 	logger.Info(
 		"Checksum : %02X (%s)",
 		c.header.Checksum,
@@ -317,6 +359,14 @@ func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	}
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title
+
+	// Read CGB flag at 0x0143
+	if len(c.romData) > 0x0143 {
+		c.cgbFlag = c.romData[0x0143]
+	} else {
+		c.cgbFlag = 0x00
+	}
+
 	logger.Info("Cartridge Loaded from bytes:")
 	logger.Info("Title    : %s", string(c.header.Title[:]))
 	logger.Info("Cartridge Type : %02X", c.header.CartType)
@@ -324,6 +374,7 @@ func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	logger.Info("RAM Size : %02X", c.header.RamSize)
 	logger.Info("LIC Code : %02X", c.header.LicCode)
 	logger.Info("ROM Vers : %02X", c.header.Version)
+	logger.Info("CGB Flag : %02X (%s)", c.cgbFlag, c.cgbModeName())
 	logger.Info("ROM data length: %d bytes", len(c.romData))
 	c.initializeRAM()
 	return true

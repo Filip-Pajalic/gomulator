@@ -101,29 +101,9 @@ func (g *Game) handleInput() {
 	}
 	g.f3Pressed = f3Current
 
-	// Preserve any input set externally (e.g., via JS postMessage). Only
-	// combine keyboard input with the existing state so host-sent events are
-	// not clobbered each frame.
-	jsB, jsA, jsStart, jsSelect := state.B, state.A, state.Start, state.Select
-	jsUp, jsDown, jsLeft, jsRight := state.Up, state.Down, state.Left, state.Right
-
-	kbB := ebiten.IsKeyPressed(ebiten.KeyZ)
-	kbA := ebiten.IsKeyPressed(ebiten.KeyX)
-	kbStart := ebiten.IsKeyPressed(ebiten.KeyEnter)
-	kbSelect := ebiten.IsKeyPressed(ebiten.KeyTab)
-	kbUp := ebiten.IsKeyPressed(ebiten.KeyArrowUp)
-	kbDown := ebiten.IsKeyPressed(ebiten.KeyArrowDown)
-	kbLeft := ebiten.IsKeyPressed(ebiten.KeyArrowLeft)
-	kbRight := ebiten.IsKeyPressed(ebiten.KeyArrowRight)
-
-	state.B = jsB || kbB
-	state.A = jsA || kbA
-	state.Start = jsStart || kbStart
-	state.Select = jsSelect || kbSelect
-	state.Up = jsUp || kbUp
-	state.Down = jsDown || kbDown
-	state.Left = jsLeft || kbLeft
-	state.Right = jsRight || kbRight
+	// Platform-specific input handling merges keyboard with any JS-set input on WASM
+	// or directly assigns keyboard input on desktop
+	handleInputPlatform(state)
 }
 
 func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
