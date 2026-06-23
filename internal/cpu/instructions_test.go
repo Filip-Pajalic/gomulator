@@ -94,6 +94,120 @@ func TestCBPrefixedInstructionsExecuteAllOpcodes(t *testing.T) {
 	}
 }
 
+func TestEIDelaysIMEUntilAfterFollowingInstruction(t *testing.T) {
+	ctx := newInstructionTestCPU()
+	ctx.Regs.Pc = 0x0100
+	ctx.Regs.Sp = 0xD000
+	ctx.IntFlags = byte(IT_TIMER)
+
+	bus := memory.BusCtx()
+	bus.BusWrite(0xFFFF, byte(IT_TIMER))
+	bus.BusWrite(0x0100, 0xFB) // EI
+	bus.BusWrite(0x0101, 0x00) // NOP
+
+	if !ctx.Step() {
+		t.Fatalf("EI step returned false")
+	}
+	if ctx.IntMasterEnabled {
+		t.Fatalf("IME enabled immediately after EI")
+	}
+	if !ctx.enablingIme || ctx.imeEnableDelay != 1 {
+		t.Fatalf("EI delay state = enabling:%t delay:%d, want enabling:true delay:1", ctx.enablingIme, ctx.imeEnableDelay)
+	}
+	if ctx.Regs.Pc != 0x0101 {
+		t.Fatalf("PC after EI = %04X, want 0101", ctx.Regs.Pc)
+	}
+
+	if !ctx.Step() {
+		t.Fatalf("NOP step returned false")
+	}
+	if ctx.IntMasterEnabled {
+		t.Fatalf("IME still enabled after servicing interrupt")
+	}
+	if ctx.IntFlags&byte(IT_TIMER) != 0 {
+		t.Fatalf("timer interrupt flag was not cleared: %02X", ctx.IntFlags)
+	}
+	if ctx.Regs.Pc != 0x0050 {
+		t.Fatalf("PC after delayed interrupt = %04X, want 0050", ctx.Regs.Pc)
+	}
+	if ctx.Regs.Sp != 0xCFFE {
+		t.Fatalf("SP after interrupt = %04X, want CFFE", ctx.Regs.Sp)
+	}
+	if lo, hi := bus.BusRead(0xCFFE), bus.BusRead(0xCFFF); lo != 0x02 || hi != 0x01 {
+		t.Fatalf("pushed return address = %02X%02X, want 0102", hi, lo)
+	}
+}
+
+func TestDICancelsPendingEIDelay(t *testing.T) {
+	ctx := newInstructionTestCPU()
+	ctx.Regs.Pc = 0x0100
+	ctx.Regs.Sp = 0xD000
+	ctx.IntFlags = byte(IT_TIMER)
+
+	bus := memory.BusCtx()
+	bus.BusWrite(0xFFFF, byte(IT_TIMER))
+	bus.BusWrite(0x0100, 0xFB) // EI
+	bus.BusWrite(0x0101, 0xF3) // DI
+	bus.BusWrite(0x0102, 0x00) // NOP
+
+	if !ctx.Step() {
+		t.Fatalf("EI step returned false")
+	}
+	if !ctx.Step() {
+		t.Fatalf("DI step returned false")
+	}
+	if ctx.IntMasterEnabled || ctx.enablingIme || ctx.imeEnableDelay != 0 {
+		t.Fatalf("DI did not cancel pending EI: IME=%t enabling=%t delay=%d", ctx.IntMasterEnabled, ctx.enablingIme, ctx.imeEnableDelay)
+	}
+	if ctx.Regs.Pc != 0x0102 {
+		t.Fatalf("PC after DI = %04X, want 0102", ctx.Regs.Pc)
+	}
+
+	if !ctx.Step() {
+		t.Fatalf("NOP step returned false")
+	}
+	if ctx.Regs.Pc != 0x0103 {
+		t.Fatalf("interrupt was serviced after EI;DI sequence, PC = %04X", ctx.Regs.Pc)
+	}
+	if ctx.IntFlags&byte(IT_TIMER) == 0 {
+		t.Fatalf("pending timer interrupt was unexpectedly cleared")
+	}
+}
+
+func TestHaltWakesOnlyForEnabledInterrupts(t *testing.T) {
+	ctx := newInstructionTestCPU()
+	ctx.Regs.Pc = 0x0100
+	ctx.Halted = true
+	ctx.IntFlags = byte(IT_VBLANK)
+
+	bus := memory.BusCtx()
+	bus.BusWrite(0xFFFF, byte(IT_TIMER))
+
+	if !ctx.Step() {
+		t.Fatalf("halted step returned false")
+	}
+	if !ctx.Halted {
+		t.Fatalf("HALT woke for disabled VBlank interrupt")
+	}
+	if ctx.Regs.Pc != 0x0100 {
+		t.Fatalf("PC changed while halted: %04X", ctx.Regs.Pc)
+	}
+
+	ctx.IntFlags |= byte(IT_TIMER)
+	if !ctx.Step() {
+		t.Fatalf("halt wake step returned false")
+	}
+	if ctx.Halted {
+		t.Fatalf("HALT did not wake for enabled timer interrupt")
+	}
+	if ctx.Regs.Pc != 0x0100 {
+		t.Fatalf("PC changed while waking from HALT without IME: %04X", ctx.Regs.Pc)
+	}
+	if ctx.IntFlags&byte(IT_TIMER) == 0 {
+		t.Fatalf("timer interrupt was serviced even though IME is disabled")
+	}
+}
+
 type gbOpcodeSet struct {
 	Unprefixed map[string]gbOpcodeSpec `json:"unprefixed"`
 	CBPrefixed map[string]gbOpcodeSpec `json:"cbprefixed"`

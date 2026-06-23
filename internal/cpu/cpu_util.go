@@ -165,12 +165,12 @@ func CpuGetRegs() *CpuRegisters {
 }
 
 func CpuGetIntFlags() byte {
-	return cpuInstance.IntFlags
+	return cpuInstance.IntFlags | 0xE0
 }
 
 func CpuSetIntFlags(value byte) {
 	logger.Debug("CpuSetIntFlags: value=%02X", value)
-	cpuInstance.IntFlags = value
+	cpuInstance.IntFlags = value & 0x1F
 }
 
 func CpuRequestInterrupt(it InterruptType) {

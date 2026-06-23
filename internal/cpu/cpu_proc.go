@@ -420,12 +420,15 @@ func procCp(ctx *CpuContext) {
 func procDi(ctx *CpuContext) {
 	// DI: Disable interrupts
 	ctx.IntMasterEnabled = false
+	ctx.enablingIme = false
+	ctx.imeEnableDelay = 0
 }
 
 func procEi(ctx *CpuContext) {
 	// EI: Enable interrupts after next instruction
 	logger.Debug("procEi invoked at PC=%04X", ctx.Regs.Pc)
 	ctx.enablingIme = true
+	ctx.imeEnableDelay = 2
 }
 
 func procPop(ctx *CpuContext) {
