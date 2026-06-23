@@ -195,13 +195,13 @@ func StartEmulator(romFile string) *EmuContext {
 
 	cpuContext = cpu.NewCpuContext(busContext)
 
-	// Enable GBC mode if this is a GBC cartridge
-	if cartContext.IsGBCCart() {
+	// Enable GBC mode only when the selected console mode requires it.
+	if cartContext.RunsInGBCMode() {
 		EnableGBCMode()
 	}
 
 	// Apply DMG color palette BEFORE creating emu instance if flag is set
-	if !cartContext.IsGBCCart() && GetDMGColorsPaletteType() != "" {
+	if !cartContext.RunsInGBCMode() && GetDMGColorsPaletteType() != "" {
 		title := cartContext.GetTitle()
 		EnableDMGGBCColors(GetDMGColorsPaletteType(), title)
 	}
@@ -246,10 +246,10 @@ func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
 
 	cpuContext = cpu.NewCpuContext(busContext)
 
-	// Enable GBC mode if this is a GBC cartridge
-	if cartContext.IsGBCCart() {
+	// Enable GBC mode only when the selected console mode requires it.
+	if cartContext.RunsInGBCMode() {
 		EnableGBCMode()
-		logger.Info("EMU: GBC mode enabled for GBC cartridge")
+		logger.Info("EMU: GBC mode enabled")
 	} else if GetDMGColorsPaletteType() != "" {
 		// DMG-only cartridge with DMG colors enabled
 		logger.Info("EMU: Applying DMG color palette for DMG-only cartridge (WASM)")

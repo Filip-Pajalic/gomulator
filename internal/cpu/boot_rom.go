@@ -41,16 +41,16 @@ func (b *BootRomContext) SimulateBootSequence() {
 
 	cpu := CpuCtx()
 
-	// Check if cartridge is GBC
+	// Check if cartridge should boot in GBC mode.
 	cart := memory.CartCtx()
-	isGBC := cart.IsGBCCart()
+	isGBC := cart.RunsInGBCMode()
 
 	if isGBC {
 		cpu.Regs.A = 0x11 // GBC boot ROM sets A=11 for GBC mode
-		logger.Info("Boot ROM: Detected GBC cartridge - setting A=0x11 (GBC mode)")
+		logger.Info("Boot ROM: Starting in GBC mode - setting A=0x11")
 	} else {
 		cpu.Regs.A = 0x01 // DMG boot ROM sets A=01
-		logger.Info("Boot ROM: Detected DMG cartridge - setting A=0x01 (DMG mode)")
+		logger.Info("Boot ROM: Starting in DMG mode - setting A=0x01")
 	}
 
 	cpu.Regs.F = 0xB0 // Z=1, N=0, H=1, C=1

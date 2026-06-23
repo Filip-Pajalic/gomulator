@@ -208,6 +208,14 @@ func (c *CartContext) IsGBCOnly() bool {
 	return c.cgbFlag == 0xC0
 }
 
+// RunsInGBCMode returns true when this emulator should boot the cartridge in
+// CGB mode. Until there is a user-selectable console model, CGB-compatible
+// cartridges keep the existing DMG boot path and only CGB-only cartridges force
+// CGB mode.
+func (c *CartContext) RunsInGBCMode() bool {
+	return c.IsGBCOnly()
+}
+
 // GetTitle returns the game title from the ROM header
 func (c *CartContext) GetTitle() []byte {
 	if c.header != nil {
