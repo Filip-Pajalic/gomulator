@@ -157,6 +157,7 @@ func procLd(ctx *CpuContext) {
 			debugLdSpCount++
 			logger.Debug("LD SP,HL debug: HL=%04X -> SP=%04X", CpuRegRead(RT_HL), CpuRegRead(RT_SP))
 		}
+		Cm.IncreaseCycle(1)
 	}
 }
 
@@ -166,10 +167,13 @@ func procCb(ctx *CpuContext) {
 	bit := (op >> 3) & 0b111
 	bitOp := (op >> 6) & 0b11
 	regval := CpuRegRead8(reg)
-	Cm.IncreaseCycle(1)
 
 	if reg == RT_HL {
-		Cm.IncreaseCycle(2)
+		if bitOp == 1 {
+			Cm.IncreaseCycle(1)
+		} else {
+			Cm.IncreaseCycle(2)
+		}
 	}
 
 	switch bitOp {
@@ -448,6 +452,7 @@ func procPush(ctx *CpuContext) {
 	Cm.IncreaseCycle(1)
 	StackPush16(value)
 	Cm.IncreaseCycle(1)
+	Cm.IncreaseCycle(1)
 }
 
 func goToAddr(ctx *CpuContext, addr uint16, pushpc bool) {
@@ -472,7 +477,9 @@ func procJp(ctx *CpuContext) {
 	// JP nn or JP cc,nn: Jump to address
 	if CheckCondition(ctx) {
 		ctx.Regs.Pc = ctx.FetchedData
-		Cm.IncreaseCycle(1) // Jump cycle
+		if ctx.currentInst.Mode != AM_R {
+			Cm.IncreaseCycle(1) // Jump cycle for absolute immediate jumps.
+		}
 	}
 }
 
@@ -492,6 +499,7 @@ func procCall(ctx *CpuContext) {
 		// Push current PC to stack
 		Cm.IncreaseCycle(1)
 		StackPush16(ctx.Regs.Pc)
+		Cm.IncreaseCycle(1)
 		// Jump to new address
 		ctx.Regs.Pc = ctx.FetchedData
 		Cm.IncreaseCycle(1)
@@ -519,6 +527,7 @@ func procRst(ctx *CpuContext) {
 	// Push current PC to stack
 	Cm.IncreaseCycle(1)
 	StackPush16(ctx.Regs.Pc)
+	Cm.IncreaseCycle(1)
 	// Jump to RST vector
 	ctx.Regs.Pc = uint16(ctx.currentInst.Param)
 	Cm.IncreaseCycle(1)

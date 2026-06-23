@@ -64,6 +64,34 @@ func TestAllBaseInstructionsCanStep(t *testing.T) {
 	}
 }
 
+func TestBaseInstructionCyclesMatchGBDevSpec(t *testing.T) {
+	opcodes := loadGBDevOpcodes(t)
+	expectedInstructions := loadGBDevBaseInstructions(t)
+
+	for opcode := 0; opcode <= 0xFF; opcode++ {
+		spec := opcodes.Unprefixed[fmt.Sprintf("0x%02X", opcode)]
+		expectedInstruction := expectedInstructions[opcode]
+		if expectedInstruction.Type == IN_NONE || expectedInstruction.Type == IN_STOP || expectedInstruction.Type == IN_HALT || expectedInstruction.Type == IN_CB {
+			continue
+		}
+
+		t.Run(fmt.Sprintf("%02X_%s", opcode, spec.Mnemonic), func(t *testing.T) {
+			ctx := newInstructionTestCPU()
+			seedStepState(ctx, byte(opcode))
+			Cm.ticks = 0
+
+			if !ctx.Step() {
+				t.Fatalf("step returned false")
+			}
+
+			wantCycles := expectedMachineCyclesForSeededStep(expectedInstruction.Condition, spec.Cycles)
+			if Cm.ticks != wantCycles {
+				t.Fatalf("cycles = %d, want %d", Cm.ticks, wantCycles)
+			}
+		})
+	}
+}
+
 func TestCBPrefixedInstructionsExecuteAllOpcodes(t *testing.T) {
 	opcodes := loadGBDevOpcodes(t)
 
@@ -89,6 +117,28 @@ func TestCBPrefixedInstructionsExecuteAllOpcodes(t *testing.T) {
 
 			if got := ctx.Regs.F; got != wantFlags {
 				t.Fatalf("flags = %02X, want %02X", got, wantFlags)
+			}
+		})
+	}
+}
+
+func TestCBPrefixedInstructionCyclesMatchGBDevSpec(t *testing.T) {
+	opcodes := loadGBDevOpcodes(t)
+
+	for opcode := 0; opcode <= 0xFF; opcode++ {
+		spec := opcodes.CBPrefixed[fmt.Sprintf("0x%02X", opcode)]
+		t.Run(fmt.Sprintf("CB_%02X_%s_cycles", opcode, spec.Mnemonic), func(t *testing.T) {
+			ctx := newInstructionTestCPU()
+			seedCBStepState(ctx, byte(opcode))
+			Cm.ticks = 0
+
+			if !ctx.Step() {
+				t.Fatalf("step returned false")
+			}
+
+			wantCycles := expectedMachineCyclesForSeededStep(CT_NONE, spec.Cycles)
+			if Cm.ticks != wantCycles {
+				t.Fatalf("cycles = %d, want %d", Cm.ticks, wantCycles)
 			}
 		})
 	}
@@ -215,6 +265,7 @@ type gbOpcodeSet struct {
 
 type gbOpcodeSpec struct {
 	Mnemonic string          `json:"mnemonic"`
+	Cycles   []int32         `json:"cycles"`
 	Operands []gbOperandSpec `json:"operands"`
 }
 
@@ -605,6 +656,31 @@ func gbDevMnemonicCanHaveCondition(mnemonic string) bool {
 	}
 }
 
+func expectedMachineCyclesForSeededStep(condition conditionTypes, cycles []int32) int32 {
+	if len(cycles) == 0 {
+		return 0
+	}
+	if len(cycles) == 1 || condition == CT_NONE {
+		return cycles[0] / 4
+	}
+
+	taken := false
+	switch condition {
+	case CT_NZ:
+		taken = true
+	case CT_Z:
+		taken = false
+	case CT_NC:
+		taken = false
+	case CT_C:
+		taken = true
+	}
+	if taken {
+		return cycles[0] / 4
+	}
+	return cycles[1] / 4
+}
+
 func assertGBDevCBSpec(t *testing.T, spec gbOpcodeSpec, opcode byte) {
 	t.Helper()
 
@@ -780,6 +856,11 @@ func seedStepState(ctx *CpuContext, opcode byte) {
 	bus.BusWrite(0xD000, 0x78)
 	bus.BusWrite(0xD001, 0x56)
 	bus.BusWrite(0xFF34, 0x9A)
+}
+
+func seedCBStepState(ctx *CpuContext, opcode byte) {
+	seedStepState(ctx, 0xCB)
+	memory.BusCtx().BusWrite(0x0101, opcode)
 }
 
 func writeCBTarget(reg regTypes, value byte) {
