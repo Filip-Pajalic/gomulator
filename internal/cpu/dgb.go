@@ -179,6 +179,7 @@ func DbgPrint() bool {
 			// Check for success indicators
 			if strings.Contains(debugmsg, "Passed") || strings.Contains(debugmsg, "PASSED") {
 				logger.Info("*** TEST PASSED ***")
+				return false
 			}
 		}
 	}
