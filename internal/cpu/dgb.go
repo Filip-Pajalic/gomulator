@@ -61,9 +61,17 @@ func DbgUpdate() {
 
 func DbgPrint() bool {
 	if msgSize > 0 {
-		// Check if we have a complete line (ends with newline)
-		if dbgMsg[msgSize-1] == '\n' {
-			debugmsg := strings.TrimSpace(string(dbgMsg[:msgSize]))
+		debugmsg := strings.TrimSpace(string(dbgMsg[:msgSize]))
+		debugmsgLower := strings.ToLower(debugmsg)
+		hasCompleteLine := dbgMsg[msgSize-1] == '\n'
+		hasResultToken := strings.Contains(debugmsgLower, "passed") ||
+			strings.Contains(debugmsgLower, "failed") ||
+			strings.Contains(debugmsgLower, "error")
+
+		// Check complete lines and terminal pass/fail messages. The Blargg
+		// multi-ROM can leave the final result in the serial buffer without a
+		// trailing newline, so don't wait forever once the result text appears.
+		if hasCompleteLine || hasResultToken {
 			if len(debugmsg) == 0 {
 				logger.Debug("TEST OUTPUT RAW: % X", dbgMsg[:msgSize])
 
@@ -120,7 +128,6 @@ func DbgPrint() bool {
 				}
 			}
 			logger.Debug("TEST OUTPUT: %s", debugmsg)
-			debugmsgLower := strings.ToLower(debugmsg)
 
 			msgSize = 0 // Reset msgSize after printing
 
