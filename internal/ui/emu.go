@@ -154,8 +154,9 @@ func (e *EmuContext) handleCpuStop() bool {
 		return true
 	}
 	e.Die = true
+	e.Running = false
 	logger.Debug("CPU has stopped unexpectedly.")
-	return false
+	return true
 }
 
 func StartEmulator(romFile string) *EmuContext {
