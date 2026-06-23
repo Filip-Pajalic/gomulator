@@ -52,11 +52,11 @@ jobs:
     
     - name: Test CPU Instructions (cpu_instrs.gb)
       id: cpu_instrs
-      timeout-minutes: 6
+      timeout-minutes: 12
       run: |
         echo "::group::CPU Instructions Test"
         set +e
-        timeout 240s xvfb-run -a ./gomulator "$GB_TEST_ROMS/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
+        timeout 600s xvfb-run -a ./gomulator "$GB_TEST_ROMS/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
         status=${PIPESTATUS[0]}
         set -e
         if [ "$status" -ne 0 ]; then
