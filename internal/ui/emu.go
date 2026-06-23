@@ -161,6 +161,7 @@ func (e *EmuContext) handleCpuStop() bool {
 
 func StartEmulator(romFile string) *EmuContext {
 	cartContext := memory.CartCtx()
+	cpu.ResetDebugTestResult()
 
 	if !cartContext.CartLoad(romFile) {
 		logger.Fatal("ROM loading failed. Exiting emulator.")
@@ -215,6 +216,7 @@ func StartEmulator(romFile string) *EmuContext {
 // StartEmulatorFromBytes initializes the emulator from a ROM byte slice (for WASM/JS)
 func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
 	cartContext := memory.CartCtx()
+	cpu.ResetDebugTestResult()
 	cartContext.LoadROMFromBytes(romBytes)
 
 	// Continue initializing other components

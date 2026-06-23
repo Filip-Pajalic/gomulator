@@ -12,6 +12,8 @@ jobs:
     name: GB Test ROMs
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      GB_TEST_ROMS: /tmp/gb-test-roms
     
     steps:
     - name: Checkout code
@@ -19,7 +21,7 @@ jobs:
     
     - name: Clone GB Test ROMs
       run: |
-        git clone https://github.com/retrio/gb-test-roms.git
+        git clone https://github.com/retrio/gb-test-roms.git "$GB_TEST_ROMS"
         echo "✅ Test ROMs cloned successfully"
     
     - name: Set up Go
@@ -54,34 +56,42 @@ jobs:
       run: |
         echo "::group::CPU Instructions Test"
         set +e
-        timeout 120s xvfb-run -a ./gomulator "gb-test-roms/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
+        timeout 240s xvfb-run -a ./gomulator "$GB_TEST_ROMS/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
         status=${PIPESTATUS[0]}
         set -e
-        if grep -qi "TEST PASSED" test_output.txt; then
+        if [ "$status" -ne 0 ]; then
+          echo "❌ CPU Instructions aggregate exited with status $status"
+          echo "::error::CPU Instructions aggregate exited with status $status"
+          echo "passed=false" >> "$GITHUB_OUTPUT"
+        elif grep -qi "TEST PASSED" test_output.txt; then
           echo "✅ CPU Instructions PASSED"
-          echo "run_individual=false" >> "$GITHUB_OUTPUT"
+          echo "passed=true" >> "$GITHUB_OUTPUT"
         else
-          echo "⚠️ CPU Instructions aggregate did not report pass (exit $status); running individual ROMs"
-          echo "run_individual=true" >> "$GITHUB_OUTPUT"
+          echo "❌ CPU Instructions aggregate did not report pass"
+          echo "::error::CPU Instructions aggregate did not report pass"
+          echo "passed=false" >> "$GITHUB_OUTPUT"
         fi
         echo "::endgroup::"
     
-    - name: Test Individual CPU Instructions (if main test failed)
-      if: steps.cpu_instrs.outputs.run_individual == 'true'
+    - name: Test Individual CPU Instructions
+      id: individual_cpu_instrs
       run: |
         echo "::group::Individual CPU Instruction Tests"
         FAILED_TESTS=""
         EXIT_CODE=0
         
-        for rom in gb-test-roms/cpu_instrs/individual/*.gb; do
+        for rom in "$GB_TEST_ROMS"/cpu_instrs/individual/*.gb; do
           rom_name=$(basename "$rom")
           echo "::group::Testing $rom_name"
           
+          set +e
           timeout 60s xvfb-run -a ./gomulator "$rom" 2>&1 | tee test_output_individual.txt
-          if grep -qi "TEST PASSED" test_output_individual.txt; then
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ] && grep -qi "TEST PASSED" test_output_individual.txt; then
             echo "✅ $rom_name PASSED"
           else
-            echo "❌ $rom_name FAILED"
+            echo "❌ $rom_name FAILED (exit $status)"
             cat test_output_individual.txt
             FAILED_TESTS="$FAILED_TESTS\n  - $rom_name"
             EXIT_CODE=1
@@ -92,30 +102,55 @@ jobs:
         
         if [ $EXIT_CODE -ne 0 ]; then
           echo "::error::Failed CPU instruction tests:$FAILED_TESTS"
-          exit 1
+          echo "passed=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "passed=true" >> "$GITHUB_OUTPUT"
         fi
         echo "::endgroup::"
     
     - name: Test Instruction Timing (instr_timing.gb)
+      id: instr_timing
       timeout-minutes: 2
       run: |
         echo "::group::Instruction Timing Test"
-        timeout 60s xvfb-run -a ./gomulator "gb-test-roms/instr_timing/instr_timing.gb" 2>&1 | tee test_timing.txt
-        if grep -qi "TEST PASSED" test_timing.txt; then
+        set +e
+        timeout 60s xvfb-run -a ./gomulator "$GB_TEST_ROMS/instr_timing/instr_timing.gb" 2>&1 | tee test_timing.txt
+        status=${PIPESTATUS[0]}
+        set -e
+        if [ "$status" -eq 0 ] && grep -qi "TEST PASSED" test_timing.txt; then
           echo "✅ Instruction Timing PASSED"
+          echo "passed=true" >> "$GITHUB_OUTPUT"
         else
-          echo "❌ Instruction Timing FAILED"
+          echo "❌ Instruction Timing FAILED (exit $status)"
           cat test_timing.txt
-          exit 1
+          echo "::error::Instruction Timing failed"
+          echo "passed=false" >> "$GITHUB_OUTPUT"
         fi
         echo "::endgroup::"
     
     - name: Test Summary
-      if: success()
+      if: always()
       run: |
+        failed=0
+        if [ "${{ steps.cpu_instrs.outputs.passed }}" != "true" ]; then
+          echo "::error::CPU Instructions aggregate failed"
+          failed=1
+        fi
+        if [ "${{ steps.individual_cpu_instrs.outputs.passed }}" != "true" ]; then
+          echo "::error::Individual CPU instruction ROMs failed"
+          failed=1
+        fi
+        if [ "${{ steps.instr_timing.outputs.passed }}" != "true" ]; then
+          echo "::error::Instruction timing ROM failed"
+          failed=1
+        fi
+        if [ "$failed" -ne 0 ]; then
+          exit 1
+        fi
         echo "::notice::✅ All GB test ROMs passed!"
         echo "Tests completed:"
-        echo "  ✅ CPU Instructions (cpu_instrs.gb)"
+        echo "  ✅ CPU Instructions aggregate (cpu_instrs.gb)"
+        echo "  ✅ Individual CPU instruction ROMs"
         echo "  ✅ Instruction Timing (instr_timing.gb)"
 
   unit-tests:

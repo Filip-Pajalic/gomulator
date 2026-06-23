@@ -17,6 +17,25 @@ const (
 var dbgMsg [1024]byte
 var msgSize = 0
 
+type DebugTestResult byte
+
+const (
+	DebugTestNone DebugTestResult = iota
+	DebugTestPassed
+	DebugTestFailed
+)
+
+func ResetDebugTestResult() {
+	msgSize = 0
+	debugTestResult = DebugTestNone
+}
+
+func GetDebugTestResult() DebugTestResult {
+	return debugTestResult
+}
+
+var debugTestResult = DebugTestNone
+
 func DbgUpdate() {
 	if memory.BusCtx().BusRead(0xFF02) == 0x81 {
 		var c = memory.BusCtx().BusRead(0xFF01)
@@ -101,12 +120,12 @@ func DbgPrint() bool {
 				}
 			}
 			logger.Debug("TEST OUTPUT: %s", debugmsg)
+			debugmsgLower := strings.ToLower(debugmsg)
 
 			msgSize = 0 // Reset msgSize after printing
 
 			// Check for common test failure indicators
-			if strings.Contains(debugmsg, "Failed") || strings.Contains(debugmsg, "FAILED") ||
-				strings.Contains(debugmsg, "Error") || strings.Contains(debugmsg, "ERROR") {
+			if strings.Contains(debugmsgLower, "failed") || strings.Contains(debugmsgLower, "error") {
 				if cpuInstance != nil {
 					regs := cpuInstance.Regs
 					sp := regs.Sp
@@ -173,12 +192,14 @@ func DbgPrint() bool {
 					logger.Debug("CRC table sample D900: % X", crcSample)
 				}
 				logger.Info("*** TEST FAILED ***")
+				debugTestResult = DebugTestFailed
 				return false
 			}
 
 			// Check for success indicators
-			if strings.Contains(debugmsg, "Passed") || strings.Contains(debugmsg, "PASSED") {
+			if strings.Contains(debugmsgLower, "passed") {
 				logger.Info("*** TEST PASSED ***")
+				debugTestResult = DebugTestPassed
 				return false
 			}
 		}
