@@ -26,10 +26,26 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+
+    - name: Install Linux native dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libc6-dev \
+          libgl1-mesa-dev \
+          libx11-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libxinerama-dev \
+          libxrandr-dev \
+          libxxf86vm-dev \
+          libasound2-dev \
+          pkg-config \
+          xvfb
     
     - name: Build emulator
       run: |
-        go build -o gomulator ./cmd
+        go build -tags debug -o gomulator ./cmd
         chmod +x gomulator
     
     - name: Test CPU Instructions (cpu_instrs.gb)
@@ -38,7 +54,7 @@ jobs:
       timeout-minutes: 3
       run: |
         echo "::group::CPU Instructions Test"
-        timeout 120s ./gomulator -skip-boot "gb-test-roms/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
+        timeout 120s xvfb-run -a ./gomulator "gb-test-roms/cpu_instrs/cpu_instrs.gb" 2>&1 | tee test_output.txt
         if grep -q "Passed" test_output.txt; then
           echo "✅ CPU Instructions PASSED"
           exit 0
@@ -59,7 +75,7 @@ jobs:
           rom_name=$(basename "$rom")
           echo "::group::Testing $rom_name"
           
-          timeout 60s ./gomulator -skip-boot "$rom" 2>&1 | tee test_output_individual.txt
+          timeout 60s xvfb-run -a ./gomulator "$rom" 2>&1 | tee test_output_individual.txt
           if grep -q "Passed" test_output_individual.txt; then
             echo "✅ $rom_name PASSED"
           else
@@ -82,7 +98,7 @@ jobs:
       timeout-minutes: 2
       run: |
         echo "::group::Instruction Timing Test"
-        timeout 60s ./gomulator -skip-boot "gb-test-roms/instr_timing/instr_timing.gb" 2>&1 | tee test_timing.txt
+        timeout 60s xvfb-run -a ./gomulator "gb-test-roms/instr_timing/instr_timing.gb" 2>&1 | tee test_timing.txt
         if grep -q "Passed" test_timing.txt; then
           echo "✅ Instruction Timing PASSED"
         else
@@ -112,6 +128,21 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+
+    - name: Install Linux native dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libc6-dev \
+          libgl1-mesa-dev \
+          libx11-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libxinerama-dev \
+          libxrandr-dev \
+          libxxf86vm-dev \
+          libasound2-dev \
+          pkg-config
     
     - name: Run unit tests
       run: |
@@ -130,6 +161,21 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.24'
+
+    - name: Install Linux native dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libc6-dev \
+          libgl1-mesa-dev \
+          libx11-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libxinerama-dev \
+          libxrandr-dev \
+          libxxf86vm-dev \
+          libasound2-dev \
+          pkg-config
     
     - name: Build native
       run: |
