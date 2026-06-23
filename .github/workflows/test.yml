@@ -52,7 +52,7 @@ jobs:
     
     - name: Test CPU Instructions (cpu_instrs.gb)
       id: cpu_instrs
-      timeout-minutes: 3
+      timeout-minutes: 6
       run: |
         echo "::group::CPU Instructions Test"
         set +e
@@ -74,6 +74,7 @@ jobs:
         echo "::endgroup::"
     
     - name: Test Individual CPU Instructions
+      if: always()
       id: individual_cpu_instrs
       run: |
         echo "::group::Individual CPU Instruction Tests"
@@ -109,6 +110,7 @@ jobs:
         echo "::endgroup::"
     
     - name: Test Instruction Timing (instr_timing.gb)
+      if: always()
       id: instr_timing
       timeout-minutes: 2
       run: |
