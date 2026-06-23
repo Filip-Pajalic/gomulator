@@ -30,3 +30,29 @@ func TestCartridgeCGBModeFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestMBC1ROMBankSelectionWrapsToAvailableBanks(t *testing.T) {
+	const bankSize = 0x4000
+
+	rom := make([]byte, 4*bankSize)
+	for bank := 0; bank < 4; bank++ {
+		rom[bank*bankSize] = byte(0xA0 + bank)
+	}
+
+	cart := &CartContext{romData: rom, romBank: 1}
+
+	cart.CartWrite(0x2000, 0x02)
+	if got := cart.CartRead(0x4000); got != 0xA2 {
+		t.Fatalf("bank 2 read = %02X, want A2", got)
+	}
+
+	cart.CartWrite(0x2000, 0x04)
+	if got := cart.CartRead(0x4000); got != 0xA1 {
+		t.Fatalf("out-of-range bank 4 read = %02X, want A1", got)
+	}
+
+	cart.CartWrite(0x2000, 0x1F)
+	if got := cart.CartRead(0x4000); got != 0xA3 {
+		t.Fatalf("out-of-range bank 31 read = %02X, want A3", got)
+	}
+}

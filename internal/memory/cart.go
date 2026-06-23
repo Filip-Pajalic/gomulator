@@ -168,6 +168,13 @@ func CartCtx() *CartContext {
 	return cartInstance
 }
 
+func (c *CartContext) resetBankingState() {
+	c.romBank = 1
+	c.ramBank = 0
+	c.ramEnabled = false
+	c.bankMode = 0
+}
+
 const headerOffset = 0x100
 
 // cartLicName returns the license name based on the license code
@@ -253,6 +260,7 @@ func (c *CartContext) loadCart(romName string) {
 	copy(c.filename[:], romName)
 
 	c.romData = data
+	c.resetBankingState()
 
 	if len(c.romData) == 0 {
 		logger.Fatal("ROM file is empty.")
@@ -347,6 +355,7 @@ func (c *CartContext) CartLoad(cart string) bool {
 // LoadROMFromBytes loads a ROM directly from a byte slice (for WASM/JS)
 func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	c.romData = append([]byte(nil), romBytes...)
+	c.resetBankingState()
 	if len(c.romData) == 0 {
 		logger.Fatal("ROM data is empty.")
 		return false
@@ -388,6 +397,26 @@ func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	return true
 }
 
+func (c *CartContext) romBankCount() int {
+	banks := len(c.romData) / 0x4000
+	if banks < 1 {
+		return 1
+	}
+	return banks
+}
+
+func (c *CartContext) normalizeROMBank(bank int) int {
+	banks := c.romBankCount()
+	bank %= banks
+	if bank < 0 {
+		bank += banks
+	}
+	if bank == 0 && banks > 1 {
+		return 1
+	}
+	return bank
+}
+
 func (c *CartContext) CartWrite(address uint16, data byte) {
 	switch {
 	case address < 0x2000:
@@ -401,7 +430,7 @@ func (c *CartContext) CartWrite(address uint16, data byte) {
 		if bank == 0 {
 			bank = 1 // Bank 0 maps to bank 1
 		}
-		c.romBank = bank
+		c.romBank = c.normalizeROMBank((c.romBank & 0x60) | bank)
 		logger.Debug("MBC1: ROM bank set to %d", c.romBank)
 
 	case address < 0x6000:
@@ -409,7 +438,7 @@ func (c *CartContext) CartWrite(address uint16, data byte) {
 		if c.bankMode == 0 {
 			// ROM banking mode - upper 2 bits of ROM bank
 			upperBits := int(data&0x03) << 5
-			c.romBank = (c.romBank & 0x1F) | upperBits
+			c.romBank = c.normalizeROMBank((c.romBank & 0x1F) | upperBits)
 			logger.Debug("MBC1: ROM bank upper bits set, new bank: %d", c.romBank)
 		} else {
 			// RAM banking mode - RAM bank number
