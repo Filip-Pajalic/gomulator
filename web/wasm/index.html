@@ -87,9 +87,9 @@
     }
 
     #emulatorBox {
-      width: calc(100% - 40px);
-      max-width: 700px;
-      aspect-ratio: 10 / 9;
+      width: 640px;
+      max-width: calc(100% - 40px);
+      height: 576px;
       margin: 0 auto;
       border: 0;
       border-radius: 6px;
@@ -244,7 +244,7 @@
       }
 
       #emulatorBox {
-        width: calc(100% - 24px);
+        max-width: calc(100% - 24px);
         max-width: 95vw;
       }
     }
@@ -257,11 +257,6 @@
       }
     }
 
-    @media (max-width: 400px) {
-      #emulatorBox {
-        aspect-ratio: 9 / 8;
-      }
-    }
   </style>
 </head>
 <body>
@@ -315,6 +310,11 @@
     const statusTextEl = document.getElementById("statusText");
     const loadTriggerEl = document.getElementById("loadTrigger");
     const iframe = document.getElementById("emulatorFrame");
+    const emulatorBox = document.getElementById("emulatorBox");
+    const emulatorContainer = document.querySelector(".emulator-container");
+    const GB_SCREEN_WIDTH = 160;
+    const GB_SCREEN_HEIGHT = 144;
+    const MAX_EMULATOR_WIDTH = 700;
     let isRomLoaded = false;
 
     const pressed = {
@@ -367,11 +367,54 @@
       if (statusTextEl) statusTextEl.textContent = text;
     }
 
-    function sendRomToEmulator(buffer, fileName) {
+    function parseRomMetadata(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const titleBytes = bytes.slice(0x0134, 0x0144);
+      const zeroIndex = titleBytes.indexOf(0);
+      const visibleTitleBytes = titleBytes.slice(0, zeroIndex === -1 ? titleBytes.length : zeroIndex);
+      const title = Array.from(visibleTitleBytes)
+        .map((value) => (value >= 32 && value <= 126 ? String.fromCharCode(value) : ""))
+        .join("")
+        .trim();
+      const cgbFlag = bytes[0x0143] || 0;
+      let mode = "DMG";
+
+      if (cgbFlag === 0xC0) {
+        mode = "GBC-only";
+      } else if (cgbFlag === 0x80) {
+        mode = "GBC-compatible, running DMG mode";
+      }
+
+      return { title, cgbFlag, mode };
+    }
+
+    function formatLoadedStatus(fileName, metadata) {
+      const romName = metadata.title ? `${fileName} (${metadata.title})` : fileName;
+      return `Loaded: ${romName} - ${metadata.mode}`;
+    }
+
+    function resizeEmulatorBox() {
+      if (!emulatorBox || !emulatorContainer) return;
+
+      const containerWidth = emulatorContainer.clientWidth;
+      const sideInset = window.matchMedia("(max-width: 600px)").matches ? 24 : 40;
+      const availableWidth = Math.min(MAX_EMULATOR_WIDTH, Math.max(0, containerWidth - sideInset));
+      let width = availableWidth;
+
+      if (availableWidth >= GB_SCREEN_WIDTH) {
+        const scale = Math.max(1, Math.floor(availableWidth / GB_SCREEN_WIDTH));
+        width = scale * GB_SCREEN_WIDTH;
+      }
+
+      emulatorBox.style.width = `${width}px`;
+      emulatorBox.style.height = `${Math.round((width * GB_SCREEN_HEIGHT) / GB_SCREEN_WIDTH)}px`;
+    }
+
+    function sendRomToEmulator(buffer, fileName, metadata) {
       const tryLoad = (attempt = 0) => {
         if (iframe?.contentWindow?.startRomLoad) {
           iframe.contentWindow.startRomLoad(buffer, fileName);
-          setStatus(`Loaded: ${fileName}`);
+          setStatus(formatLoadedStatus(fileName, metadata));
           statusBarEl?.classList.add("loaded");
           if (loadTriggerEl) loadTriggerEl.textContent = "LOAD NEW";
           isRomLoaded = true;
@@ -396,17 +439,18 @@
           setStatus("Failed to read the file.");
           return;
         }
+        const metadata = parseRomMetadata(buffer);
 
         if (isRomLoaded && iframe) {
           setStatus("Reloading emulator for new ROM...");
           iframe.onload = () => {
-            sendRomToEmulator(buffer, file.name);
+            sendRomToEmulator(buffer, file.name, metadata);
             iframe.onload = null;
           };
           const currentSrc = iframe.src.split("?")[0];
           iframe.src = `${currentSrc}?reload=${Date.now()}`;
         } else {
-          sendRomToEmulator(buffer, file.name);
+          sendRomToEmulator(buffer, file.name, metadata);
         }
       };
       reader.onerror = () => setStatus("Failed to read the file.");
@@ -497,6 +541,12 @@
         }
       });
     });
+
+    resizeEmulatorBox();
+    window.addEventListener("resize", resizeEmulatorBox);
+    if (window.ResizeObserver && emulatorContainer) {
+      new ResizeObserver(resizeEmulatorBox).observe(emulatorContainer);
+    }
   </script>
 </body>
 </html>

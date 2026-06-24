@@ -54,18 +54,25 @@ inject_inline_wasm() {
 
   awk -v marker="${marker}" '
     index($0, marker) {
+      sub(/\r$/, "")
       sub(marker, "const GOMULATOR_WASM_BASE64 = \"")
       printf "%s", $0
       exit
     }
-    { print }
+    {
+      sub(/\r$/, "")
+      print
+    }
   ' "${html_file}" > "${tmp_file}"
 
   base64_nowrap "${wasm_file}" >> "${tmp_file}"
   printf '";\n' >> "${tmp_file}"
 
   awk -v marker="${marker}" '
-    found { print }
+    found {
+      sub(/\r$/, "")
+      print
+    }
     index($0, marker) { found = 1 }
   ' "${html_file}" >> "${tmp_file}"
 
