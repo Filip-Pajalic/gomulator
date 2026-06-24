@@ -181,11 +181,12 @@ jobs:
           libxrandr-dev \
           libxxf86vm-dev \
           libasound2-dev \
-          pkg-config
+          pkg-config \
+          xvfb
     
     - name: Run unit tests
       run: |
-        go test ./... -v
+        xvfb-run -a go test ./... -v
 
   build-check:
     name: Build Verification
