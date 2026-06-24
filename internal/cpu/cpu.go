@@ -93,6 +93,7 @@ func NewCpuContext(memoryBus Bus) *CpuContext {
 	//TimerCtx().div = 0xABCC TODO
 	InitInstructions()
 	InitProcessors()
+	Cm.SetPeripheralTick(nil)
 	cpuInstance = &CpuContext{
 		Regs: CpuRegisters{
 			A:  0x01,
