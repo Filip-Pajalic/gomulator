@@ -45,7 +45,7 @@ inject_inline_wasm() {
   awk -v marker="${marker}" '
     index($0, marker) {
       sub(marker, "const GOMULATOR_WASM_BASE64 = \"")
-      print
+      printf "%s", $0
       exit
     }
     { print }
