@@ -313,8 +313,10 @@ func LCDCTileDataSelect() bool {
 
 // PpuTick steps the PPU forward one cycle (main state machine)
 func (p *PpuContext) PpuTick() {
-	// FIXED: Reference implementation NEVER checks LCD enabled in ppu_tick()
-	// Always process the state machine like the reference
+	if !LCDCLCDEnabled() {
+		p.LineTicks = 0
+		return
+	}
 
 	// Increment line ticks FIRST like reference
 	p.LineTicks++
@@ -342,6 +344,8 @@ func (p *PpuContext) PpuTickBatch(ticks int32) {
 // ResetLCDState resets PPU state when LCD is disabled
 func (p *PpuContext) ResetLCDState() {
 	p.LineTicks = 0
+	p.WindowLine = 0
+	p.ResetPipelineState()
 	LcdCtx().Ly = 0
 	SetLCDMode(ModeHBlank)
 
@@ -433,11 +437,6 @@ func (p *PpuContext) ModeHBlank() {
 			// Request V-Blank interrupt (like reference)
 			cpu.CpuRequestInterrupt(cpu.IT_VBLANK)
 			logger.Debug("PPU: V-Blank interrupt requested")
-
-			if LCDSStatInt(SSVBlank) {
-				// Request V-Blank STAT interrupt
-				logger.Debug("PPU: V-Blank STAT interrupt requested")
-			}
 
 			p.CurrentFrame++
 			logger.Debug("PPU: Entering V-blank at line %d, frame %d", LcdCtx().Ly, p.CurrentFrame)

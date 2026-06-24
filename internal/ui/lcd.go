@@ -466,11 +466,9 @@ func LcdRead(address uint16) uint8 {
 	switch offset {
 	case 0:
 		return lcdContext.Lcdc
-		if ppuInstance != nil {
-			ppuInstance.WindowLine = 0
-		}
-		// Add cases for other fields as needed.
-		return lcdContext.Lcds
+	case 1:
+		// STAT bit 7 is unused and reads back as 1 on hardware.
+		return lcdContext.Lcds | 0x80
 	case 2:
 		return lcdContext.ScrollY
 	case 3:
@@ -542,6 +540,7 @@ func LcdWrite(address uint16, value uint8) {
 	offset := address - 0xFF40
 	switch offset {
 	case 0:
+		previousLCDC := lcdContext.Lcdc
 		// Debug: Log LCDC writes
 		if address == 0xFF40 {
 			// Special alert when background gets enabled
@@ -552,7 +551,9 @@ func LcdWrite(address uint16, value uint8) {
 			// only when window is actually disabled via LCDC bit 5
 			if (value&0x20) == 0 && (lcdContext.Lcdc&0x20) != 0 {
 				// Window disabled via LCDC bit 5 - reset window line counter
-				ppuInstance.WindowLine = 0
+				if ppuInstance != nil {
+					ppuInstance.WindowLine = 0
+				}
 				logger.Debug("Window disabled via LCDC bit 5 - reset window line counter")
 			}
 
@@ -563,8 +564,23 @@ func LcdWrite(address uint16, value uint8) {
 			}
 		}
 		lcdContext.Lcdc = value
+
+		wasEnabled := previousLCDC&LCDC_DISPLAY_ENABLE != 0
+		isEnabled := value&LCDC_DISPLAY_ENABLE != 0
+		if wasEnabled && !isEnabled {
+			PpuCtx().ResetLCDState()
+		} else if !wasEnabled && isEnabled {
+			ppu := PpuCtx()
+			ppu.LineTicks = 0
+			ppu.WindowLine = 0
+			ppu.ResetPipelineState()
+			lcdContext.Ly = 0
+			SetLCDMode(ModeOam)
+		}
 	case 1:
-		lcdContext.Lcds = value
+		// STAT mode and LYC coincidence bits are hardware-owned. The CPU can only
+		// configure the STAT interrupt source enable bits.
+		lcdContext.Lcds = (lcdContext.Lcds & 0x07) | (value & 0x78)
 	case 2:
 		lcdContext.ScrollY = value
 	case 3:
@@ -717,19 +733,18 @@ func SetLCDMode(mode lcdMode) {
 	switch mode {
 	case ModeHBlank:
 		if LCDSStatInt(SSHBlank) {
-			// TODO: Request STAT interrupt when interrupt system is ready
+			cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
 			logger.Debug("LCD: H-blank STAT interrupt requested")
 		}
 	case ModeVBlank:
 		if LCDSStatInt(SSVBlank) {
-			// TODO: Request STAT interrupt when interrupt system is ready
+			cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
 			logger.Debug("LCD: V-blank STAT interrupt requested")
 		}
-		// TODO: Request VBlank interrupt when interrupt system is ready
 		logger.Debug("LCD: V-blank interrupt requested")
 	case ModeOam:
 		if LCDSStatInt(SSOam) {
-			// TODO: Request STAT interrupt when interrupt system is ready
+			cpu.CpuRequestInterrupt(cpu.IT_LCD_STAT)
 			logger.Debug("LCD: OAM STAT interrupt requested")
 		}
 	}
