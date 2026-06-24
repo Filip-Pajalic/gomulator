@@ -2,7 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DIST_DIR="${WASM_DIST_DIR:-"${ROOT_DIR}/dist/wasm"}"
+BUILD_DIR="${BUILD_DIR:-"${ROOT_DIR}/build"}"
+WASM_DIR="${WASM_DIR:-"${BUILD_DIR}/wasm"}"
+ARTIFACT_DIR="${ARTIFACT_DIR:-"${BUILD_DIR}/artifacts"}"
+WASM_ZIP="${WASM_ZIP:-"${ARTIFACT_DIR}/gomulator-wasm.zip"}"
 
 GOROOT="$(go env GOROOT)"
 WASM_EXEC="${GOROOT}/lib/wasm/wasm_exec.js"
@@ -10,10 +13,15 @@ if [[ ! -f "${WASM_EXEC}" ]]; then
   echo "wasm_exec.js not found at ${WASM_EXEC}" >&2
   exit 1
 fi
+if ! command -v zip >/dev/null 2>&1; then
+  echo "zip is required to build the WASM package" >&2
+  exit 1
+fi
 
-rm -rf "${DIST_DIR}"
-mkdir -p "${DIST_DIR}"
+rm -rf "${WASM_DIR}"
+mkdir -p "${WASM_DIR}" "${ARTIFACT_DIR}"
 rm -f "${ROOT_DIR}/gomulator-wasm.zip"
+rm -rf "${ROOT_DIR}/dist/wasm"
 : "${GOCACHE:="${TMPDIR:-/tmp}/gomulator-go-build-cache"}"
 export GOCACHE
 mkdir -p "${GOCACHE}"
@@ -21,12 +29,13 @@ mkdir -p "${GOCACHE}"
 echo "Building gomulator.wasm..."
 (
   cd "${ROOT_DIR}"
-  GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o "${DIST_DIR}/gomulator.wasm" ./cmd
+  GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o "${WASM_DIR}/gomulator.wasm" ./cmd
 )
 
-cp "${WASM_EXEC}" "${DIST_DIR}/wasm_exec.js"
-cp "${ROOT_DIR}/index.html" "${DIST_DIR}/index.html"
-cp "${ROOT_DIR}/web/wasm/emulator-iframe.html" "${DIST_DIR}/emulator-iframe.html"
+cp "${WASM_EXEC}" "${WASM_DIR}/wasm_exec.js"
+cp "${ROOT_DIR}/web/wasm/index.html" "${WASM_DIR}/index.html"
+cp "${ROOT_DIR}/web/wasm/emulator-iframe.html" "${WASM_DIR}/emulator-iframe.html"
+cp "${ROOT_DIR}/web/wasm/README.md" "${WASM_DIR}/README.md"
 
 base64_nowrap() {
   if base64 --help 2>/dev/null | grep -q -- "-w"; then
@@ -64,27 +73,30 @@ inject_inline_wasm() {
   chmod 0644 "${html_file}"
 }
 
-inject_inline_wasm "${DIST_DIR}/emulator-iframe.html" "${DIST_DIR}/gomulator.wasm"
+inject_inline_wasm "${WASM_DIR}/emulator-iframe.html" "${WASM_DIR}/gomulator.wasm"
 
-if command -v zip >/dev/null 2>&1; then
-  (
-    cd "${DIST_DIR}"
-    zip -qr "${ROOT_DIR}/gomulator-wasm.zip" index.html emulator-iframe.html wasm_exec.js gomulator.wasm
-  )
-fi
+(
+  cd "${WASM_DIR}"
+  zip -qr "${WASM_ZIP}" README.md index.html emulator-iframe.html wasm_exec.js gomulator.wasm
+)
 
 cat <<EOF
 WASM package ready:
-  ${DIST_DIR}/index.html
-  ${DIST_DIR}/emulator-iframe.html
-  ${DIST_DIR}/gomulator.wasm
-  ${DIST_DIR}/wasm_exec.js
+  ${WASM_DIR}/README.md
+  ${WASM_DIR}/index.html
+  ${WASM_DIR}/emulator-iframe.html
+  ${WASM_DIR}/gomulator.wasm
+  ${WASM_DIR}/wasm_exec.js
+  ${WASM_ZIP}
 
 Open the standalone page directly:
-  ${DIST_DIR}/index.html
+  ${WASM_DIR}/index.html
 
 Or serve it locally with:
-  python3 -m http.server 8080 --directory ${DIST_DIR}
+  npx serve ${WASM_DIR}
+
+Or:
+  python3 -m http.server 8080 --directory ${WASM_DIR}
 
 Then open:
   http://localhost:8080/

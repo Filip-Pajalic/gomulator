@@ -7,15 +7,16 @@ Game Boy emulator written in Go with Ebiten. Supports native Windows and WASM/br
 
 ```bash
 make native
-./gomulator.exe path/to/rom.gb
+./build/native/gomulator.exe path/to/rom.gb
 ```
 
 ### WASM/Browser
 
 ```bash
 make wasm
-# Open dist/wasm/index.html directly, or serve it over HTTP:
-# python3 -m http.server 8080 --directory dist/wasm
+cd build/wasm
+npx serve .
+# or: python3 -m http.server 8080
 ```
 
 ## Build Commands
@@ -29,12 +30,32 @@ make test     # Run GB test ROM suite
 make clean    # Remove build artifacts
 ```
 
-`make wasm` writes a self-contained browser package to `dist/wasm/`:
+Build commands write generated files under `build/`:
 
+- `build/native/gomulator` or `build/native/gomulator.exe` - native executable
+- `build/native/gomulator-debug` or `build/native/gomulator-debug.exe` - debug executable
+- `build/wasm/` - self-contained browser package
+- `build/artifacts/gomulator-wasm.zip` - zipped WASM browser package
+
+`make wasm` writes this self-contained browser package to `build/wasm/`:
+
+- `README.md` - package usage and serve commands
 - `index.html` - minimal host page showing how to embed the emulator iframe
 - `emulator-iframe.html` - the styled emulator page to embed
 - `gomulator.wasm` - emulator build
 - `wasm_exec.js` - Go WASM runtime copied from the active Go toolchain
+
+Serve the generated browser package with either command:
+
+```bash
+cd build/wasm
+npx serve .
+```
+
+```bash
+cd build/wasm
+python3 -m http.server 8080
+```
 
 For embedding, point an iframe at the generated `emulator-iframe.html`:
 
@@ -104,8 +125,16 @@ Runs GB test ROMs from https://github.com/retrio/gb-test-roms
 ## CI/CD
 
 GitHub Actions workflows:
-- `build.yml` - Builds native + WASM on every push
+- `build.yml` - Builds release artifacts on PRs and publishes a GitHub Release on merges to `main`
 - `test.yml` - Runs test ROMs on PRs
+
+Release assets published from `main`:
+
+- `gomulator-windows-x64.exe` - Windows executable
+- `gomulator-linux-arm64` - Linux ARM64 executable
+- `gomulator-macos` - macOS executable
+- `gomulator.wasm` - raw WASM binary
+- `gomulator-wasm.zip` - zip containing the WASM test/embed page, iframe page, runtime, README, and WASM binary
 
 See [CI_CD_TESTING.md](CI_CD_TESTING.md) for details.
 

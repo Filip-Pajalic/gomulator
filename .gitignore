@@ -26,6 +26,7 @@ roms/
 .idea/
 
 # Build artifacts
+build/
 gomulator
 gomulator-debug
 gomulator.exe
