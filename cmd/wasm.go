@@ -3,6 +3,8 @@
 package main
 
 import (
+	"app/internal/cpu"
+	"app/internal/input"
 	"app/internal/logger"
 	"app/internal/memory"
 	"app/internal/ui"
@@ -107,6 +109,50 @@ func applyWASMInput(btn string, pressed bool) bool {
 	}
 }
 
+func wasmDebugState() js.Value {
+	state := js.Global().Get("Object").New()
+	state.Set("running", false)
+	state.Set("joyp", fmt.Sprintf("0x%02X", input.GetOutput()))
+
+	pressed := input.GetState()
+	state.Set("pressedStart", pressed.Start)
+	state.Set("pressedSelect", pressed.Select)
+	state.Set("pressedA", pressed.A)
+	state.Set("pressedB", pressed.B)
+	state.Set("pressedUp", pressed.Up)
+	state.Set("pressedDown", pressed.Down)
+	state.Set("pressedLeft", pressed.Left)
+	state.Set("pressedRight", pressed.Right)
+
+	if currentEmu == nil {
+		return state
+	}
+
+	state.Set("running", currentEmu.Running)
+	state.Set("ticks", fmt.Sprintf("%d", currentEmu.Ticks))
+	if currentEmu.BusCtx != nil {
+		state.Set("ie", fmt.Sprintf("0x%02X", currentEmu.BusCtx.BusRead(0xFFFF)))
+	}
+
+	cpuCtx, ok := currentEmu.CpuCtx.(*cpu.CpuContext)
+	if !ok || cpuCtx == nil {
+		return state
+	}
+
+	state.Set("pc", fmt.Sprintf("0x%04X", cpuCtx.Regs.Pc))
+	state.Set("sp", fmt.Sprintf("0x%04X", cpuCtx.Regs.Sp))
+	state.Set("if", fmt.Sprintf("0x%02X", cpuCtx.IntFlags))
+	state.Set("ime", cpuCtx.IntMasterEnabled)
+	state.Set("halted", cpuCtx.Halted)
+	state.Set("stopped", cpuCtx.Stopped)
+	state.Set("a", fmt.Sprintf("0x%02X", cpuCtx.Regs.A))
+	state.Set("f", fmt.Sprintf("0x%02X", cpuCtx.Regs.F))
+	state.Set("bc", fmt.Sprintf("0x%02X%02X", cpuCtx.Regs.B, cpuCtx.Regs.C))
+	state.Set("de", fmt.Sprintf("0x%02X%02X", cpuCtx.Regs.D, cpuCtx.Regs.E))
+	state.Set("hl", fmt.Sprintf("0x%02X%02X", cpuCtx.Regs.H, cpuCtx.Regs.L))
+	return state
+}
+
 func platformMain() {
 	logger.Info("Waiting for ROM from JavaScript...")
 	memory.SetSaveStore(wasmLocalStorageSaveStore{})
@@ -167,6 +213,13 @@ func platformMain() {
 	})
 	// Keep reference in global so it won't be garbage collected
 	js.Global().Set("emuInput", emuInput)
+
+	debugState := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		state := wasmDebugState()
+		js.Global().Get("console").Call("table", state)
+		return state
+	})
+	js.Global().Set("gomulatorDebugState", debugState)
 
 	flushSave := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		memory.FlushSave()

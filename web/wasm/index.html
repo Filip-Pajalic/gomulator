@@ -482,6 +482,19 @@
       target.postMessage({ type: "emu-input", button, pressed: pressedState }, "*");
     }
 
+    window.gomulatorDebugState = () => {
+      if (!iframe?.contentWindow) return null;
+
+      try {
+        const state = iframe.contentWindow.gomulatorDebugState?.() || null;
+        if (state) console.table(state);
+        return state;
+      } catch (error) {
+        console.warn("Unable to read emulator debug state", error);
+        return null;
+      }
+    };
+
     statusBarEl?.addEventListener("click", () => {
       romInput?.click();
     });

@@ -167,6 +167,8 @@ func StartEmulator(romFile string) *EmuContext {
 		logger.Fatal("ROM loading failed. Exiting emulator.")
 	}
 
+	input.Init()
+
 	// Continue initializing other components
 	timerContext := cpu.TimerCtx()
 	dmaContext := cpu.DmaCtx()
@@ -224,6 +226,8 @@ func StartEmulatorFromBytesWithSaveKey(romBytes []byte, saveKey string) *EmuCont
 	cartContext := memory.CartCtx()
 	cpu.ResetDebugTestResult()
 	cartContext.LoadROMFromBytesWithSaveKey(romBytes, saveKey)
+
+	input.Init()
 
 	// Continue initializing other components
 	timerContext := cpu.TimerCtx()

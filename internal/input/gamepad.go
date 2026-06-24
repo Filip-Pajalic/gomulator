@@ -1,5 +1,7 @@
 package input
 
+import "app/internal/cpu"
+
 type State struct {
 	Start  bool
 	Select bool
@@ -36,14 +38,33 @@ func DirSel() bool {
 }
 
 func SetSel(value uint8) {
+	previous := GetOutput()
+
 	// Joypad register uses active-low selection bits: when bit is 0 the group
 	// is selected. SetSel receives the written byte and stores booleans that
 	// are true when the corresponding group is selected.
 	Ctx.ButtonSel = (value & 0x20) == 0
 	Ctx.DirSel = (value & 0x10) == 0
+
+	requestJoypadInterruptIfNeeded(previous)
 }
+
 func GetState() *State {
 	return &Ctx.Controller
+}
+
+func SetState(state State) {
+	previous := GetOutput()
+	Ctx.Controller = state
+	requestJoypadInterruptIfNeeded(previous)
+}
+
+func requestJoypadInterruptIfNeeded(previous uint8) {
+	// JOYPAD interrupt fires when any selected P1 input bit transitions from
+	// high to low. The selected lines are already reflected by GetOutput().
+	if previous&^GetOutput()&0x0F != 0 {
+		cpu.CpuRequestInterrupt(cpu.IT_JOYPAD)
+	}
 }
 
 func GetOutput() uint8 {
