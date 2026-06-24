@@ -3,7 +3,6 @@
 package main
 
 import (
-	"app/internal/input"
 	"app/internal/logger"
 	"app/internal/memory"
 	"app/internal/ui"
@@ -156,29 +155,9 @@ func platformMain() {
 			return nil
 		}
 
-		st := input.GetState()
-		if st == nil {
-			js.Global().Get("console").Call("warn", "emuInput: input state not initialized")
-			return nil
-		}
-
 		switch btn {
-		case "up":
-			st.Up = pressed
-		case "down":
-			st.Down = pressed
-		case "left":
-			st.Left = pressed
-		case "right":
-			st.Right = pressed
-		case "a":
-			st.A = pressed
-		case "b":
-			st.B = pressed
-		case "start":
-			st.Start = pressed
-		case "select":
-			st.Select = pressed
+		case "up", "down", "left", "right", "a", "b", "start", "select":
+			ui.SetWASMInput(btn, pressed)
 		default:
 			js.Global().Get("console").Call("warn", "emuInput: unknown button", btn)
 		}
@@ -218,29 +197,9 @@ func platformMain() {
 			}
 			js.Global().Get("console").Call("log", "emu-input payload:", btn, pressed)
 
-			st := input.GetState()
-			if st == nil {
-				js.Global().Get("console").Call("warn", "postMessage: input state not initialized")
-				return nil
-			}
-
 			switch btn {
-			case "up":
-				st.Up = pressed
-			case "down":
-				st.Down = pressed
-			case "left":
-				st.Left = pressed
-			case "right":
-				st.Right = pressed
-			case "a":
-				st.A = pressed
-			case "b":
-				st.B = pressed
-			case "start":
-				st.Start = pressed
-			case "select":
-				st.Select = pressed
+			case "up", "down", "left", "right", "a", "b", "start", "select":
+				ui.SetWASMInput(btn, pressed)
 			default:
 				js.Global().Get("console").Call("warn", "message handler: unknown button", btn)
 			}
