@@ -26,8 +26,11 @@ roms/
 .idea/
 
 # Build artifacts
+gomulator
+gomulator-debug
 gomulator.exe
 gomulator.wasm
 gomulator-wasm.zip
 wasm_exec.js
 test_output*.txt
+dist/

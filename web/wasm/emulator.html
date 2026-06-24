@@ -1,0 +1,154 @@
+<style>
+  .emulator-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    text-align: center;
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  #gameCanvas,
+  #canvasContainer canvas {
+    border: 2px solid #333;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: min(100%, 640px) !important;
+    height: auto !important;
+    max-width: 100%;
+    background: #000 !important;
+    display: block;
+    margin: 0 auto;
+  }
+  .rom-upload {
+    margin: 2rem 0;
+    padding: 1rem;
+    border: 2px dashed #888;
+    border-radius: 8px;
+  }
+  #romInput {
+    display: none;
+  }
+  .upload-btn {
+    padding: 0.5rem 1rem;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .upload-btn:hover {
+    background: #45a049;
+  }
+  .info-box {
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+    text-align: left;
+  }
+</style>
+
+<div class="emulator-container">
+  <div class="rom-upload">
+    <h3>Load ROM File</h3>
+    <p>Select a Game Boy ROM file (.gb or .gbc) to start playing</p>
+    <input type="file" id="romInput" accept=".gb,.gbc" />
+    <button class="upload-btn" type="button" onclick="document.getElementById('romInput').click()">
+      Choose ROM File
+    </button>
+    <p id="romStatus">Loading emulator...</p>
+  </div>
+
+  <div id="canvasContainer" style="display: none;">
+    <canvas id="gameCanvas" width="640" height="576"></canvas>
+  </div>
+</div>
+
+<script src="./wasm_exec.js"></script>
+<script>
+  (function () {
+    const go = new Go();
+    let wasmReady = false;
+    let runningRomName = "";
+    const statusEl = document.getElementById("romStatus");
+    const romInput = document.getElementById("romInput");
+    const canvasContainer = document.getElementById("canvasContainer");
+
+    function setStatus(message, color) {
+      statusEl.textContent = message;
+      statusEl.style.color = color || "";
+    }
+
+    function mountEbitenCanvas(attemptsLeft) {
+      const canvas = Array.from(document.querySelectorAll("canvas"))
+        .find((candidate) => !canvasContainer.contains(candidate));
+
+      if (!canvas) {
+        if (attemptsLeft > 0) {
+          window.setTimeout(() => mountEbitenCanvas(attemptsLeft - 1), 50);
+        }
+        return;
+      }
+
+      const placeholder = document.getElementById("gameCanvas");
+      if (placeholder && placeholder !== canvas) {
+        placeholder.remove();
+      }
+
+      canvas.id = "gameCanvas";
+      canvasContainer.appendChild(canvas);
+      canvasContainer.style.display = "block";
+      canvas.focus();
+    }
+
+    async function instantiateWasm(url, importObject) {
+      if (WebAssembly.instantiateStreaming) {
+        try {
+          return await WebAssembly.instantiateStreaming(fetch(url), importObject);
+        } catch (error) {
+          console.warn("instantiateStreaming failed; retrying with arrayBuffer", error);
+        }
+      }
+
+      const response = await fetch(url);
+      const bytes = await response.arrayBuffer();
+      return WebAssembly.instantiate(bytes, importObject);
+    }
+
+    instantiateWasm("./gomulator.wasm", go.importObject)
+      .then((result) => {
+        wasmReady = true;
+        go.run(result.instance);
+        setStatus("Emulator ready - choose a ROM file", "green");
+      })
+      .catch((error) => {
+        console.error("Failed to load emulator:", error);
+        setStatus("Error: failed to load emulator", "red");
+      });
+
+    romInput.addEventListener("change", async function (event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!wasmReady || !window.startEmulatorWithROM) {
+        setStatus("Error: emulator not ready", "red");
+        return;
+      }
+
+      try {
+        if (runningRomName && window.stopEmulator) {
+          window.stopEmulator();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        const romData = new Uint8Array(await file.arrayBuffer());
+        window.startEmulatorWithROM(romData, "auto");
+        runningRomName = file.name;
+        mountEbitenCanvas(40);
+        setStatus(`Loaded: ${file.name}`, "green");
+      } catch (error) {
+        console.error("Failed to read ROM file:", error);
+        setStatus("Error: failed to read ROM file", "red");
+      }
+    });
+  })();
+</script>

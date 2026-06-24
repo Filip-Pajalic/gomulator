@@ -4,44 +4,39 @@
 .PHONY: all
 all: native wasm
 
-# Build native Windows executable (release)
+# Build native executable for the current platform (release)
 .PHONY: native
 native:
-	@echo Building native Windows executable (release)...
-	@set GOOS=& set GOARCH=& go build -o gomulator.exe ./cmd
-	@echo Native build complete: gomulator.exe
+	@echo Building native executable (release)...
+	@go build -o gomulator ./cmd
+	@echo Native build complete: gomulator
 
-# Build native Windows executable (debug mode)
+# Build native executable for the current platform (debug mode)
 .PHONY: debug
 debug:
-	@echo Building native Windows executable (debug mode)...
-	@set GOOS=& set GOARCH=& go build -tags debug -o gomulator-debug.exe ./cmd
-	@echo Debug build complete: gomulator-debug.exe
+	@echo Building native executable (debug mode)...
+	@go build -tags debug -o gomulator-debug ./cmd
+	@echo Debug build complete: gomulator-debug
 
-# Build WASM version with package
+# Build WASM version and static test page package
 .PHONY: wasm
 wasm:
-	@echo Building WASM package...
-	@set GOOS=js& set GOARCH=wasm& go build -ldflags="-s -w" -o gomulator.wasm ./cmd
-	@echo WASM build complete: gomulator.wasm
 	@bash build-wasm.sh
 
 # Clean build artifacts
 .PHONY: clean
 clean:
 	@echo Cleaning build artifacts...
-	@if exist gomulator.exe del gomulator.exe
-	@if exist gomulator-debug.exe del gomulator-debug.exe
-	@if exist gomulator.wasm del gomulator.wasm
-	@if exist gomulator-wasm.zip del gomulator-wasm.zip
-	@if exist wasm_exec.js del wasm_exec.js
+	@rm -f gomulator gomulator-debug gomulator.exe gomulator-debug.exe
+	@rm -f gomulator.wasm gomulator-wasm.zip wasm_exec.js
+	@rm -rf dist/wasm
 	@echo Clean complete
 
 # Run native version (requires ROM file path)
 .PHONY: run
 run: native
-	@echo Usage: gomulator.exe path\to\rom.gb
-	@echo Example: gomulator.exe myrom.gb
+	@echo Usage: ./gomulator path/to/rom.gb
+	@echo Example: ./gomulator myrom.gb
 
 # Run GB test ROMs
 .PHONY: test
@@ -56,9 +51,9 @@ help:
 	@echo.
 	@echo Available targets:
 	@echo   all     - Build both native and WASM versions (default)
-	@echo   native  - Build native Windows executable (release mode)
-	@echo   debug   - Build native Windows executable (debug mode with DbgPrint)
-	@echo   wasm    - Build WASM version and create deployment package (zip)
+	@echo   native  - Build native executable (release mode)
+	@echo   debug   - Build native executable (debug mode with DbgPrint)
+	@echo   wasm    - Build WASM version and static test page in dist/wasm
 	@echo   test    - Run GB test ROM suite (requires bash)
 	@echo   clean   - Remove build artifacts
 	@echo   run     - Show usage for running emulator

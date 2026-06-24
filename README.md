@@ -14,20 +14,27 @@ make native
 
 ```bash
 make wasm
-# Deploy gomulator-wasm.zip to your web server
-# Or use any HTTP server to serve the files locally
+python3 -m http.server 8080 --directory dist/wasm
+# Open http://localhost:8080/
 ```
 
 ## Build Commands
 
 ```bash
 make all      # Build native and WASM
-make native   # Build Windows executable
+make native   # Build native executable
 make debug    # Build with CPU instruction tracing
-make wasm     # Build WASM package (auto-downloads wasm_exec.js)
+make wasm     # Build WASM package with a local test page
 make test     # Run GB test ROM suite
 make clean    # Remove build artifacts
 ```
+
+`make wasm` writes a self-contained browser package to `dist/wasm/`:
+
+- `index.html` - standalone local test page
+- `emulator.html` - embeddable page fragment matching the GitHub Pages blog layout
+- `gomulator.wasm` - emulator build
+- `wasm_exec.js` - Go WASM runtime copied from the active Go toolchain
 
 ## Command Line Options
 

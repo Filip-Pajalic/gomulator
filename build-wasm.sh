@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIST_DIR="${WASM_DIST_DIR:-"${ROOT_DIR}/dist/wasm"}"
+
+GOROOT="$(go env GOROOT)"
+WASM_EXEC="${GOROOT}/lib/wasm/wasm_exec.js"
+if [[ ! -f "${WASM_EXEC}" ]]; then
+  echo "wasm_exec.js not found at ${WASM_EXEC}" >&2
+  exit 1
+fi
+
+mkdir -p "${DIST_DIR}"
+: "${GOCACHE:="${TMPDIR:-/tmp}/gomulator-go-build-cache"}"
+export GOCACHE
+mkdir -p "${GOCACHE}"
+
+echo "Building gomulator.wasm..."
+(
+  cd "${ROOT_DIR}"
+  GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o "${DIST_DIR}/gomulator.wasm" ./cmd
+)
+
+cp "${WASM_EXEC}" "${DIST_DIR}/wasm_exec.js"
+cp "${ROOT_DIR}/index.html" "${DIST_DIR}/index.html"
+cp "${ROOT_DIR}/web/wasm/emulator.html" "${DIST_DIR}/emulator.html"
+
+if command -v zip >/dev/null 2>&1; then
+  (
+    cd "${DIST_DIR}"
+    zip -qr "${ROOT_DIR}/gomulator-wasm.zip" index.html emulator.html wasm_exec.js gomulator.wasm
+  )
+fi
+
+cat <<EOF
+WASM package ready:
+  ${DIST_DIR}/index.html
+  ${DIST_DIR}/emulator.html
+  ${DIST_DIR}/gomulator.wasm
+  ${DIST_DIR}/wasm_exec.js
+
+Serve it locally with:
+  python3 -m http.server 8080 --directory ${DIST_DIR}
+
+Then open:
+  http://localhost:8080/
+EOF
