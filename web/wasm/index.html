@@ -468,10 +468,18 @@
 
     function sendInput(button, pressedState) {
       if (!iframe?.contentWindow) return;
-      iframe.contentWindow.postMessage(
-        { type: "emu-input", button, pressed: pressedState },
-        "*"
-      );
+      const target = iframe.contentWindow;
+
+      try {
+        if (typeof target.emuInput === "function") {
+          target.emuInput(button, pressedState);
+          return;
+        }
+      } catch {
+        // Cross-origin embeds cannot directly access iframe functions.
+      }
+
+      target.postMessage({ type: "emu-input", button, pressed: pressedState }, "*");
     }
 
     statusBarEl?.addEventListener("click", () => {

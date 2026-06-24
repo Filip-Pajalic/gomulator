@@ -33,6 +33,11 @@ func SetWASMInput(button string, pressed bool) {
 	}
 }
 
+// ResetWASMInput clears host-page input state between ROM loads.
+func ResetWASMInput() {
+	wasmJSInput = input.State{}
+}
+
 // handleInputPlatform handles platform-specific input logic for WASM
 func handleInputPlatform(state *input.State) {
 	// JS host-page controls and iframe keyboard are separate input sources.

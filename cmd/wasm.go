@@ -97,6 +97,16 @@ func platformInit() {
 	js.Global().Get("console").Call("log", "🔧 Go platformInit called - WASM is running!")
 }
 
+func applyWASMInput(btn string, pressed bool) bool {
+	switch btn {
+	case "up", "down", "left", "right", "a", "b", "start", "select":
+		ui.SetWASMInput(btn, pressed)
+		return true
+	default:
+		return false
+	}
+}
+
 func platformMain() {
 	logger.Info("Waiting for ROM from JavaScript...")
 	memory.SetSaveStore(wasmLocalStorageSaveStore{})
@@ -149,16 +159,7 @@ func platformMain() {
 		btn := args[0].String()
 		pressed := args[1].Bool()
 
-		// Safety check: only process input if emulator is running
-		if currentEmu == nil || !currentEmu.Running {
-			js.Global().Get("console").Call("warn", "emuInput: emulator not running, ignoring input")
-			return nil
-		}
-
-		switch btn {
-		case "up", "down", "left", "right", "a", "b", "start", "select":
-			ui.SetWASMInput(btn, pressed)
-		default:
+		if !applyWASMInput(btn, pressed) {
 			js.Global().Get("console").Call("warn", "emuInput: unknown button", btn)
 		}
 
@@ -184,23 +185,13 @@ func platformMain() {
 			return nil
 		}
 		if data.Get("type").String() == "emu-input" {
-			// Safety check: only process input if emulator is running
-			if currentEmu == nil || !currentEmu.Running {
-				js.Global().Get("console").Call("warn", "postMessage: emulator not running, ignoring input")
-				return nil
-			}
-
 			btn := data.Get("button").String()
 			pressed := false
 			if p := data.Get("pressed"); !p.IsUndefined() {
 				pressed = p.Bool()
 			}
-			js.Global().Get("console").Call("log", "emu-input payload:", btn, pressed)
 
-			switch btn {
-			case "up", "down", "left", "right", "a", "b", "start", "select":
-				ui.SetWASMInput(btn, pressed)
-			default:
+			if !applyWASMInput(btn, pressed) {
 				js.Global().Get("console").Call("warn", "message handler: unknown button", btn)
 			}
 		}
@@ -228,6 +219,7 @@ func platformMain() {
 		romConfig := <-romStartCh
 		logger.Info("Starting emulator from enqueued ROM (%d bytes)", len(romConfig.ROMBytes))
 		js.Global().Get("console").Call("log", "🎮 ROM received, size:", len(romConfig.ROMBytes))
+		ui.ResetWASMInput()
 
 		// Set the DMG color palette type before starting the emulator
 		// Default to "auto" if not specified (enables GBC colorization for DMG games)
@@ -247,6 +239,7 @@ func platformMain() {
 		// Run the UI (blocks until the emulator stops)
 		ui.UiInit(emuInstance, false)
 		memory.FlushSave()
+		ui.ResetWASMInput()
 		logger.Info("UiInit returned; emulator stopped or exited")
 		currentEmu = nil
 	}
