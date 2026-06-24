@@ -5,7 +5,12 @@ package main
 import (
 	"app/internal/input"
 	"app/internal/logger"
+	"app/internal/memory"
 	"app/internal/ui"
+	"encoding/base64"
+	"fmt"
+	"hash/crc32"
+	"strings"
 	"syscall/js"
 )
 
@@ -17,6 +22,72 @@ var currentEmu *ui.EmuContext
 type ROMStartConfig struct {
 	ROMBytes  []byte
 	ColorMode string // "auto", "green", "grayscale", "brown", "red", "blue", or "" for default
+	SaveKey   string
+}
+
+type wasmLocalStorageSaveStore struct{}
+
+func (wasmLocalStorageSaveStore) Load(key string) ([]byte, error) {
+	storage := js.Global().Get("localStorage")
+	if storage.IsUndefined() || storage.IsNull() {
+		return nil, nil
+	}
+
+	value := storage.Call("getItem", key)
+	if value.IsUndefined() || value.IsNull() {
+		return nil, nil
+	}
+
+	return base64.StdEncoding.DecodeString(value.String())
+}
+
+func (wasmLocalStorageSaveStore) Save(key string, data []byte) error {
+	storage := js.Global().Get("localStorage")
+	if storage.IsUndefined() || storage.IsNull() {
+		return nil
+	}
+
+	storage.Call("setItem", key, base64.StdEncoding.EncodeToString(data))
+	return nil
+}
+
+func wasmSaveKey(fileName string, romBytes []byte) string {
+	return fmt.Sprintf(
+		"gomulator-save:%s:%08x",
+		sanitizeSaveName(fileName),
+		crc32.ChecksumIEEE(romBytes),
+	)
+}
+
+func sanitizeSaveName(fileName string) string {
+	fileName = strings.TrimSpace(fileName)
+	if fileName == "" {
+		return "rom"
+	}
+
+	var b strings.Builder
+	for _, r := range fileName {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '.', r == '-', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+		if b.Len() >= 120 {
+			break
+		}
+	}
+
+	if b.Len() == 0 {
+		return "rom"
+	}
+	return b.String()
 }
 
 func platformInit() {
@@ -29,6 +100,8 @@ func platformInit() {
 
 func platformMain() {
 	logger.Info("Waiting for ROM from JavaScript...")
+	memory.SetSaveStore(wasmLocalStorageSaveStore{})
+
 	// Channel used to send ROM configuration to the main goroutine so UiInit runs
 	// on the main thread (required by some windowing/JS interactions).
 	romStartCh := make(chan ROMStartConfig, 1)
@@ -51,10 +124,16 @@ func platformMain() {
 			logger.Info("ROM: Color mode specified from JS: %s", colorMode)
 		}
 
+		fileName := "rom"
+		if len(args) >= 3 && !args[2].IsUndefined() && !args[2].IsNull() {
+			fileName = args[2].String()
+		}
+		saveKey := wasmSaveKey(fileName, romBytes)
+
 		logger.Info("ROM received from JS (%d bytes), enqueuing for start...", len(romBytes))
 		// Enqueue the ROM configuration for the main goroutine to pick up and start the UI
 		select {
-		case romStartCh <- ROMStartConfig{ROMBytes: romBytes, ColorMode: colorMode}:
+		case romStartCh <- ROMStartConfig{ROMBytes: romBytes, ColorMode: colorMode, SaveKey: saveKey}:
 		default:
 			// If channel already has a pending startup, drop or log
 			logger.Warn("startEmulatorWithROM: previous ROM start pending, ignoring new request")
@@ -108,6 +187,12 @@ func platformMain() {
 	})
 	// Keep reference in global so it won't be garbage collected
 	js.Global().Set("emuInput", emuInput)
+
+	flushSave := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		memory.FlushSave()
+		return true
+	})
+	js.Global().Set("flushSave", flushSave)
 
 	// Also listen for postMessage events (host can postMessage {type: 'emu-input', button, pressed})
 	msgHandler := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
@@ -169,6 +254,7 @@ func platformMain() {
 	stopEmulator := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		if currentEmu != nil && currentEmu.Running {
 			logger.Info("stopEmulator called from JS - stopping emulator")
+			memory.FlushSave()
 			currentEmu.Running = false
 			return true
 		}
@@ -194,13 +280,14 @@ func platformMain() {
 		logger.Info("Set color mode to: %s", colorMode)
 		js.Global().Get("console").Call("log", "🎨 Color mode set to:", colorMode)
 
-		emuInstance := ui.StartEmulatorFromBytes(romConfig.ROMBytes)
+		emuInstance := ui.StartEmulatorFromBytesWithSaveKey(romConfig.ROMBytes, romConfig.SaveKey)
 		js.Global().Get("console").Call("log", "✅ Emulator instance created")
 
 		// Save the current emu instance for debug reads
 		currentEmu = emuInstance
 		// Run the UI (blocks until the emulator stops)
 		ui.UiInit(emuInstance, false)
+		memory.FlushSave()
 		logger.Info("UiInit returned; emulator stopped or exited")
 		currentEmu = nil
 	}

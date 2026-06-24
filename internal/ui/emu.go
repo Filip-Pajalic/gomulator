@@ -215,9 +215,15 @@ func StartEmulator(romFile string) *EmuContext {
 
 // StartEmulatorFromBytes initializes the emulator from a ROM byte slice (for WASM/JS)
 func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
+	return StartEmulatorFromBytesWithSaveKey(romBytes, "")
+}
+
+// StartEmulatorFromBytesWithSaveKey initializes the emulator from a ROM byte
+// slice and uses saveKey for battery-backed cartridge RAM.
+func StartEmulatorFromBytesWithSaveKey(romBytes []byte, saveKey string) *EmuContext {
 	cartContext := memory.CartCtx()
 	cpu.ResetDebugTestResult()
-	cartContext.LoadROMFromBytes(romBytes)
+	cartContext.LoadROMFromBytesWithSaveKey(romBytes, saveKey)
 
 	// Continue initializing other components
 	timerContext := cpu.TimerCtx()

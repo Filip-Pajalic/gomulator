@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 	"unsafe"
 
 	logger "app/internal/logger"
@@ -16,6 +18,7 @@ type Cartridge interface {
 	CartRead(address uint16) byte
 	CartWrite(address uint16, data byte)
 	CartLoad(cart string) bool
+	FlushSave()
 }
 
 // CartContext holds the state and data of the cartridge
@@ -31,6 +34,10 @@ type CartContext struct {
 	ramEnabled bool   // RAM enable flag
 	bankMode   int    // Banking mode (0=ROM, 1=RAM)
 	cgbFlag    byte   // GBC compatibility flag (0x00=DMG, 0x80=GBC compatible, 0xC0=GBC only)
+
+	mbc2RAM   []byte
+	saveKey   string
+	saveDirty bool
 }
 
 // romHeader represents the header structure of a Game Boy ROM
@@ -156,6 +163,47 @@ var LIC_CODE = map[int][]byte{
 
 var cartInstance *CartContext
 
+// SaveStore persists battery-backed cartridge RAM.
+type SaveStore interface {
+	Load(key string) ([]byte, error)
+	Save(key string, data []byte) error
+}
+
+type fileSaveStore struct{}
+
+func (fileSaveStore) Load(key string) ([]byte, error) {
+	data, err := os.ReadFile(key)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	return data, err
+}
+
+func (fileSaveStore) Save(key string, data []byte) error {
+	if dir := filepath.Dir(key); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(key, data, 0644)
+}
+
+var saveStore SaveStore = fileSaveStore{}
+
+// SetSaveStore changes the battery save backend and returns the previous one.
+func SetSaveStore(store SaveStore) SaveStore {
+	previous := saveStore
+	saveStore = store
+	return previous
+}
+
+// FlushSave flushes the singleton cartridge save data, if dirty.
+func FlushSave() {
+	if cartInstance != nil {
+		cartInstance.FlushSave()
+	}
+}
+
 // CartCtx returns the singleton CartContext
 func CartCtx() *CartContext {
 	if cartInstance == nil {
@@ -175,6 +223,9 @@ func (c *CartContext) resetBankingState() {
 	c.ramBank = 0
 	c.ramEnabled = false
 	c.bankMode = 0
+	c.ramData = nil
+	c.mbc2RAM = nil
+	c.saveDirty = false
 }
 
 const headerOffset = 0x100
@@ -193,6 +244,40 @@ func (c *CartContext) cartTypeName() []byte {
 		return ROM_TYPES[c.header.CartType]
 	}
 	return nil
+}
+
+func (c *CartContext) cartType() byte {
+	if c.header == nil {
+		return 0x00
+	}
+	return c.header.CartType
+}
+
+func (c *CartContext) isMBC1() bool {
+	switch c.cartType() {
+	case 0x01, 0x02, 0x03:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *CartContext) isMBC2() bool {
+	switch c.cartType() {
+	case 0x05, 0x06:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *CartContext) hasBattery() bool {
+	switch c.cartType() {
+	case 0x03, 0x06, 0x09, 0x0D, 0x0F, 0x10, 0x13, 0x1B, 0x1E, 0x22:
+		return true
+	default:
+		return false
+	}
 }
 
 // cgbModeName returns the CGB mode name based on the CGB flag
@@ -256,7 +341,7 @@ func (c *CartContext) checkSumChecker(checksum byte) string {
 	return result
 }
 
-func (c *CartContext) loadCart(romName string) {
+func (c *CartContext) loadCart(romName string, saveKey string) {
 	data, err := os.ReadFile(romName)
 	slog.Info("Loading ROM file:", slog.String("filename", romName))
 	if err != nil {
@@ -267,6 +352,7 @@ func (c *CartContext) loadCart(romName string) {
 
 	c.romData = data
 	c.resetBankingState()
+	c.saveKey = saveKey
 
 	if len(c.romData) == 0 {
 		logger.Fatal("ROM file is empty.")
@@ -314,9 +400,17 @@ func (c *CartContext) loadCart(romName string) {
 	logger.Info("ROM data length: %d bytes", len(c.romData))
 
 	c.initializeRAM()
+	c.loadBatteryBackedRAM()
 }
 
 func (c *CartContext) initializeRAM() {
+	if c.isMBC2() {
+		c.ramData = nil
+		c.mbc2RAM = make([]byte, 512)
+		logger.Info("Initialized 512 x 4-bit internal MBC2 RAM")
+		return
+	}
+
 	ramSizes := map[byte]int{
 		0x00: 0,      // No RAM
 		0x01: 2048,   // 2KB
@@ -341,6 +435,51 @@ func (c *CartContext) initializeRAM() {
 	}
 }
 
+func saveKeyForROMPath(romPath string) string {
+	ext := filepath.Ext(romPath)
+	if ext == "" {
+		return romPath + ".sav"
+	}
+	return strings.TrimSuffix(romPath, ext) + ".sav"
+}
+
+func (c *CartContext) loadBatteryBackedRAM() {
+	if !c.isMBC2() || !c.hasBattery() || c.saveKey == "" || saveStore == nil || len(c.mbc2RAM) == 0 {
+		return
+	}
+
+	data, err := saveStore.Load(c.saveKey)
+	if err != nil {
+		logger.Warn("Failed to load MBC2 battery save %q: %v", c.saveKey, err)
+		return
+	}
+	if len(data) == 0 {
+		return
+	}
+
+	n := len(data)
+	if n > len(c.mbc2RAM) {
+		n = len(c.mbc2RAM)
+	}
+	copy(c.mbc2RAM, data[:n])
+	logger.Info("Loaded MBC2 battery save: %s (%d bytes)", c.saveKey, n)
+}
+
+// FlushSave persists dirty battery-backed cartridge RAM.
+func (c *CartContext) FlushSave() {
+	if c == nil || !c.saveDirty || !c.isMBC2() || !c.hasBattery() || c.saveKey == "" || saveStore == nil || len(c.mbc2RAM) == 0 {
+		return
+	}
+
+	data := append([]byte(nil), c.mbc2RAM...)
+	if err := saveStore.Save(c.saveKey, data); err != nil {
+		logger.Warn("Failed to save MBC2 battery RAM %q: %v", c.saveKey, err)
+		return
+	}
+	c.saveDirty = false
+	logger.Info("Saved MBC2 battery RAM: %s (%d bytes)", c.saveKey, len(data))
+}
+
 // ProgramLoad loads a program into memory by writing to the bus
 func (c *CartContext) ProgramLoad(program [][2]uint) {
 	for _, v := range program {
@@ -353,15 +492,27 @@ func (c *CartContext) ProgramLoad(program [][2]uint) {
 
 // CartLoad loads a cartridge from a file and initializes event processing
 func (c *CartContext) CartLoad(cart string) bool {
+	return c.CartLoadWithSaveKey(cart, saveKeyForROMPath(cart))
+}
+
+// CartLoadWithSaveKey loads a cartridge from a file using the provided battery-save key.
+func (c *CartContext) CartLoadWithSaveKey(cart string, saveKey string) bool {
 	copy(c.filename[:], cart)
-	c.loadCart(cart)
+	c.loadCart(cart, saveKey)
 	return true
 }
 
 // LoadROMFromBytes loads a ROM directly from a byte slice (for WASM/JS)
 func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
+	return c.LoadROMFromBytesWithSaveKey(romBytes, "")
+}
+
+// LoadROMFromBytesWithSaveKey loads a ROM directly from a byte slice and uses
+// saveKey for battery-backed RAM persistence.
+func (c *CartContext) LoadROMFromBytesWithSaveKey(romBytes []byte, saveKey string) bool {
 	c.romData = append([]byte(nil), romBytes...)
 	c.resetBankingState()
+	c.saveKey = saveKey
 	if len(c.romData) == 0 {
 		logger.Fatal("ROM data is empty.")
 		return false
@@ -400,6 +551,7 @@ func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	logger.Info("CGB Flag : %02X (%s)", c.cgbFlag, c.cgbModeName())
 	logger.Info("ROM data length: %d bytes", len(c.romData))
 	c.initializeRAM()
+	c.loadBatteryBackedRAM()
 	return true
 }
 
@@ -434,6 +586,17 @@ func (c *CartContext) updateSelectedROMBank() {
 }
 
 func (c *CartContext) CartWrite(address uint16, data byte) {
+	switch {
+	case c.isMBC2():
+		c.cartWriteMBC2(address, data)
+	case c.isMBC1():
+		c.cartWriteMBC1(address, data)
+	default:
+		c.cartWriteROMOnly(address, data)
+	}
+}
+
+func (c *CartContext) cartWriteMBC1(address uint16, data byte) {
 	switch {
 	case address < 0x2000:
 		// RAM Enable (0x0000-0x1FFF)
@@ -487,6 +650,17 @@ func (c *CartContext) CartWrite(address uint16, data byte) {
 
 func (c *CartContext) CartRead(address uint16) byte {
 	switch {
+	case c.isMBC2():
+		return c.cartReadMBC2(address)
+	case c.isMBC1():
+		return c.cartReadMBC1(address)
+	default:
+		return c.cartReadROMOnly(address)
+	}
+}
+
+func (c *CartContext) cartReadMBC1(address uint16) byte {
+	switch {
 	case address < 0x4000:
 		// ROM Bank 0 (0x0000-0x3FFF) - always reads from bank 0
 		if int(address) < len(c.romData) {
@@ -517,6 +691,111 @@ func (c *CartContext) CartRead(address uint16) byte {
 			}
 		}
 		logger.Debug("MBC1: RAM read from disabled/invalid RAM, address %04X", address)
+		return 0xFF
+
+	default:
+		logger.Warn("Cart read from invalid address %04X", address)
+		return 0xFF
+	}
+}
+
+func (c *CartContext) cartWriteMBC2(address uint16, data byte) {
+	switch {
+	case address < 0x4000:
+		if address&0x0100 == 0 {
+			c.ramEnabled = data&0x0F == 0x0A
+			logger.Debug("MBC2: RAM %s", map[bool]string{true: "enabled", false: "disabled"}[c.ramEnabled])
+			return
+		}
+
+		bank := int(data & 0x0F)
+		if bank == 0 {
+			bank = 1
+		}
+		c.romBank = c.normalizeROMBank(bank)
+		logger.Debug("MBC2: ROM bank set to %d", c.romBank)
+
+	case address < 0x8000:
+		// MBC2 has no registers in 0x4000-0x7FFF.
+		logger.Debug("MBC2: ignoring write to %04X = %02X", address, data)
+
+	case address >= 0xA000 && address < 0xC000:
+		if !c.ramEnabled || len(c.mbc2RAM) == 0 {
+			logger.Debug("MBC2: RAM write ignored (RAM disabled or not present)")
+			return
+		}
+
+		c.mbc2RAM[int(address&0x01FF)] = data & 0x0F
+		if c.hasBattery() {
+			c.saveDirty = true
+		}
+		logger.Debug("MBC2: RAM write %02X to address %04X", data&0x0F, address)
+
+	default:
+		logger.Warn("Cart write to invalid address %04X = %02X", address, data)
+	}
+}
+
+func (c *CartContext) cartReadMBC2(address uint16) byte {
+	switch {
+	case address < 0x4000:
+		if int(address) < len(c.romData) {
+			return c.romData[address]
+		}
+		return 0xFF
+
+	case address < 0x8000:
+		bankOffset := c.romBank * 0x4000
+		romAddr := bankOffset + int(address-0x4000)
+		if romAddr < len(c.romData) {
+			return c.romData[romAddr]
+		}
+		logger.Debug("MBC2: ROM read beyond data, bank %d, address %04X", c.romBank, address)
+		return 0xFF
+
+	case address >= 0xA000 && address < 0xC000:
+		if c.ramEnabled && len(c.mbc2RAM) > 0 {
+			return 0xF0 | (c.mbc2RAM[int(address&0x01FF)] & 0x0F)
+		}
+		logger.Debug("MBC2: RAM read from disabled/invalid RAM, address %04X", address)
+		return 0xFF
+
+	default:
+		logger.Warn("Cart read from invalid address %04X", address)
+		return 0xFF
+	}
+}
+
+func (c *CartContext) cartWriteROMOnly(address uint16, data byte) {
+	if address >= 0xA000 && address < 0xC000 && len(c.ramData) > 0 {
+		ramAddr := int(address - 0xA000)
+		if ramAddr < len(c.ramData) {
+			c.ramData[ramAddr] = data
+		}
+		return
+	}
+
+	if address < 0x8000 {
+		logger.Debug("ROM-only cart ignored write to %04X = %02X", address, data)
+		return
+	}
+
+	logger.Warn("Cart write to invalid address %04X = %02X", address, data)
+}
+
+func (c *CartContext) cartReadROMOnly(address uint16) byte {
+	switch {
+	case address < 0x8000:
+		if int(address) < len(c.romData) {
+			return c.romData[address]
+		}
+		return 0xFF
+
+	case address >= 0xA000 && address < 0xC000:
+		ramAddr := int(address - 0xA000)
+		if len(c.ramData) > 0 && ramAddr < len(c.ramData) {
+			return c.ramData[ramAddr]
+		}
 		return 0xFF
 
 	default:

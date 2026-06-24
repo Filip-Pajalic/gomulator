@@ -205,6 +205,10 @@ func convertColor(value uint32) color.RGBA {
 
 // UiInit initializes the UI and starts the game loop
 func UiInit(emuInstance *EmuContext, showFPS bool) {
+	if emuInstance != nil && emuInstance.CartCtx != nil {
+		defer emuInstance.CartCtx.FlushSave()
+	}
+
 	game := NewGame(emuInstance)
 	game.showDebugInfo = showFPS // Set initial FPS display state
 

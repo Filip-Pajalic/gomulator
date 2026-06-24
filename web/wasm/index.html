@@ -544,6 +544,11 @@
 
     resizeEmulatorBox();
     window.addEventListener("resize", resizeEmulatorBox);
+    window.addEventListener("beforeunload", () => {
+      if (typeof iframe?.contentWindow?.flushSave === "function") {
+        iframe.contentWindow.flushSave();
+      }
+    });
     if (window.ResizeObserver && emulatorContainer) {
       new ResizeObserver(resizeEmulatorBox).observe(emulatorContainer);
     }
