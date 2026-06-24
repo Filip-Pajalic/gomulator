@@ -149,6 +149,13 @@ func (c *CpuContext) Execute() {
 
 // This should probably not call the emulator
 func (c *CpuContext) Step() bool {
+	// Debug hook (only active when built with -tags debug). Run this before
+	// stopped/halted handling too, so serial test output can still be consumed
+	// if a ROM prints a result and then enters HALT or STOP.
+	if !stepDebugHook() {
+		return false
+	}
+
 	if c.Stopped {
 		return false
 	}
@@ -161,11 +168,6 @@ func (c *CpuContext) Step() bool {
 		if c.currentInst == nil {
 			logger.Warn("Unknown instruction! %02X\n", c.CurOpCode)
 			os.Exit(1)
-		}
-
-		// Debug hook (only active when built with -tags debug)
-		if !stepDebugHook() {
-			return false
 		}
 
 		c.Execute()
