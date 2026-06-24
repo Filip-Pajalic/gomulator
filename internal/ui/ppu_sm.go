@@ -11,10 +11,13 @@ func (p *PpuContext) IncrementLY() {
 	windowOnScreen := LcdCtx().WinX < 167
 
 	switch {
-	case !windowEnabled || !windowOnScreen:
+	case !windowEnabled:
 		p.WindowLine = 0
 	case currentLy < LcdCtx().WinY:
 		p.WindowLine = 0
+	case !windowOnScreen:
+		// Moving WX offscreen hides the window without resetting its internal line
+		// counter. dmg-acid2 relies on this when it resumes the window for the chin.
 	case currentLy < YRES:
 		if currentLy == LcdCtx().WinY && p.WindowLine != 0 {
 			p.WindowLine = 0
