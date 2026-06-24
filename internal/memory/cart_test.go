@@ -41,18 +41,28 @@ func TestMBC1ROMBankSelectionWrapsToAvailableBanks(t *testing.T) {
 
 	cart := &CartContext{romData: rom, romBank: 1}
 
+	cart.CartWrite(0x2000, 0x00)
+	if got := cart.CartRead(0x4000); got != 0xA1 {
+		t.Fatalf("bank 0 read = %02X, want A1", got)
+	}
+
 	cart.CartWrite(0x2000, 0x02)
 	if got := cart.CartRead(0x4000); got != 0xA2 {
 		t.Fatalf("bank 2 read = %02X, want A2", got)
 	}
 
 	cart.CartWrite(0x2000, 0x04)
-	if got := cart.CartRead(0x4000); got != 0xA1 {
-		t.Fatalf("out-of-range bank 4 read = %02X, want A1", got)
+	if got := cart.CartRead(0x4000); got != 0xA0 {
+		t.Fatalf("masked bank 4 read = %02X, want A0", got)
 	}
 
 	cart.CartWrite(0x2000, 0x1F)
 	if got := cart.CartRead(0x4000); got != 0xA3 {
-		t.Fatalf("out-of-range bank 31 read = %02X, want A3", got)
+		t.Fatalf("masked bank 31 read = %02X, want A3", got)
+	}
+
+	cart.CartWrite(0x4000, 0x03)
+	if got := cart.CartRead(0x4000); got != 0xA3 {
+		t.Fatalf("secondary bank register should be ignored for 4-bank ROM, got %02X, want A3", got)
 	}
 }

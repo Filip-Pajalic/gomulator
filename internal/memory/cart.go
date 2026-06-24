@@ -26,6 +26,7 @@ type CartContext struct {
 
 	ramData    []byte // External RAM data
 	romBank    int    // Current ROM bank (1-127)
+	romBankLow int    // Raw lower 5-bit MBC1 ROM bank register
 	ramBank    int    // Current RAM bank (0-3)
 	ramEnabled bool   // RAM enable flag
 	bankMode   int    // Banking mode (0=ROM, 1=RAM)
@@ -170,6 +171,7 @@ func CartCtx() *CartContext {
 
 func (c *CartContext) resetBankingState() {
 	c.romBank = 1
+	c.romBankLow = 0
 	c.ramBank = 0
 	c.ramEnabled = false
 	c.bankMode = 0
@@ -407,14 +409,24 @@ func (c *CartContext) romBankCount() int {
 
 func (c *CartContext) normalizeROMBank(bank int) int {
 	banks := c.romBankCount()
-	bank %= banks
-	if bank < 0 {
-		bank += banks
-	}
-	if bank == 0 && banks > 1 {
-		return 1
+	if banks > 0 {
+		bank &= banks - 1
 	}
 	return bank
+}
+
+func (c *CartContext) updateSelectedROMBank() {
+	lower := c.romBankLow & 0x1F
+	if lower == 0 {
+		lower = 1
+	}
+
+	bank := lower
+	if c.romBankCount() > 32 {
+		bank |= (c.ramBank & 0x03) << 5
+	}
+
+	c.romBank = c.normalizeROMBank(bank)
 }
 
 func (c *CartContext) CartWrite(address uint16, data byte) {
@@ -426,35 +438,36 @@ func (c *CartContext) CartWrite(address uint16, data byte) {
 
 	case address < 0x4000:
 		// ROM Bank Number (0x2000-0x3FFF)
-		bank := int(data & 0x1F) // 5 bits for ROM bank
-		if bank == 0 {
-			bank = 1 // Bank 0 maps to bank 1
-		}
-		c.romBank = c.normalizeROMBank((c.romBank & 0x60) | bank)
+		c.romBankLow = int(data & 0x1F) // 5 bits for ROM bank
+		c.updateSelectedROMBank()
 		logger.Debug("MBC1: ROM bank set to %d", c.romBank)
 
 	case address < 0x6000:
 		// RAM Bank Number or Upper ROM Bank (0x4000-0x5FFF)
+		c.ramBank = int(data & 0x03)
 		if c.bankMode == 0 {
 			// ROM banking mode - upper 2 bits of ROM bank
-			upperBits := int(data&0x03) << 5
-			c.romBank = c.normalizeROMBank((c.romBank & 0x1F) | upperBits)
+			c.updateSelectedROMBank()
 			logger.Debug("MBC1: ROM bank upper bits set, new bank: %d", c.romBank)
 		} else {
 			// RAM banking mode - RAM bank number
-			c.ramBank = int(data & 0x03)
 			logger.Debug("MBC1: RAM bank set to %d", c.ramBank)
 		}
 
 	case address < 0x8000:
 		// Banking Mode Select (0x6000-0x7FFF)
 		c.bankMode = int(data & 0x01)
+		c.updateSelectedROMBank()
 		logger.Debug("MBC1: Banking mode set to %d", c.bankMode)
 
 	case address >= 0xA000 && address < 0xC000:
 		// External RAM Write (0xA000-0xBFFF)
 		if c.ramEnabled && len(c.ramData) > 0 {
-			ramAddr := int(address-0xA000) + (c.ramBank * 0x2000)
+			ramBank := 0
+			if c.bankMode == 1 {
+				ramBank = c.ramBank
+			}
+			ramAddr := int(address-0xA000) + (ramBank * 0x2000)
 			if ramAddr < len(c.ramData) {
 				c.ramData[ramAddr] = data
 				logger.Debug("MBC1: RAM write %02X to bank %d, address %04X", data, c.ramBank, address)
@@ -490,7 +503,11 @@ func (c *CartContext) CartRead(address uint16) byte {
 	case address >= 0xA000 && address < 0xC000:
 		// External RAM Read (0xA000-0xBFFF)
 		if c.ramEnabled && len(c.ramData) > 0 {
-			ramAddr := int(address-0xA000) + (c.ramBank * 0x2000)
+			ramBank := 0
+			if c.bankMode == 1 {
+				ramBank = c.ramBank
+			}
+			ramAddr := int(address-0xA000) + (ramBank * 0x2000)
 			if ramAddr < len(c.ramData) {
 				return c.ramData[ramAddr]
 			}
