@@ -736,10 +736,15 @@ func procAdd(ctx *CpuContext) {
 }
 
 func procStop(ctx *CpuContext) {
-	// STOP: Enter low-power mode (not fully emulated here)
-	logger.Debug("STOP instruction encountered; halting CPU")
-	ctx.Halted = true
-	//ctx.Stopped = true
+	if bus := memory.BusCtx(); bus != nil && bus.TrySpeedSwitch() {
+		// On CGB, STOP performs a speed switch when KEY1 bit 0 is armed, then
+		// execution resumes at the following instruction.
+		Cm.IncreaseCycle(2050)
+		return
+	}
+
+	logger.Debug("STOP instruction encountered; stopping CPU")
+	ctx.Stopped = true
 }
 
 func procDaa(ctx *CpuContext) {

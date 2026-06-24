@@ -30,6 +30,10 @@ type IO interface {
 	Write(address uint16, value byte)
 }
 
+type SpeedSwitchIO interface {
+	TrySpeedSwitch() bool
+}
+
 type Ppu interface {
 	OamRead(address uint16) byte
 	OamWrite(address uint16, value byte)
@@ -158,6 +162,19 @@ func (b *Bus) BusWrite(address uint16, data byte) {
 	default:
 		logger.Warn("BusWrite: Invalid address %04X", address)
 	}
+}
+
+func (b *Bus) TrySpeedSwitch() bool {
+	if b == nil || b.io == nil {
+		return false
+	}
+
+	speedSwitchIO, ok := b.io.(SpeedSwitchIO)
+	if !ok {
+		return false
+	}
+
+	return speedSwitchIO.TrySpeedSwitch()
 }
 
 // DmaWriteToOam writes directly to OAM, bypassing CPU access restrictions during DMA

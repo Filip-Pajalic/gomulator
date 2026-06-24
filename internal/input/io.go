@@ -44,6 +44,7 @@ type Io struct {
 	cpu   Cpu
 	timer Timer
 	dma   DMA
+	key1  byte
 }
 
 var ioInstance *Io
@@ -84,8 +85,8 @@ func (i *Io) Read(address uint16) byte {
 		logger.Warn("LCD not initialized for LY read at 0xFF44")
 		return 0
 	case 0xFF4D:
-		// GBC: KEY1 - Speed switch (not implemented yet, return normal speed)
-		return 0x00
+		// GBC: KEY1 - current speed and prepared speed-switch state.
+		return i.key1
 	case 0xFF4F:
 		// GBC: VBK - VRAM bank select
 		if VramBankReadFunc != nil {
@@ -161,8 +162,10 @@ func (i *Io) Write(address uint16, value byte) {
 		i.dma.RestartDMAContext(value)
 		logger.Debug("DMA START!\n")
 	case 0xFF4D:
-		// GBC: KEY1 - Speed switch (not implemented yet)
-		logger.Debug("GBC: Speed switch register written: %02X", value)
+		// GBC: KEY1 - bit 0 prepares a speed switch; bit 7 is current speed
+		// and changes only when STOP consumes the prepared switch.
+		i.key1 = (i.key1 & 0x80) | (value & 0x01)
+		logger.Debug("GBC: KEY1 written: %02X", i.key1)
 	case 0xFF4F:
 		// GBC: VBK - VRAM bank select
 		if VramBankWriteFunc != nil {
@@ -217,4 +220,14 @@ func (i *Io) Write(address uint16, value byte) {
 			// Silently ignore unsupported writes to reduce log spam
 		}
 	}
+}
+
+func (i *Io) TrySpeedSwitch() bool {
+	if i == nil || i.key1&0x01 == 0 {
+		return false
+	}
+
+	i.key1 = (i.key1 ^ 0x80) & 0x80
+	logger.Debug("GBC: speed switch complete, KEY1=%02X", i.key1)
+	return true
 }

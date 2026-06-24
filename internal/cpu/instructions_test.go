@@ -45,7 +45,7 @@ func TestAllBaseInstructionsCanStep(t *testing.T) {
 	want := loadGBDevBaseInstructions(t)
 
 	for opcode, expected := range want {
-		if expected.Type == IN_NONE {
+		if expected.Type == IN_NONE || expected.Type == IN_STOP {
 			continue
 		}
 
@@ -221,6 +221,41 @@ func TestDICancelsPendingEIDelay(t *testing.T) {
 	}
 	if ctx.IntFlags&byte(IT_TIMER) == 0 {
 		t.Fatalf("pending timer interrupt was unexpectedly cleared")
+	}
+}
+
+func TestSTOPWithPreparedSpeedSwitchContinues(t *testing.T) {
+	ctx := newInstructionTestCPU()
+	seedStepState(ctx, 0x10) // STOP
+
+	bus := memory.BusCtx()
+	bus.BusWrite(0x0101, 0x00)
+	bus.BusWrite(0xFF4D, 0x01)
+
+	if !ctx.Step() {
+		t.Fatalf("STOP speed-switch step returned false")
+	}
+	if ctx.Halted || ctx.Stopped {
+		t.Fatalf("STOP with prepared speed switch halted=%t stopped=%t, want both false", ctx.Halted, ctx.Stopped)
+	}
+	if ctx.Regs.Pc != 0x0102 {
+		t.Fatalf("PC after STOP = %04X, want 0102", ctx.Regs.Pc)
+	}
+	if got := bus.BusRead(0xFF4D); got != 0x80 {
+		t.Fatalf("KEY1 after speed switch = %02X, want 80", got)
+	}
+}
+
+func TestSTOPWithoutPreparedSpeedSwitchStopsCPU(t *testing.T) {
+	ctx := newInstructionTestCPU()
+	seedStepState(ctx, 0x10) // STOP
+
+	stepped := ctx.Step()
+	if !ctx.Stopped {
+		t.Fatalf("STOP without prepared speed switch did not stop CPU")
+	}
+	if stepped {
+		t.Fatalf("STOP without prepared speed switch returned true, want false")
 	}
 }
 
@@ -934,4 +969,13 @@ func (m *testMemory) Read(address uint16) byte {
 
 func (m *testMemory) Write(address uint16, value byte) {
 	m.data[address] = value
+}
+
+func (m *testMemory) TrySpeedSwitch() bool {
+	if m.data[0xFF4D]&0x01 == 0 {
+		return false
+	}
+
+	m.data[0xFF4D] = (m.data[0xFF4D] ^ 0x80) & 0x80
+	return true
 }
