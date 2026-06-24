@@ -14,8 +14,8 @@ make native
 
 ```bash
 make wasm
-python3 -m http.server 8080 --directory dist/wasm
-# Open http://localhost:8080/
+# Open dist/wasm/index.html directly, or serve it over HTTP:
+# python3 -m http.server 8080 --directory dist/wasm
 ```
 
 ## Build Commands
@@ -33,6 +33,7 @@ make clean    # Remove build artifacts
 
 - `index.html` - standalone local test page
 - `emulator.html` - embeddable page fragment matching the GitHub Pages blog layout
+- `emulator-iframe.html` - iframe payload used by the embeddable fragment
 - `gomulator.wasm` - emulator build
 - `wasm_exec.js` - Go WASM runtime copied from the active Go toolchain
 
