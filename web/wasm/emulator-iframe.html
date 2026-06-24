@@ -35,6 +35,7 @@
       const go = new Go();
       let wasmReady = false;
       let pendingRom = null;
+      let pendingFileName = "rom";
 
       function decodeBase64Bytes(base64) {
         const binary = atob(base64);
@@ -67,13 +68,14 @@
         return WebAssembly.instantiate(bytes, go.importObject);
       }
 
-      function startRom(buffer) {
+      function startRom(buffer, fileName = "rom") {
         if (!wasmReady || typeof window.startEmulatorWithROM !== "function") {
           pendingRom = buffer;
+          pendingFileName = fileName;
           return;
         }
 
-        window.startEmulatorWithROM(new Uint8Array(buffer), "auto");
+        window.startEmulatorWithROM(new Uint8Array(buffer), "auto", fileName);
       }
 
       function sendInput(button, pressed) {
@@ -86,9 +88,15 @@
         }
       }
 
-      window.startRomLoad = (buffer) => {
-        startRom(buffer);
+      window.startRomLoad = (buffer, fileName = "rom") => {
+        startRom(buffer, fileName);
       };
+
+      window.addEventListener("beforeunload", () => {
+        if (typeof window.flushSave === "function") {
+          window.flushSave();
+        }
+      });
 
       window.addEventListener("message", (event) => {
         const message = event.data;
@@ -102,8 +110,10 @@
           wasmReady = true;
           if (pendingRom) {
             const rom = pendingRom;
+            const fileName = pendingFileName;
             pendingRom = null;
-            window.setTimeout(() => startRom(rom), 0);
+            pendingFileName = "rom";
+            window.setTimeout(() => startRom(rom, fileName), 0);
           }
         })
         .catch((error) => {

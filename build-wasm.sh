@@ -108,6 +108,12 @@ Or:
 Then open:
   http://localhost:8080/
 
+If npx fails with "ENOENT: no such file or directory, uv_cwd",
+your shell is probably inside an old build/wasm directory that make wasm
+deleted and recreated. Run:
+  cd "${WASM_DIR}"
+or serve ${WASM_DIR} from another directory.
+
 Embed later with:
   <iframe src="/path/to/emulator-iframe.html"></iframe>
 EOF

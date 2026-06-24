@@ -91,7 +91,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 }
 
 func (g *Game) handleInput() {
-	state := input.GetState()
+	state := *input.GetState()
 
 	// Toggle FPS display with F3 key (debounced)
 	f3Current := ebiten.IsKeyPressed(ebiten.KeyF3)
@@ -103,7 +103,8 @@ func (g *Game) handleInput() {
 
 	// Platform-specific input handling merges keyboard with any JS-set input on WASM
 	// or directly assigns keyboard input on desktop
-	handleInputPlatform(state)
+	handleInputPlatform(&state)
+	input.SetState(state)
 }
 
 func (g *Game) drawVideoBuffer(screen *ebiten.Image) {
@@ -205,6 +206,10 @@ func convertColor(value uint32) color.RGBA {
 
 // UiInit initializes the UI and starts the game loop
 func UiInit(emuInstance *EmuContext, showFPS bool) {
+	if emuInstance != nil && emuInstance.CartCtx != nil {
+		defer emuInstance.CartCtx.FlushSave()
+	}
+
 	game := NewGame(emuInstance)
 	game.showDebugInfo = showFPS // Set initial FPS display state
 

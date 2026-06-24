@@ -38,7 +38,7 @@ var emuInstance *EmuContext
 var ErrEmulationStopped = errors.New("emulation stopped")
 
 func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext, dmaCtx cpu.DMA, ppuCtx PPU, busCtx *memory.Bus) *EmuContext {
-	return &EmuContext{
+	emu := &EmuContext{
 		Paused:   false,
 		Running:  true,
 		Ticks:    0,
@@ -50,6 +50,21 @@ func EmuCtx(cpuCtx cpu.CPU, cartCtx memory.Cartridge, timerCtx *cpu.TimerContext
 		PpuCtx:   ppuCtx,
 		BusCtx:   busCtx,
 	}
+	cpu.Cm.SetPeripheralTick(emu.tickPeripherals)
+	return emu
+}
+
+func (e *EmuContext) tickPeripherals(tCycles int32) {
+	if tCycles <= 0 {
+		return
+	}
+	if e.PpuCtx != nil {
+		e.PpuCtx.PpuTickBatch(tCycles)
+	}
+	if e.dmaCtx != nil {
+		e.dmaCtx.DMATickBatch(tCycles)
+	}
+	e.Ticks += uint64(tCycles)
 }
 
 func (e *EmuContext) Start() {
@@ -91,27 +106,12 @@ func (e *EmuContext) ExecuteCycles(cpuCycles int) {
 	targetTicks := cpu.Cm.GetCycleTicks() + remainingMachineCycles
 
 	for cpu.Cm.GetCycleTicks() < targetTicks {
-		prevTicks := cpu.Cm.GetCycleTicks()
-
 		if !e.CpuCtx.Step() {
 			if e.handleCpuStop() {
 				return
 			}
 			return
 		}
-
-		consumedTicks := cpu.Cm.GetCycleTicks() - prevTicks
-		if consumedTicks <= 0 {
-			consumedTicks = 1
-		}
-
-		cpuSteps := consumedTicks * 4
-
-		// OPTIMIZED: Batch tick the PPU and DMA instead of looping
-		e.PpuCtx.PpuTickBatch(cpuSteps)
-		e.dmaCtx.DMATickBatch(cpuSteps)
-
-		e.Ticks += uint64(cpuSteps)
 	}
 }
 
@@ -167,6 +167,8 @@ func StartEmulator(romFile string) *EmuContext {
 		logger.Fatal("ROM loading failed. Exiting emulator.")
 	}
 
+	input.Init()
+
 	// Continue initializing other components
 	timerContext := cpu.TimerCtx()
 	dmaContext := cpu.DmaCtx()
@@ -215,9 +217,17 @@ func StartEmulator(romFile string) *EmuContext {
 
 // StartEmulatorFromBytes initializes the emulator from a ROM byte slice (for WASM/JS)
 func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
+	return StartEmulatorFromBytesWithSaveKey(romBytes, "")
+}
+
+// StartEmulatorFromBytesWithSaveKey initializes the emulator from a ROM byte
+// slice and uses saveKey for battery-backed cartridge RAM.
+func StartEmulatorFromBytesWithSaveKey(romBytes []byte, saveKey string) *EmuContext {
 	cartContext := memory.CartCtx()
 	cpu.ResetDebugTestResult()
-	cartContext.LoadROMFromBytes(romBytes)
+	cartContext.LoadROMFromBytesWithSaveKey(romBytes, saveKey)
+
+	input.Init()
 
 	// Continue initializing other components
 	timerContext := cpu.TimerCtx()
