@@ -271,7 +271,7 @@ func InitInstructions() {
 
 	//0x1X
 	inst[0x10] = Instruction{
-		Type: IN_STOP,
+		Type: IN_STOP, Mode: AM_D8,
 	}
 	inst[0x11] = Instruction{
 		Type: IN_LD, Mode: AM_R_D16, Reg1: RT_DE,

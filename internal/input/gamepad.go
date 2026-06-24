@@ -47,7 +47,21 @@ func GetState() *State {
 }
 
 func GetOutput() uint8 {
-	var output uint8 = 0xCF
+	// Start with bits 7-6 set (unused) and bits 3-0 set (no buttons pressed)
+	// Bits 5-4 will be set based on the selection state
+	var output uint8 = 0xC0 // 11000000
+
+	// Preserve the selection bits: set bit to 1 if that group is NOT selected
+	// (active-low: 0 = selected, 1 = not selected)
+	if !ButtonSel() {
+		output |= 0x20 // Set bit 5 to 1 (button group not selected)
+	}
+	if !DirSel() {
+		output |= 0x10 // Set bit 4 to 1 (direction group not selected)
+	}
+
+	// Initialize all button bits as 1 (not pressed)
+	output |= 0x0F
 
 	// When a group is selected (ButtonSel/DirSel true), clear the
 	// corresponding bits for pressed buttons (active-low logic on the port).

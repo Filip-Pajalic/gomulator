@@ -42,7 +42,7 @@ func IntCheck(ctx *CpuContext, address uint16, it InterruptType) bool {
 	if ifFlag && ieFlag {
 		IntHandle(ctx, address, it)
 		ctx.Halted = false
-		Cm.IncreaseCycle(2) // Interrupt handling takes additional cycles
+		Cm.IncreaseCycle(5)
 		return true
 	}
 	return false

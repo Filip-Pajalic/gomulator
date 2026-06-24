@@ -16,6 +16,29 @@ const (
 
 var dbgMsg [1024]byte
 var msgSize = 0
+var nextDebugProgressTick int32 = debugProgressInterval
+
+const debugProgressInterval int32 = 20_000_000
+
+type DebugTestResult byte
+
+const (
+	DebugTestNone DebugTestResult = iota
+	DebugTestPassed
+	DebugTestFailed
+)
+
+func ResetDebugTestResult() {
+	msgSize = 0
+	nextDebugProgressTick = debugProgressInterval
+	debugTestResult = DebugTestNone
+}
+
+func GetDebugTestResult() DebugTestResult {
+	return debugTestResult
+}
+
+var debugTestResult = DebugTestNone
 
 func DbgUpdate() {
 	if memory.BusCtx().BusRead(0xFF02) == 0x81 {
@@ -40,11 +63,59 @@ func DbgUpdate() {
 	}
 }
 
+func DbgProgress() {
+	ticks := Cm.GetCycleTicks()
+	if ticks < nextDebugProgressTick {
+		return
+	}
+	for ticks >= nextDebugProgressTick {
+		nextDebugProgressTick += debugProgressInterval
+	}
+
+	if cpuInstance == nil || memory.BusCtx() == nil {
+		return
+	}
+
+	bus := memory.BusCtx()
+	regs := cpuInstance.Regs
+	logger.Info("DEBUG PROGRESS ticks=%d PC=%04X SP=%04X OP=%02X AF=%02X%02X BC=%02X%02X DE=%02X%02X HL=%02X%02X HALT=%t STOP=%t ROMBANK=%d IF=%02X IE=%02X LY=%02X SB=%02X SC=%02X MSG=%d",
+		ticks,
+		regs.Pc,
+		regs.Sp,
+		bus.BusRead(regs.Pc),
+		regs.A,
+		regs.F,
+		regs.B,
+		regs.C,
+		regs.D,
+		regs.E,
+		regs.H,
+		regs.L,
+		cpuInstance.Halted,
+		cpuInstance.Stopped,
+		memory.CartCtx().CurrentROMBank(),
+		cpuInstance.IntFlags,
+		bus.GetInterruptEnable(),
+		bus.BusRead(0xFF44),
+		bus.BusRead(0xFF01),
+		bus.BusRead(0xFF02),
+		msgSize,
+	)
+}
+
 func DbgPrint() bool {
 	if msgSize > 0 {
-		// Check if we have a complete line (ends with newline)
-		if dbgMsg[msgSize-1] == '\n' {
-			debugmsg := strings.TrimSpace(string(dbgMsg[:msgSize]))
+		debugmsg := strings.TrimSpace(string(dbgMsg[:msgSize]))
+		debugmsgLower := strings.ToLower(debugmsg)
+		hasCompleteLine := dbgMsg[msgSize-1] == '\n'
+		hasResultToken := strings.Contains(debugmsgLower, "passed") ||
+			strings.Contains(debugmsgLower, "failed") ||
+			strings.Contains(debugmsgLower, "error")
+
+		// Check complete lines and terminal pass/fail messages. The Blargg
+		// multi-ROM can leave the final result in the serial buffer without a
+		// trailing newline, so don't wait forever once the result text appears.
+		if hasCompleteLine || hasResultToken {
 			if len(debugmsg) == 0 {
 				logger.Debug("TEST OUTPUT RAW: % X", dbgMsg[:msgSize])
 
@@ -105,8 +176,7 @@ func DbgPrint() bool {
 			msgSize = 0 // Reset msgSize after printing
 
 			// Check for common test failure indicators
-			if strings.Contains(debugmsg, "Failed") || strings.Contains(debugmsg, "FAILED") ||
-				strings.Contains(debugmsg, "Error") || strings.Contains(debugmsg, "ERROR") {
+			if strings.Contains(debugmsgLower, "failed") || strings.Contains(debugmsgLower, "error") {
 				if cpuInstance != nil {
 					regs := cpuInstance.Regs
 					sp := regs.Sp
@@ -173,12 +243,15 @@ func DbgPrint() bool {
 					logger.Debug("CRC table sample D900: % X", crcSample)
 				}
 				logger.Info("*** TEST FAILED ***")
+				debugTestResult = DebugTestFailed
 				return false
 			}
 
 			// Check for success indicators
-			if strings.Contains(debugmsg, "Passed") || strings.Contains(debugmsg, "PASSED") {
+			if strings.Contains(debugmsgLower, "passed") {
 				logger.Info("*** TEST PASSED ***")
+				debugTestResult = DebugTestPassed
+				return false
 			}
 		}
 	}

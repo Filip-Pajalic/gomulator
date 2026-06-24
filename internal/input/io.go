@@ -12,6 +12,20 @@ var serialData [2]byte
 var LcdReadFunc func(address uint16) uint8
 var LcdWriteFunc func(address uint16, value uint8)
 
+// GBC-specific register access functions (to be set by other packages)
+var VramBankReadFunc func() byte
+var VramBankWriteFunc func(byte)
+var WramBankReadFunc func() byte
+var WramBankWriteFunc func(byte)
+var BgcpIndexReadFunc func() byte
+var BgcpIndexWriteFunc func(byte)
+var BgcpDataReadFunc func() byte
+var BgcpDataWriteFunc func(byte)
+var ObcpIndexReadFunc func() byte
+var ObcpIndexWriteFunc func(byte)
+var ObcpDataReadFunc func() byte
+var ObcpDataWriteFunc func(byte)
+
 type Timer interface {
 	Write(address uint16, value byte)
 	Read(address uint16) byte
@@ -30,6 +44,7 @@ type Io struct {
 	cpu   Cpu
 	timer Timer
 	dma   DMA
+	key1  byte
 }
 
 var ioInstance *Io
@@ -69,9 +84,48 @@ func (i *Io) Read(address uint16) byte {
 		}
 		logger.Warn("LCD not initialized for LY read at 0xFF44")
 		return 0
+	case 0xFF4D:
+		// GBC: KEY1 - current speed and prepared speed-switch state.
+		return i.key1
+	case 0xFF4F:
+		// GBC: VBK - VRAM bank select
+		if VramBankReadFunc != nil {
+			return VramBankReadFunc()
+		}
+		return 0
 	case 0xFF50:
 		// Boot ROM disable register - always return 0x01 (boot ROM disabled after simulation)
 		return 0x01
+	case 0xFF68:
+		// GBC: BCPS/BGPI - Background color palette index
+		if BgcpIndexReadFunc != nil {
+			return BgcpIndexReadFunc()
+		}
+		return 0
+	case 0xFF69:
+		// GBC: BCPD/BGPD - Background color palette data
+		if BgcpDataReadFunc != nil {
+			return BgcpDataReadFunc()
+		}
+		return 0
+	case 0xFF6A:
+		// GBC: OCPS/OBPI - Object color palette index
+		if ObcpIndexReadFunc != nil {
+			return ObcpIndexReadFunc()
+		}
+		return 0
+	case 0xFF6B:
+		// GBC: OCPD/OBPD - Object color palette data
+		if ObcpDataReadFunc != nil {
+			return ObcpDataReadFunc()
+		}
+		return 0
+	case 0xFF70:
+		// GBC: SVBK - WRAM bank select
+		if WramBankReadFunc != nil {
+			return WramBankReadFunc()
+		}
+		return 1 // Default to bank 1
 	default:
 		if common.Between16(address, 0xFF04, 0xFF07) {
 			return i.timer.Read(address)
@@ -107,10 +161,53 @@ func (i *Io) Write(address uint16, value byte) {
 	case 0xFF46:
 		i.dma.RestartDMAContext(value)
 		logger.Debug("DMA START!\n")
+	case 0xFF4D:
+		// GBC: KEY1 - bit 0 prepares a speed switch; bit 7 is current speed
+		// and changes only when STOP consumes the prepared switch.
+		i.key1 = (i.key1 & 0x80) | (value & 0x01)
+		logger.Debug("GBC: KEY1 written: %02X", i.key1)
+	case 0xFF4F:
+		// GBC: VBK - VRAM bank select
+		if VramBankWriteFunc != nil {
+			VramBankWriteFunc(value & 0x01)
+			logger.Debug("GBC: VRAM bank set to %d", value&0x01)
+		}
 	case 0xFF50:
 		// Boot ROM disable register - write of any value disables boot ROM
 		// Since we simulate boot sequence, this is handled but not needed
 		logger.Debug("Boot ROM disable register written: %02X", value)
+	case 0xFF68:
+		// GBC: BCPS/BGPI - Background color palette index
+		if BgcpIndexWriteFunc != nil {
+			BgcpIndexWriteFunc(value)
+			logger.Debug("GBC: BCPS written: %02X", value)
+		}
+	case 0xFF69:
+		// GBC: BCPD/BGPD - Background color palette data
+		if BgcpDataWriteFunc != nil {
+			BgcpDataWriteFunc(value)
+		}
+	case 0xFF6A:
+		// GBC: OCPS/OBPI - Object color palette index
+		if ObcpIndexWriteFunc != nil {
+			ObcpIndexWriteFunc(value)
+			logger.Debug("GBC: OCPS written: %02X", value)
+		}
+	case 0xFF6B:
+		// GBC: OCPD/OBPD - Object color palette data
+		if ObcpDataWriteFunc != nil {
+			ObcpDataWriteFunc(value)
+		}
+	case 0xFF70:
+		// GBC: SVBK - WRAM bank select
+		if WramBankWriteFunc != nil {
+			bank := value & 0x07
+			if bank == 0 {
+				bank = 1 // Bank 0 maps to bank 1
+			}
+			WramBankWriteFunc(bank)
+			logger.Debug("GBC: WRAM bank set to %d", bank)
+		}
 	default:
 		if common.Between16(address, 0xFF04, 0xFF07) {
 			i.timer.Write(address, value)
@@ -123,4 +220,14 @@ func (i *Io) Write(address uint16, value byte) {
 			// Silently ignore unsupported writes to reduce log spam
 		}
 	}
+}
+
+func (i *Io) TrySpeedSwitch() bool {
+	if i == nil || i.key1&0x01 == 0 {
+		return false
+	}
+
+	i.key1 = (i.key1 ^ 0x80) & 0x80
+	logger.Debug("GBC: speed switch complete, KEY1=%02X", i.key1)
+	return true
 }

@@ -154,12 +154,14 @@ func (e *EmuContext) handleCpuStop() bool {
 		return true
 	}
 	e.Die = true
+	e.Running = false
 	logger.Debug("CPU has stopped unexpectedly.")
-	return false
+	return true
 }
 
 func StartEmulator(romFile string) *EmuContext {
 	cartContext := memory.CartCtx()
+	cpu.ResetDebugTestResult()
 
 	if !cartContext.CartLoad(romFile) {
 		logger.Fatal("ROM loading failed. Exiting emulator.")
@@ -173,10 +175,37 @@ func StartEmulator(romFile string) *EmuContext {
 
 	ioContext := input.NewIo(nil, timerContext, dmaContext)
 
+	// Wire up GBC function pointers to avoid import cycles
+	input.LcdReadFunc = LcdRead
+	input.LcdWriteFunc = LcdWrite
+	input.VramBankReadFunc = ReadVramBank
+	input.VramBankWriteFunc = WriteVramBank
+	input.WramBankReadFunc = memory.ReadWramBank
+	input.WramBankWriteFunc = memory.WriteWramBank
+	input.BgcpIndexReadFunc = ReadBGCPIndex
+	input.BgcpIndexWriteFunc = WriteBGCPIndex
+	input.BgcpDataReadFunc = ReadBGCP
+	input.BgcpDataWriteFunc = WriteBGCP
+	input.ObcpIndexReadFunc = ReadOBCPIndex
+	input.ObcpIndexWriteFunc = WriteOBCPIndex
+	input.ObcpDataReadFunc = ReadOBCP
+	input.ObcpDataWriteFunc = WriteOBCP
+
 	cpuContext := cpu.NewCpuContext(nil) // Bus will be set later
 	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext, ioContext, cpuContext)
 
 	cpuContext = cpu.NewCpuContext(busContext)
+
+	// Enable GBC mode only when the selected console mode requires it.
+	if cartContext.RunsInGBCMode() {
+		EnableGBCMode()
+	}
+
+	// Apply DMG color palette BEFORE creating emu instance if flag is set
+	if !cartContext.RunsInGBCMode() && GetDMGColorsPaletteType() != "" {
+		title := cartContext.GetTitle()
+		EnableDMGGBCColors(GetDMGColorsPaletteType(), title)
+	}
 
 	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext, busContext)
 
@@ -187,6 +216,7 @@ func StartEmulator(romFile string) *EmuContext {
 // StartEmulatorFromBytes initializes the emulator from a ROM byte slice (for WASM/JS)
 func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
 	cartContext := memory.CartCtx()
+	cpu.ResetDebugTestResult()
 	cartContext.LoadROMFromBytes(romBytes)
 
 	// Continue initializing other components
@@ -197,10 +227,37 @@ func StartEmulatorFromBytes(romBytes []byte) *EmuContext {
 
 	ioContext := input.NewIo(nil, timerContext, dmaContext)
 
+	// Wire up GBC function pointers to avoid import cycles
+	input.LcdReadFunc = LcdRead
+	input.LcdWriteFunc = LcdWrite
+	input.VramBankReadFunc = ReadVramBank
+	input.VramBankWriteFunc = WriteVramBank
+	input.WramBankReadFunc = memory.ReadWramBank
+	input.WramBankWriteFunc = memory.WriteWramBank
+	input.BgcpIndexReadFunc = ReadBGCPIndex
+	input.BgcpIndexWriteFunc = WriteBGCPIndex
+	input.BgcpDataReadFunc = ReadBGCP
+	input.BgcpDataWriteFunc = WriteBGCP
+	input.ObcpIndexReadFunc = ReadOBCPIndex
+	input.ObcpIndexWriteFunc = WriteOBCPIndex
+	input.ObcpDataReadFunc = ReadOBCP
+	input.ObcpDataWriteFunc = WriteOBCP
+
 	cpuContext := cpu.NewCpuContext(nil) // Bus will be set later
 	busContext := memory.NewBus(cartContext, ramContext, dmaContext, ppuContext, ioContext, cpuContext)
 
 	cpuContext = cpu.NewCpuContext(busContext)
+
+	// Enable GBC mode only when the selected console mode requires it.
+	if cartContext.RunsInGBCMode() {
+		EnableGBCMode()
+		logger.Info("EMU: GBC mode enabled")
+	} else if GetDMGColorsPaletteType() != "" {
+		// DMG-only cartridge with DMG colors enabled
+		logger.Info("EMU: Applying DMG color palette for DMG-only cartridge (WASM)")
+		title := cartContext.GetTitle()
+		EnableDMGGBCColors(GetDMGColorsPaletteType(), title)
+	}
 
 	emuInstance = EmuCtx(cpuContext, cartContext, timerContext, dmaContext, ppuContext, busContext)
 

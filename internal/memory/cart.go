@@ -26,9 +26,11 @@ type CartContext struct {
 
 	ramData    []byte // External RAM data
 	romBank    int    // Current ROM bank (1-127)
+	romBankLow int    // Raw lower 5-bit MBC1 ROM bank register
 	ramBank    int    // Current RAM bank (0-3)
 	ramEnabled bool   // RAM enable flag
 	bankMode   int    // Banking mode (0=ROM, 1=RAM)
+	cgbFlag    byte   // GBC compatibility flag (0x00=DMG, 0x80=GBC compatible, 0xC0=GBC only)
 }
 
 // romHeader represents the header structure of a Game Boy ROM
@@ -167,6 +169,14 @@ func CartCtx() *CartContext {
 	return cartInstance
 }
 
+func (c *CartContext) resetBankingState() {
+	c.romBank = 1
+	c.romBankLow = 0
+	c.ramBank = 0
+	c.ramEnabled = false
+	c.bankMode = 0
+}
+
 const headerOffset = 0x100
 
 // cartLicName returns the license name based on the license code
@@ -181,6 +191,51 @@ func (c *CartContext) cartLicName() []byte {
 func (c *CartContext) cartTypeName() []byte {
 	if c.header.CartType <= 0x22 {
 		return ROM_TYPES[c.header.CartType]
+	}
+	return nil
+}
+
+// cgbModeName returns the CGB mode name based on the CGB flag
+func (c *CartContext) cgbModeName() string {
+	switch c.cgbFlag {
+	case 0x80:
+		return "GBC Compatible"
+	case 0xC0:
+		return "GBC Only"
+	default:
+		return "DMG Only"
+	}
+}
+
+// IsGBCCart returns true if this cartridge supports Game Boy Color
+func (c *CartContext) IsGBCCart() bool {
+	return c.cgbFlag == 0x80 || c.cgbFlag == 0xC0
+}
+
+// IsGBCOnly returns true if this cartridge requires Game Boy Color
+func (c *CartContext) IsGBCOnly() bool {
+	return c.cgbFlag == 0xC0
+}
+
+// RunsInGBCMode returns true when this emulator should boot the cartridge in
+// CGB mode. Until there is a user-selectable console model, CGB-compatible
+// cartridges keep the existing DMG boot path and only CGB-only cartridges force
+// CGB mode.
+func (c *CartContext) RunsInGBCMode() bool {
+	return c.IsGBCOnly()
+}
+
+func (c *CartContext) CurrentROMBank() int {
+	return c.romBank
+}
+
+// GetTitle returns the game title from the ROM header
+func (c *CartContext) GetTitle() []byte {
+	if c.header != nil {
+		// Return a copy of the title to avoid external modification
+		title := make([]byte, len(c.header.Title))
+		copy(title, c.header.Title[:])
+		return title
 	}
 	return nil
 }
@@ -211,6 +266,7 @@ func (c *CartContext) loadCart(romName string) {
 	copy(c.filename[:], romName)
 
 	c.romData = data
+	c.resetBankingState()
 
 	if len(c.romData) == 0 {
 		logger.Fatal("ROM file is empty.")
@@ -232,6 +288,13 @@ func (c *CartContext) loadCart(romName string) {
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title
 
+	// Read CGB flag at 0x0143
+	if len(c.romData) > 0x0143 {
+		c.cgbFlag = c.romData[0x0143]
+	} else {
+		c.cgbFlag = 0x00
+	}
+
 	// Log ROM information
 	logger.Info("Cartridge Loaded:")
 	logger.Info("Title    : %s", string(c.header.Title[:]))
@@ -240,6 +303,7 @@ func (c *CartContext) loadCart(romName string) {
 	logger.Info("RAM Size : %02X", c.header.RamSize)
 	logger.Info("LIC Code : %02X (%s)", c.header.LicCode, c.cartLicName())
 	logger.Info("ROM Vers : %02X", c.header.Version)
+	logger.Info("CGB Flag : %02X (%s)", c.cgbFlag, c.cgbModeName())
 	logger.Info(
 		"Checksum : %02X (%s)",
 		c.header.Checksum,
@@ -297,6 +361,7 @@ func (c *CartContext) CartLoad(cart string) bool {
 // LoadROMFromBytes loads a ROM directly from a byte slice (for WASM/JS)
 func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	c.romData = append([]byte(nil), romBytes...)
+	c.resetBankingState()
 	if len(c.romData) == 0 {
 		logger.Fatal("ROM data is empty.")
 		return false
@@ -317,6 +382,14 @@ func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	}
 	c.header = &rh
 	c.header.Title[15] = 0 // Null-terminate the title
+
+	// Read CGB flag at 0x0143
+	if len(c.romData) > 0x0143 {
+		c.cgbFlag = c.romData[0x0143]
+	} else {
+		c.cgbFlag = 0x00
+	}
+
 	logger.Info("Cartridge Loaded from bytes:")
 	logger.Info("Title    : %s", string(c.header.Title[:]))
 	logger.Info("Cartridge Type : %02X", c.header.CartType)
@@ -324,9 +397,40 @@ func (c *CartContext) LoadROMFromBytes(romBytes []byte) bool {
 	logger.Info("RAM Size : %02X", c.header.RamSize)
 	logger.Info("LIC Code : %02X", c.header.LicCode)
 	logger.Info("ROM Vers : %02X", c.header.Version)
+	logger.Info("CGB Flag : %02X (%s)", c.cgbFlag, c.cgbModeName())
 	logger.Info("ROM data length: %d bytes", len(c.romData))
 	c.initializeRAM()
 	return true
+}
+
+func (c *CartContext) romBankCount() int {
+	banks := len(c.romData) / 0x4000
+	if banks < 1 {
+		return 1
+	}
+	return banks
+}
+
+func (c *CartContext) normalizeROMBank(bank int) int {
+	banks := c.romBankCount()
+	if banks > 0 {
+		bank &= banks - 1
+	}
+	return bank
+}
+
+func (c *CartContext) updateSelectedROMBank() {
+	lower := c.romBankLow & 0x1F
+	if lower == 0 {
+		lower = 1
+	}
+
+	bank := lower
+	if c.romBankCount() > 32 {
+		bank |= (c.ramBank & 0x03) << 5
+	}
+
+	c.romBank = c.normalizeROMBank(bank)
 }
 
 func (c *CartContext) CartWrite(address uint16, data byte) {
@@ -338,35 +442,36 @@ func (c *CartContext) CartWrite(address uint16, data byte) {
 
 	case address < 0x4000:
 		// ROM Bank Number (0x2000-0x3FFF)
-		bank := int(data & 0x1F) // 5 bits for ROM bank
-		if bank == 0 {
-			bank = 1 // Bank 0 maps to bank 1
-		}
-		c.romBank = bank
+		c.romBankLow = int(data & 0x1F) // 5 bits for ROM bank
+		c.updateSelectedROMBank()
 		logger.Debug("MBC1: ROM bank set to %d", c.romBank)
 
 	case address < 0x6000:
 		// RAM Bank Number or Upper ROM Bank (0x4000-0x5FFF)
+		c.ramBank = int(data & 0x03)
 		if c.bankMode == 0 {
 			// ROM banking mode - upper 2 bits of ROM bank
-			upperBits := int(data&0x03) << 5
-			c.romBank = (c.romBank & 0x1F) | upperBits
+			c.updateSelectedROMBank()
 			logger.Debug("MBC1: ROM bank upper bits set, new bank: %d", c.romBank)
 		} else {
 			// RAM banking mode - RAM bank number
-			c.ramBank = int(data & 0x03)
 			logger.Debug("MBC1: RAM bank set to %d", c.ramBank)
 		}
 
 	case address < 0x8000:
 		// Banking Mode Select (0x6000-0x7FFF)
 		c.bankMode = int(data & 0x01)
+		c.updateSelectedROMBank()
 		logger.Debug("MBC1: Banking mode set to %d", c.bankMode)
 
 	case address >= 0xA000 && address < 0xC000:
 		// External RAM Write (0xA000-0xBFFF)
 		if c.ramEnabled && len(c.ramData) > 0 {
-			ramAddr := int(address-0xA000) + (c.ramBank * 0x2000)
+			ramBank := 0
+			if c.bankMode == 1 {
+				ramBank = c.ramBank
+			}
+			ramAddr := int(address-0xA000) + (ramBank * 0x2000)
 			if ramAddr < len(c.ramData) {
 				c.ramData[ramAddr] = data
 				logger.Debug("MBC1: RAM write %02X to bank %d, address %04X", data, c.ramBank, address)
@@ -402,7 +507,11 @@ func (c *CartContext) CartRead(address uint16) byte {
 	case address >= 0xA000 && address < 0xC000:
 		// External RAM Read (0xA000-0xBFFF)
 		if c.ramEnabled && len(c.ramData) > 0 {
-			ramAddr := int(address-0xA000) + (c.ramBank * 0x2000)
+			ramBank := 0
+			if c.bankMode == 1 {
+				ramBank = c.ramBank
+			}
+			ramAddr := int(address-0xA000) + (ramBank * 0x2000)
 			if ramAddr < len(c.ramData) {
 				return c.ramData[ramAddr]
 			}

@@ -80,6 +80,7 @@ type CpuContext struct {
 
 	IntMasterEnabled bool
 	enablingIme      bool
+	imeEnableDelay   byte
 	iERegister       byte
 	IntFlags         byte
 	memoryBus        Bus
@@ -115,6 +116,7 @@ func NewCpuContext(memoryBus Bus) *CpuContext {
 		Stepping:         false,
 		IntMasterEnabled: false,
 		enablingIme:      false,
+		imeEnableDelay:   0,
 		iERegister:       0,
 		IntFlags:         0,
 		memoryBus:        memoryBus,
@@ -147,6 +149,13 @@ func (c *CpuContext) Execute() {
 
 // This should probably not call the emulator
 func (c *CpuContext) Step() bool {
+	// Debug hook (only active when built with -tags debug). Run this before
+	// stopped/halted handling too, so serial test output can still be consumed
+	// if a ROM prints a result and then enters HALT or STOP.
+	if !stepDebugHook() {
+		return false
+	}
+
 	if c.Stopped {
 		return false
 	}
@@ -161,15 +170,10 @@ func (c *CpuContext) Step() bool {
 			os.Exit(1)
 		}
 
-		// Debug hook (only active when built with -tags debug)
-		if !stepDebugHook() {
-			return false
-		}
-
 		c.Execute()
 	} else {
 		Cm.IncreaseCycle(1)
-		if c.IntFlags != 0 {
+		if c.hasPendingEnabledInterrupt() {
 			c.Halted = false
 		}
 	}
@@ -178,19 +182,30 @@ func (c *CpuContext) Step() bool {
 		return false
 	}
 
-	// Handle interrupts AFTER instruction execution (reference implementation order)
-	if c.IntMasterEnabled {
-		CpuHandleInterrupts(c)
-		c.enablingIme = false
+	if c.enablingIme && c.imeEnableDelay > 0 {
+		c.imeEnableDelay--
+		if c.imeEnableDelay == 0 {
+			logger.Debug("IME enabled at PC=%04X", c.Regs.Pc)
+			c.IntMasterEnabled = true
+			c.enablingIme = false
+		}
 	}
 
-	// Handle EI instruction: enable interrupts now if EI was executed
-	if c.enablingIme {
-		logger.Debug("IME enabled at PC=%04X", c.Regs.Pc)
-		c.IntMasterEnabled = true
+	// Handle interrupts AFTER instruction execution (reference implementation order).
+	if c.IntMasterEnabled {
+		CpuHandleInterrupts(c)
 	}
 
 	return true
+}
+
+func (c *CpuContext) hasPendingEnabledInterrupt() bool {
+	if c.memoryBus == nil {
+		return c.IntFlags&0x1F != 0
+	}
+
+	enabled := c.memoryBus.BusRead(0xFFFF)
+	return (c.IntFlags & enabled & 0x1F) != 0
 }
 
 func (c *CpuContext) GetIERegister() byte {

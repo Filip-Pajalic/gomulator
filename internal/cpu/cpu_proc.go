@@ -157,6 +157,7 @@ func procLd(ctx *CpuContext) {
 			debugLdSpCount++
 			logger.Debug("LD SP,HL debug: HL=%04X -> SP=%04X", CpuRegRead(RT_HL), CpuRegRead(RT_SP))
 		}
+		Cm.IncreaseCycle(1)
 	}
 }
 
@@ -166,10 +167,13 @@ func procCb(ctx *CpuContext) {
 	bit := (op >> 3) & 0b111
 	bitOp := (op >> 6) & 0b11
 	regval := CpuRegRead8(reg)
-	Cm.IncreaseCycle(1)
 
 	if reg == RT_HL {
-		Cm.IncreaseCycle(2)
+		if bitOp == 1 {
+			Cm.IncreaseCycle(1)
+		} else {
+			Cm.IncreaseCycle(2)
+		}
 	}
 
 	switch bitOp {
@@ -420,12 +424,15 @@ func procCp(ctx *CpuContext) {
 func procDi(ctx *CpuContext) {
 	// DI: Disable interrupts
 	ctx.IntMasterEnabled = false
+	ctx.enablingIme = false
+	ctx.imeEnableDelay = 0
 }
 
 func procEi(ctx *CpuContext) {
 	// EI: Enable interrupts after next instruction
 	logger.Debug("procEi invoked at PC=%04X", ctx.Regs.Pc)
 	ctx.enablingIme = true
+	ctx.imeEnableDelay = 2
 }
 
 func procPop(ctx *CpuContext) {
@@ -444,6 +451,7 @@ func procPush(ctx *CpuContext) {
 	value := CpuRegRead(ctx.currentInst.Reg1)
 	Cm.IncreaseCycle(1)
 	StackPush16(value)
+	Cm.IncreaseCycle(1)
 	Cm.IncreaseCycle(1)
 }
 
@@ -469,7 +477,9 @@ func procJp(ctx *CpuContext) {
 	// JP nn or JP cc,nn: Jump to address
 	if CheckCondition(ctx) {
 		ctx.Regs.Pc = ctx.FetchedData
-		Cm.IncreaseCycle(1) // Jump cycle
+		if ctx.currentInst.Mode != AM_R {
+			Cm.IncreaseCycle(1) // Jump cycle for absolute immediate jumps.
+		}
 	}
 }
 
@@ -489,6 +499,7 @@ func procCall(ctx *CpuContext) {
 		// Push current PC to stack
 		Cm.IncreaseCycle(1)
 		StackPush16(ctx.Regs.Pc)
+		Cm.IncreaseCycle(1)
 		// Jump to new address
 		ctx.Regs.Pc = ctx.FetchedData
 		Cm.IncreaseCycle(1)
@@ -516,6 +527,7 @@ func procRst(ctx *CpuContext) {
 	// Push current PC to stack
 	Cm.IncreaseCycle(1)
 	StackPush16(ctx.Regs.Pc)
+	Cm.IncreaseCycle(1)
 	// Jump to RST vector
 	ctx.Regs.Pc = uint16(ctx.currentInst.Param)
 	Cm.IncreaseCycle(1)
@@ -724,10 +736,15 @@ func procAdd(ctx *CpuContext) {
 }
 
 func procStop(ctx *CpuContext) {
-	// STOP: Enter low-power mode (not fully emulated here)
-	logger.Debug("STOP instruction encountered; halting CPU")
-	ctx.Halted = true
-	//ctx.Stopped = true
+	if bus := memory.BusCtx(); bus != nil && bus.TrySpeedSwitch() {
+		// On CGB, STOP performs a speed switch when KEY1 bit 0 is armed, then
+		// execution resumes at the following instruction.
+		Cm.IncreaseCycle(2050)
+		return
+	}
+
+	logger.Debug("STOP instruction encountered; stopping CPU")
+	ctx.Stopped = true
 }
 
 func procDaa(ctx *CpuContext) {
