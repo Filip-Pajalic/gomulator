@@ -31,11 +31,16 @@ make clean    # Remove build artifacts
 
 `make wasm` writes a self-contained browser package to `dist/wasm/`:
 
-- `index.html` - standalone local test page
-- `emulator.html` - embeddable page fragment matching the GitHub Pages blog layout
-- `emulator-iframe.html` - iframe payload used by the embeddable fragment
+- `index.html` - minimal host page showing how to embed the emulator iframe
+- `emulator-iframe.html` - the styled emulator page to embed
 - `gomulator.wasm` - emulator build
 - `wasm_exec.js` - Go WASM runtime copied from the active Go toolchain
+
+For embedding, point an iframe at the generated `emulator-iframe.html`:
+
+```html
+<iframe src="/path/to/emulator-iframe.html"></iframe>
+```
 
 ## Command Line Options
 

@@ -11,7 +11,9 @@ if [[ ! -f "${WASM_EXEC}" ]]; then
   exit 1
 fi
 
+rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
+rm -f "${ROOT_DIR}/gomulator-wasm.zip"
 : "${GOCACHE:="${TMPDIR:-/tmp}/gomulator-go-build-cache"}"
 export GOCACHE
 mkdir -p "${GOCACHE}"
@@ -24,7 +26,6 @@ echo "Building gomulator.wasm..."
 
 cp "${WASM_EXEC}" "${DIST_DIR}/wasm_exec.js"
 cp "${ROOT_DIR}/index.html" "${DIST_DIR}/index.html"
-cp "${ROOT_DIR}/web/wasm/emulator.html" "${DIST_DIR}/emulator.html"
 cp "${ROOT_DIR}/web/wasm/emulator-iframe.html" "${DIST_DIR}/emulator-iframe.html"
 
 base64_nowrap() {
@@ -63,19 +64,18 @@ inject_inline_wasm() {
   chmod 0644 "${html_file}"
 }
 
-inject_inline_wasm "${DIST_DIR}/index.html" "${DIST_DIR}/gomulator.wasm"
+inject_inline_wasm "${DIST_DIR}/emulator-iframe.html" "${DIST_DIR}/gomulator.wasm"
 
 if command -v zip >/dev/null 2>&1; then
   (
     cd "${DIST_DIR}"
-    zip -qr "${ROOT_DIR}/gomulator-wasm.zip" index.html emulator.html emulator-iframe.html wasm_exec.js gomulator.wasm
+    zip -qr "${ROOT_DIR}/gomulator-wasm.zip" index.html emulator-iframe.html wasm_exec.js gomulator.wasm
   )
 fi
 
 cat <<EOF
 WASM package ready:
   ${DIST_DIR}/index.html
-  ${DIST_DIR}/emulator.html
   ${DIST_DIR}/emulator-iframe.html
   ${DIST_DIR}/gomulator.wasm
   ${DIST_DIR}/wasm_exec.js
@@ -88,4 +88,7 @@ Or serve it locally with:
 
 Then open:
   http://localhost:8080/
+
+Embed later with:
+  <iframe src="/path/to/emulator-iframe.html"></iframe>
 EOF

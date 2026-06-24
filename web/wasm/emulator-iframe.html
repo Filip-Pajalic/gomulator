@@ -3,36 +3,438 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gomulator Frame</title>
+  <title>Gomulator - Game Boy Emulator</title>
   <style>
-    html,
     body {
       margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
+      min-height: 100vh;
+      background: #1d2636;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      padding: 24px;
+      box-sizing: border-box;
     }
 
-    canvas {
+    .emulator-container {
+      max-width: 800px;
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.7);
+      margin: 0 auto;
+      text-align: center;
+      padding: 0;
+      border-radius: 8px;
+      background-color: #333;
+      padding-bottom: 2rem;
+    }
+
+    #gameCanvas,
+    #canvasContainer canvas {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       width: 100% !important;
-      height: 100% !important;
-      display: block;
+      max-width: 100%;
+      height: auto !important;
       background: #000 !important;
+      display: block;
+      margin: 0 auto;
+      border-radius: 4px;
+    }
+
+    #canvasContainer {
+      width: calc(100% - 40px);
+      aspect-ratio: 10 / 9;
+      margin: 0 auto;
+      background: #000;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .rom-upload {
+      margin: 0;
+      padding: 0;
+      border-radius: 8px;
+      background-color: #333;
+    }
+
+    .upload-btn {
+      padding: 0.5rem 1rem;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .upload-btn:hover {
+      background: #45a049;
+    }
+
+    .info-box {
+      margin-top: 10px;
+      max-width: 800px;
+      color: #fff;
+    }
+
+    .controls-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 0 20px;
+      box-sizing: border-box;
+      margin-top: 20px;
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 8px;
+      width: 150px;
+      height: 150px;
+      touch-action: none;
+    }
+
+    .dpad .arrow,
+    .round-button,
+    .pill-button,
+    .buttons,
+    .center-buttons,
+    .rom-status-display,
+    .load-trigger {
+      touch-action: none;
+      -ms-touch-action: none;
+      cursor: pointer;
+    }
+
+    .dpad .arrow,
+    .dpad .center {
+      background: #666;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-size: 1.2rem;
+      user-select: none;
+    }
+
+    .dpad .arrow.up {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .dpad .arrow.down {
+      grid-column: 2;
+      grid-row: 3;
+    }
+
+    .dpad .arrow.left {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .dpad .arrow.right {
+      grid-column: 3;
+      grid-row: 2;
+    }
+
+    .dpad .center {
+      grid-column: 2;
+      grid-row: 2;
+      background: #777;
+    }
+
+    .dpad .arrow:active {
+      background: #b37777;
+    }
+
+    .dpad .arrow.pressed,
+    .round-button.pressed,
+    .pill-button.pressed,
+    .load-trigger.pressed {
+      background: #b37777;
+      transform: scale(0.98);
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 24px;
+      justify-content: center;
+    }
+
+    .round-button {
+      width: 70px;
+      height: 70px;
+      background: #666;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.5rem;
+      user-select: none;
+    }
+
+    .round-button:active {
+      background: #b37777;
+    }
+
+    .center-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .pill-button {
+      background: #666;
+      color: #fff;
+      border-radius: 20px;
+      padding: 0.3rem 1.2rem;
+      font-size: 0.9rem;
+      user-select: none;
+    }
+
+    .pill-button:active {
+      background: #b37777;
+    }
+
+    #romInput {
+      display: none;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 12px;
+      }
+
+      .controls-layout {
+        flex-direction: column;
+        justify-content: center;
+        gap: 25px;
+      }
+    }
+
+    .rom-upload h3 {
+      padding-top: 1rem;
+      margin-bottom: 0.5rem;
+      color: #f0f0f0;
+    }
+
+    .load-interface {
+      padding: 0 1rem;
+      padding-top: 0.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .rom-status-display {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #4caf50;
+      background-color: #222;
+      border: 2px solid #4caf50;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      font-family: "Press Start 2P", monospace;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+      transition: box-shadow 0.1s ease;
+      box-sizing: border-box;
+    }
+
+    .rom-status-display:hover {
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.7);
+    }
+
+    .load-trigger {
+      background-color: #45a049;
+      color: white;
+      padding: 0.3rem 0.8rem;
+      border-radius: 3px;
+      font-family: sans-serif;
+      font-size: 0.8rem;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    #statusText {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      margin-right: 10px;
+      flex-grow: 1;
     }
   </style>
 </head>
 <body>
+  <div class="emulator-container">
+    <div class="rom-upload">
+      <div class="load-interface">
+        <input type="file" id="romInput" accept=".gb,.gbc" />
+
+        <div id="romStatusDisplay" class="rom-status-display">
+          <span id="statusText">Select a ROM to begin emulation</span>
+          <span id="loadTrigger" class="load-trigger">Load</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="canvasContainer">
+      <canvas id="gameCanvas" width="640" height="576"></canvas>
+    </div>
+
+    <div class="info-box">
+      <div class="controls-layout">
+        <div class="dpad">
+          <div class="arrow up">↑</div>
+          <div class="arrow left">←</div>
+          <div class="center"></div>
+          <div class="arrow right">→</div>
+          <div class="arrow down">↓</div>
+        </div>
+
+        <div class="buttons">
+          <div class="round-button b">X</div>
+          <div class="round-button a">Z</div>
+        </div>
+      </div>
+
+      <div class="center-buttons">
+        <div class="pill-button select">Tab</div>
+        <div class="pill-button start">Enter</div>
+      </div>
+    </div>
+  </div>
+
   <script src="./wasm_exec.js"></script>
+  <script>
+    const GOMULATOR_WASM_BASE64 = "";
+  </script>
   <script>
     (function () {
       const go = new Go();
       let wasmReady = false;
+      let isRomLoaded = false;
       let pendingRom = null;
+      const romInput = document.getElementById("romInput");
+      const statusBarEl = document.getElementById("romStatusDisplay");
+      const statusTextEl = document.getElementById("statusText");
+      const loadTriggerEl = document.getElementById("loadTrigger");
+      const canvasContainer = document.getElementById("canvasContainer");
+
+      const pressed = {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        a: false,
+        b: false,
+        start: false,
+        select: false,
+      };
+
+      const keyMap = {
+        ArrowUp: "up",
+        ArrowDown: "down",
+        ArrowLeft: "left",
+        ArrowRight: "right",
+        KeyZ: "a",
+        KeyX: "b",
+        Enter: "start",
+        Tab: "select",
+        ShiftLeft: "select",
+        ShiftRight: "select",
+      };
+
+      const selectorMap = {
+        up: [".dpad .arrow.up"],
+        down: [".dpad .arrow.down"],
+        left: [".dpad .arrow.left"],
+        right: [".dpad .arrow.right"],
+        a: [".round-button.a"],
+        b: [".round-button.b"],
+        start: [".pill-button.start"],
+        select: [".pill-button.select"],
+      };
+
+      const buttonSelectors = {
+        ".dpad .arrow.up": "up",
+        ".dpad .arrow.down": "down",
+        ".dpad .arrow.left": "left",
+        ".dpad .arrow.right": "right",
+        ".round-button.a": "a",
+        ".round-button.b": "b",
+        ".pill-button.start": "start",
+        ".pill-button.select": "select",
+      };
+
+      function setStatus(text) {
+        if (statusTextEl) statusTextEl.textContent = text;
+      }
+
+      function setVisual(button, isPressed) {
+        const selectors = selectorMap[button] || [];
+        selectors.forEach((selector) => {
+          document.querySelectorAll(selector).forEach((element) => {
+            element.classList.toggle("pressed", !!isPressed);
+          });
+        });
+      }
+
+      function sendInput(button, pressedState) {
+        if (typeof window.emuInput === "function") {
+          window.emuInput(button, pressedState);
+        }
+      }
+
+      function mountEbitenCanvas(attemptsLeft) {
+        const canvas = Array.from(document.querySelectorAll("canvas"))
+          .find((candidate) => !canvasContainer.contains(candidate));
+
+        if (!canvas) {
+          if (attemptsLeft > 0) {
+            window.setTimeout(() => mountEbitenCanvas(attemptsLeft - 1), 50);
+          }
+          return;
+        }
+
+        const placeholder = document.getElementById("gameCanvas");
+        if (placeholder && placeholder !== canvas) {
+          placeholder.remove();
+        }
+
+        canvas.id = "gameCanvas";
+        canvasContainer.appendChild(canvas);
+        canvas.focus();
+      }
+
+      function decodeBase64Bytes(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
 
       async function instantiateWasm() {
+        if (GOMULATOR_WASM_BASE64) {
+          return WebAssembly.instantiate(decodeBase64Bytes(GOMULATOR_WASM_BASE64), go.importObject);
+        }
+
+        if (window.location.protocol === "file:") {
+          throw new Error("Open the generated dist/wasm/index.html from `make wasm`, or serve this directory over HTTP.");
+        }
+
         if (WebAssembly.instantiateStreaming) {
           try {
             return await WebAssembly.instantiateStreaming(fetch("./gomulator.wasm"), go.importObject);
@@ -46,29 +448,128 @@
         return WebAssembly.instantiate(bytes, go.importObject);
       }
 
-      function startRomLoad(buffer) {
+      async function startRom(buffer, fileName) {
         if (!wasmReady || typeof window.startEmulatorWithROM !== "function") {
-          pendingRom = buffer;
+          pendingRom = { buffer, fileName };
+          setStatus("Emulator loading...");
           return;
         }
 
+        if (isRomLoaded && typeof window.stopEmulator === "function") {
+          setStatus("Reloading emulator for new ROM...");
+          window.stopEmulator();
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
         window.startEmulatorWithROM(new Uint8Array(buffer), "auto");
+        isRomLoaded = true;
+        mountEbitenCanvas(40);
+        if (statusBarEl) statusBarEl.classList.add("loaded");
+        if (loadTriggerEl) loadTriggerEl.textContent = "LOAD NEW";
+        setStatus(`Loaded: ${fileName}`);
       }
 
-      window.startRomLoad = startRomLoad;
+      window.startRomLoad = (buffer, fileName = "ROM") => {
+        startRom(buffer, fileName);
+      };
+
+      statusBarEl?.addEventListener("click", () => {
+        romInput?.click();
+      });
+
+      romInput?.addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        setStatus(`Loading: ${file.name}`);
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const buffer = readerEvent.target && readerEvent.target.result;
+          if (!buffer) {
+            setStatus("Failed to read the file.");
+            return;
+          }
+          startRom(buffer, file.name);
+        };
+        reader.onerror = () => setStatus("Failed to read the file.");
+        reader.readAsArrayBuffer(file);
+      });
+
+      document.addEventListener("keydown", (event) => {
+        const button = keyMap[event.code];
+        if (!button) return;
+        if (!pressed[button]) {
+          pressed[button] = true;
+          sendInput(button, true);
+          setVisual(button, true);
+        }
+        event.preventDefault();
+      });
+
+      document.addEventListener("keyup", (event) => {
+        const button = keyMap[event.code];
+        if (!button) return;
+        if (pressed[button]) {
+          pressed[button] = false;
+          sendInput(button, false);
+          setVisual(button, false);
+        }
+        event.preventDefault();
+      });
+
+      Object.entries(buttonSelectors).forEach(([selector, button]) => {
+        document.querySelectorAll(selector).forEach((element) => {
+          const start = (event) => {
+            if (event.cancelable) event.preventDefault();
+            if (!pressed[button]) {
+              pressed[button] = true;
+              sendInput(button, true);
+            }
+            element.classList.add("pressed");
+          };
+
+          const end = (event) => {
+            if (event && event.cancelable) event.preventDefault();
+            if (pressed[button]) {
+              pressed[button] = false;
+              sendInput(button, false);
+            }
+            element.classList.remove("pressed");
+          };
+
+          element.addEventListener("touchstart", start, { passive: false });
+          element.addEventListener("touchend", end, { passive: false });
+          element.addEventListener("touchcancel", end, { passive: false });
+
+          if (window.PointerEvent) {
+            element.addEventListener("pointerdown", start);
+            element.addEventListener("pointerup", end);
+            element.addEventListener("pointercancel", end);
+            element.addEventListener("pointerleave", end);
+          } else {
+            element.addEventListener("mousedown", start);
+            element.addEventListener("mouseup", end);
+            element.addEventListener("mouseleave", end);
+          }
+        });
+      });
 
       instantiateWasm()
         .then((result) => {
-          wasmReady = true;
           go.run(result.instance);
-          if (pendingRom) {
-            const rom = pendingRom;
-            pendingRom = null;
-            startRomLoad(rom);
-          }
+          wasmReady = true;
+          window.setTimeout(() => {
+            setStatus("Select a ROM to begin emulation");
+            if (pendingRom) {
+              const rom = pendingRom;
+              pendingRom = null;
+              startRom(rom.buffer, rom.fileName);
+            }
+          }, 0);
         })
         .catch((error) => {
           console.error("Failed to load emulator:", error);
+          setStatus("Failed to load emulator");
         });
     })();
   </script>
