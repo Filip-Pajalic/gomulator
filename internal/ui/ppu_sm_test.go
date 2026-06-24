@@ -142,3 +142,51 @@ func TestSetLCDModeRequestsSTATInterrupt(t *testing.T) {
 		t.Fatalf("expected LCD STAT interrupt, IF=%02X", ctx.IntFlags)
 	}
 }
+
+func TestPipelinePushPixelDiscardsBackgroundFineScroll(t *testing.T) {
+	resetPPUTestState()
+
+	ppu := NewPpuContext()
+	lcd := LcdCtx()
+	lcd.ScrollX = 3
+
+	for i := 0; i < 9; i++ {
+		ppu.PixelFifoPushWithIndex(0x11223344, 1, false)
+	}
+
+	ppu.PipelinePushPixel()
+
+	if ppu.Pfc.PushedX != 0 {
+		t.Fatalf("PushedX = %d, want 0 while discarding background fine scroll", ppu.Pfc.PushedX)
+	}
+	if ppu.Pfc.LineX != 1 {
+		t.Fatalf("LineX = %d, want 1 after one discarded background pixel", ppu.Pfc.LineX)
+	}
+	if ppu.VideoBuffer[0] != 0 {
+		t.Fatalf("first pixel = %08X, want untouched while discarding background fine scroll", ppu.VideoBuffer[0])
+	}
+}
+
+func TestPipelinePushPixelDoesNotDiscardWindowForBackgroundFineScroll(t *testing.T) {
+	resetPPUTestState()
+
+	ppu := NewPpuContext()
+	lcd := LcdCtx()
+	lcd.ScrollX = 3
+
+	for i := 0; i < 9; i++ {
+		ppu.PixelFifoPushWithIndex(0x55667788, 1, true)
+	}
+
+	ppu.PipelinePushPixel()
+
+	if ppu.Pfc.PushedX != 1 {
+		t.Fatalf("PushedX = %d, want 1 for window pixel despite background fine scroll", ppu.Pfc.PushedX)
+	}
+	if ppu.Pfc.LineX != 1 {
+		t.Fatalf("LineX = %d, want 1 after one window pixel", ppu.Pfc.LineX)
+	}
+	if ppu.VideoBuffer[0] != 0x55667788 {
+		t.Fatalf("first pixel = %08X, want window pixel unaffected by SCX", ppu.VideoBuffer[0])
+	}
+}

@@ -85,12 +85,13 @@ type PixelFifoContext struct {
 	FifoX          byte
 
 	// GBC Tile Attributes
-	TileAttr       byte // Current tile attributes (from VRAM bank 1)
-	TilePalette    byte // Palette number (0-7)
-	TileVramBank   byte // VRAM bank (0-1)
-	TileFlipX      bool // Horizontal flip
-	TileFlipY      bool // Vertical flip
-	TileBgPriority bool // BG-to-OAM priority
+	TileAttr        byte // Current tile attributes (from VRAM bank 1)
+	TilePalette     byte // Palette number (0-7)
+	TileVramBank    byte // VRAM bank (0-1)
+	TileFlipX       bool // Horizontal flip
+	TileFlipY       bool // Vertical flip
+	TileBgPriority  bool // BG-to-OAM priority
+	RenderingWindow bool // Current fetched tile belongs to the window layer
 }
 
 type FetchState int
@@ -108,6 +109,7 @@ type FifoEntry struct {
 	Next       *FifoEntry
 	Value      uint32 // 32-bit color value
 	ColorIndex uint8  // Original color index (0-3)
+	IsWindow   bool   // True when this pixel came from the window layer
 }
 
 // Fifo represents a FIFO queue using a ring buffer for better performance
@@ -472,6 +474,7 @@ func (p *PpuContext) ResetPipelineState() {
 	p.Pfc.FetchX = 0
 	p.Pfc.FifoX = 0
 	p.Pfc.CurFetchState = FS_TILE
+	p.Pfc.RenderingWindow = false
 
 	// Clear the pixel FIFO
 	p.Pfc.PixelFifo.head = 0
@@ -546,6 +549,7 @@ func (p *PpuContext) FetchTileNumber() {
 		tileMapIndex = tileY*32 + tileX
 		mapAddr = LCDCBgMapArea()
 	}
+	p.Pfc.RenderingWindow = windowVisible
 
 	// Fetch the tile number
 	p.Pfc.BgwFetchData[0] = p.VramRead(mapAddr + uint16(tileMapIndex))
@@ -660,7 +664,7 @@ func (p *PpuContext) PushPixelsToFIFO() {
 		}
 
 		if x >= 0 {
-			p.PixelFifoPushWithIndex(pixelColor, colorIndex)
+			p.PixelFifoPushWithIndex(pixelColor, colorIndex, p.Pfc.RenderingWindow)
 			p.Pfc.FifoX++
 		}
 
@@ -673,11 +677,11 @@ func (p *PpuContext) PushPixelsToFIFO() {
 
 // PixelFifoPush adds a pixel to the pixel FIFO
 func (p *PpuContext) PixelFifoPush(value uint32) {
-	p.PixelFifoPushWithIndex(value, 0) // Default to color index 0
+	p.PixelFifoPushWithIndex(value, 0, false) // Default to color index 0
 }
 
 // PixelFifoPushWithIndex adds a pixel with color index to the pixel FIFO
-func (p *PpuContext) PixelFifoPushWithIndex(value uint32, colorIndex uint8) {
+func (p *PpuContext) PixelFifoPushWithIndex(value uint32, colorIndex uint8, isWindow bool) {
 	// Ring buffer implementation - no allocations!
 	if p.Pfc.PixelFifo.size >= 16 {
 		logger.Warn("PPU: FIFO overflow, size=%d", p.Pfc.PixelFifo.size)
@@ -686,6 +690,7 @@ func (p *PpuContext) PixelFifoPushWithIndex(value uint32, colorIndex uint8) {
 
 	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].Value = value
 	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].ColorIndex = colorIndex
+	p.Pfc.PixelFifo.entries[p.Pfc.PixelFifo.tail].IsWindow = isWindow
 
 	p.Pfc.PixelFifo.tail = (p.Pfc.PixelFifo.tail + 1) % 16
 	p.Pfc.PixelFifo.size++
@@ -696,6 +701,7 @@ type PixelData struct {
 	Color      uint32 // Final rendered color
 	ColorIndex uint8  // Original color index (0-3) for priority checking
 	IsBgColor0 bool   // True if this is background color 0
+	IsWindow   bool   // True if this pixel came from the window layer
 }
 
 // PixelFifoPop removes and returns a pixel from the pixel FIFO
@@ -715,6 +721,7 @@ func (p *PpuContext) PixelFifoPop() PixelData {
 		Color:      value,
 		ColorIndex: colorIndex,
 		IsBgColor0: colorIndex == 0,
+		IsWindow:   entry.IsWindow,
 	}
 }
 
@@ -730,7 +737,7 @@ func (p *PpuContext) PipelinePushPixel() {
 			finalPixel := bgPixel
 
 			// Handle scroll X - only start rendering after scroll offset
-			if p.Pfc.LineX >= (LcdCtx().ScrollX % 8) {
+			if bgPixel.IsWindow || p.Pfc.LineX >= (LcdCtx().ScrollX%8) {
 				// Check for sprites at this position if sprites are enabled
 				if LCDCObjEnable() {
 					spritePixel := p.GetSpritePixel(p.Pfc.PushedX, currentLine)
