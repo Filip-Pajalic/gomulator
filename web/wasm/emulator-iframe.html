@@ -5,13 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gomulator - Game Boy Emulator</title>
   <style>
+    html,
     body {
       margin: 0;
-      min-height: 100vh;
-      background: #1d2636;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    body {
       color: #fff;
       font-family: Arial, sans-serif;
-      padding: 24px;
+      padding: 0;
       box-sizing: border-box;
     }
 
@@ -330,6 +334,7 @@
       const statusTextEl = document.getElementById("statusText");
       const loadTriggerEl = document.getElementById("loadTrigger");
       const canvasContainer = document.getElementById("canvasContainer");
+      const emulatorContainer = document.querySelector(".emulator-container");
 
       const pressed = {
         up: false,
@@ -379,6 +384,25 @@
 
       function setStatus(text) {
         if (statusTextEl) statusTextEl.textContent = text;
+        requestFrameResize();
+      }
+
+      function getPageHeight() {
+        return Math.max(
+          document.body.scrollHeight,
+          document.documentElement.scrollHeight,
+          emulatorContainer ? emulatorContainer.getBoundingClientRect().bottom : 0
+        );
+      }
+
+      function requestFrameResize() {
+        window.parent?.postMessage(
+          {
+            type: "gomulator-resize",
+            height: getPageHeight(),
+          },
+          "*"
+        );
       }
 
       function setVisual(button, isPressed) {
@@ -415,6 +439,7 @@
         canvas.id = "gameCanvas";
         canvasContainer.appendChild(canvas);
         canvas.focus();
+        requestFrameResize();
       }
 
       function decodeBase64Bytes(base64) {
@@ -553,6 +578,13 @@
           }
         });
       });
+
+      window.addEventListener("load", requestFrameResize);
+      window.addEventListener("resize", requestFrameResize);
+      if (window.ResizeObserver && emulatorContainer) {
+        new ResizeObserver(requestFrameResize).observe(emulatorContainer);
+      }
+      requestFrameResize();
 
       instantiateWasm()
         .then((result) => {
