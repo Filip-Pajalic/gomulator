@@ -16,6 +16,9 @@ const (
 
 var dbgMsg [1024]byte
 var msgSize = 0
+var nextDebugProgressTick int32 = debugProgressInterval
+
+const debugProgressInterval int32 = 20_000_000
 
 type DebugTestResult byte
 
@@ -27,6 +30,7 @@ const (
 
 func ResetDebugTestResult() {
 	msgSize = 0
+	nextDebugProgressTick = debugProgressInterval
 	debugTestResult = DebugTestNone
 }
 
@@ -57,6 +61,46 @@ func DbgUpdate() {
 
 		memory.BusCtx().BusWrite(0xFF02, 0)
 	}
+}
+
+func DbgProgress() {
+	ticks := Cm.GetCycleTicks()
+	if ticks < nextDebugProgressTick {
+		return
+	}
+	for ticks >= nextDebugProgressTick {
+		nextDebugProgressTick += debugProgressInterval
+	}
+
+	if cpuInstance == nil || memory.BusCtx() == nil {
+		return
+	}
+
+	bus := memory.BusCtx()
+	regs := cpuInstance.Regs
+	logger.Info("DEBUG PROGRESS ticks=%d PC=%04X SP=%04X OP=%02X AF=%02X%02X BC=%02X%02X DE=%02X%02X HL=%02X%02X HALT=%t STOP=%t ROMBANK=%d IF=%02X IE=%02X LY=%02X SB=%02X SC=%02X MSG=%d",
+		ticks,
+		regs.Pc,
+		regs.Sp,
+		bus.BusRead(regs.Pc),
+		regs.A,
+		regs.F,
+		regs.B,
+		regs.C,
+		regs.D,
+		regs.E,
+		regs.H,
+		regs.L,
+		cpuInstance.Halted,
+		cpuInstance.Stopped,
+		memory.CartCtx().CurrentROMBank(),
+		cpuInstance.IntFlags,
+		bus.GetInterruptEnable(),
+		bus.BusRead(0xFF44),
+		bus.BusRead(0xFF01),
+		bus.BusRead(0xFF02),
+		msgSize,
+	)
 }
 
 func DbgPrint() bool {

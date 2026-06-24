@@ -225,6 +225,10 @@ func (c *CartContext) RunsInGBCMode() bool {
 	return c.IsGBCOnly()
 }
 
+func (c *CartContext) CurrentROMBank() int {
+	return c.romBank
+}
+
 // GetTitle returns the game title from the ROM header
 func (c *CartContext) GetTitle() []byte {
 	if c.header != nil {
