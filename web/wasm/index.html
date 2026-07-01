@@ -3,576 +3,529 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gomulator Embed Example</title>
+  <title>Gomulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
     body {
-      margin: 0;
       min-height: 100vh;
-      background: #1d2636;
-      padding: 24px;
-      box-sizing: border-box;
-    }
-
-    .emulator-container {
-      max-width: 800px;
-      box-shadow: 0 0 15px rgba(76, 175, 80, 0.7);
-      margin: 0 auto;
-      text-align: center;
-      padding: 0;
-      border-radius: 8px;
-      background-color: #333;
-      padding-bottom: 2rem;
-    }
-
-    .rom-upload {
-      margin: 0;
-      padding: 0;
-      border-radius: 8px;
-      background-color: #333;
-    }
-
-    .load-interface {
-      padding: 0 1rem;
-      padding-top: 0.5rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-
-    .rom-status-display {
-      width: 100%;
+      background: radial-gradient(120% 90% at 50% 8%, #333a42 0%, #23272d 45%, #16181c 100%);
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: #4caf50;
-      background-color: #222;
-      border: 2px solid #4caf50;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      font-size: 0.9rem;
-      font-family: "Press Start 2P", monospace;
-      cursor: pointer;
-      text-align: left;
-      box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
-      transition: box-shadow 0.1s ease;
-      box-sizing: border-box;
-    }
-
-    .rom-status-display:hover {
-      box-shadow: 0 0 15px rgba(76, 175, 80, 0.7);
-    }
-
-    .load-trigger {
-      background-color: #45a049;
-      color: white;
-      padding: 0.3rem 0.8rem;
-      border-radius: 3px;
-      font-family: sans-serif;
-      font-size: 0.8rem;
-      font-weight: bold;
-      user-select: none;
-      touch-action: none;
-      cursor: pointer;
-    }
-
-    #statusText {
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      margin-right: 10px;
-      flex-grow: 1;
-    }
-
-    #romInput {
-      display: none;
-    }
-
-    #emulatorBox {
-      width: 640px;
-      max-width: calc(100% - 40px);
-      height: 576px;
-      margin: 0 auto;
-      border: 0;
-      border-radius: 6px;
-      overflow: hidden;
-      background: #000;
-    }
-
-    #emulatorFrame {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-      background: #000;
-    }
-
-    .info-box {
-      margin-top: 10px;
-      max-width: 800px;
-      color: #fff;
-    }
-
-    .controls-layout {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      padding: 0 20px;
-      box-sizing: border-box;
-      margin-top: 20px;
-    }
-
-    .dpad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(3, 1fr);
-      gap: 8px;
-      width: 150px;
-      height: 150px;
-      touch-action: none;
-    }
-
-    .dpad .arrow,
-    .round-button,
-    .pill-button,
-    .buttons,
-    .center-buttons,
-    .rom-status-display {
-      touch-action: none;
-      -ms-touch-action: none;
-      cursor: pointer;
-    }
-
-    .dpad .arrow,
-    .dpad .center {
-      background: #666;
-      color: #fff;
-      display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
-      border-radius: 4px;
-      font-size: 1.2rem;
-      user-select: none;
+      padding: 44px 16px 60px;
+      font-family: "Inter", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-
-    .dpad .arrow.up {
-      grid-column: 2;
-      grid-row: 1;
+    @keyframes ledpulse {
+      0%, 100% { box-shadow: 0 0 6px 1px rgba(233,72,60,.9), 0 0 2px rgba(0,0,0,.4) inset; }
+      50%      { box-shadow: 0 0 10px 2px rgba(233,72,60,1), 0 0 2px rgba(0,0,0,.4) inset; }
     }
-
-    .dpad .arrow.down {
-      grid-column: 2;
-      grid-row: 3;
+    .round-button, .dpad .arrow, .dpad .center, .pill-button, .load-trigger, .rom-status-display, .settings-btn {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      outline: none;
     }
-
-    .dpad .arrow.left {
-      grid-column: 1;
-      grid-row: 2;
+    /* interactive chrome hover / press (game buttons are driven by JS) */
+    .load-trigger:active { transform: translateY(2px); box-shadow: 0 0 0 #205b28, inset 0 1px 2px rgba(0,0,0,.35); }
+    .settings-btn:hover { filter: brightness(1.14); }
+    .settings-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #2a2e33, inset 0 1px 2px rgba(0,0,0,.3); }
+    .settings-close:hover { color: #fff !important; background: rgba(255,255,255,.08); }
+    @media (max-width: 680px) {
+      .speaker-grille { display: none; }
+      .emulator-container { padding-left: 16px; padding-right: 16px; }
+      .controls-layout { gap: 8px !important; padding: 0 2px 4px !important; }
+      .buttons { gap: 14px !important; }
+      .round-button { width: 54px !important; height: 54px !important; }
+      .dpad { grid-template-columns: repeat(3, 34px) !important; grid-template-rows: repeat(3, 34px) !important; }
     }
-
-    .dpad .arrow.right {
-      grid-column: 3;
-      grid-row: 2;
-    }
-
-    .dpad .center {
-      grid-column: 2;
-      grid-row: 2;
-      background: #777;
-    }
-
-    .dpad .arrow:active {
-      background: #b37777;
-    }
-
-    .dpad .arrow.pressed,
-    .round-button.pressed,
-    .pill-button.pressed,
-    .load-trigger.pressed {
-      background: #b37777;
-      transform: scale(0.98);
-    }
-
-    .buttons {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 24px;
-      justify-content: center;
-    }
-
-    .round-button {
-      width: 70px;
-      height: 70px;
-      background: #666;
-      color: #fff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 1.5rem;
-      user-select: none;
-    }
-
-    .round-button:active {
-      background: #b37777;
-    }
-
-    .center-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 1.5rem;
-      margin-top: 1rem;
-    }
-
-    .pill-button {
-      background: #666;
-      color: #fff;
-      border-radius: 20px;
-      padding: 0.3rem 1.2rem;
-      font-size: 0.9rem;
-      user-select: none;
-    }
-
-    .pill-button:active {
-      background: #b37777;
-    }
-
-    @media (max-width: 600px) {
-      body {
-        padding: 12px;
-      }
-
-      #emulatorBox {
-        max-width: calc(100% - 24px);
-        max-width: 95vw;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .controls-layout {
-        flex-direction: column;
-        justify-content: center;
-        gap: 25px;
-      }
-    }
-
   </style>
 </head>
 <body>
-  <div class="emulator-container">
-    <div class="rom-upload">
-      <div class="load-interface">
-        <input type="file" id="romInput" accept=".gb,.gbc">
 
-        <div id="romStatusDisplay" class="rom-status-display">
-          <span id="statusText">Select a ROM to begin emulation</span>
-          <span id="loadTrigger" class="load-trigger">Load</span>
-        </div>
-      </div>
+<div class="emulator-container" style="position:relative; width:640px; max-width:calc(100vw - 32px); padding:22px 26px 34px; background:linear-gradient(157deg,#eeece3 0%,#e0ded2 52%,#ceccbe 100%); border-radius:26px 26px 26px 64px; box-shadow: inset 0 3px 0 rgba(255,255,255,.85), inset 0 -7px 16px rgba(120,116,98,.4), inset 0 0 0 2px rgba(255,255,255,.35), 0 3px 5px rgba(0,0,0,.28), 0 44px 80px -32px rgba(0,0,0,.7);">
+
+  <!-- ambient sheen -->
+  <div style="position:absolute; inset:2px 2px 40% 2px; border-radius:24px 24px 0 0; background:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0)); pointer-events:none;"></div>
+
+  <!-- ROM status / loader strip -->
+  <div class="rom-upload" style="position:relative;">
+    <input type="file" id="romInput" accept=".gb,.gbc" style="display:none;">
+    <div id="romStatusDisplay" class="rom-status-display" style="display:flex; justify-content:space-between; align-items:center; gap:11px; background:linear-gradient(#15181b,#0c0e10); border:1px solid rgba(255,255,255,.05); border-radius:10px; padding:9px 9px 9px 13px; margin-bottom:18px; cursor:pointer; box-shadow: inset 0 2px 6px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.6);">
+      <span id="statusDot" style="width:8px; height:8px; border-radius:50%; flex-shrink:0; background:#6b6f6a; box-shadow:none; transition:background .25s, box-shadow .25s;"></span>
+      <span id="statusText" style="flex-grow:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-family:'Inter', sans-serif; font-size:12.5px; font-weight:600; letter-spacing:.1px; color:#c4cac5;">No cartridge inserted</span>
+      <span id="loadTrigger" class="load-trigger" style="flex-shrink:0; font-family:'Press Start 2P', monospace; background:#37913f; color:#fff; padding:8px 12px; border-radius:6px; font-size:8px; letter-spacing:.5px; box-shadow:0 2px 0 #205b28, inset 0 1px 0 rgba(255,255,255,.28); user-select:none; transition:transform .06s ease-out, box-shadow .06s ease-out;">LOAD</span>
+    </div>
+  </div>
+
+  <!-- Screen panel (recessed charcoal) -->
+  <div class="screen-panel" style="position:relative; background:linear-gradient(162deg,#3d3f3e 0%,#282f2b 55%,#1c2320 100%); border-radius:12px 12px 40px 12px; padding:14px 30px 20px; margin-bottom:16px; box-shadow: inset 0 3px 8px rgba(0,0,0,.72), inset 0 -1px 0 rgba(255,255,255,.06), 0 1px 0 rgba(255,255,255,.6);">
+
+    <!-- top strip: power led + decorative line + label + menu -->
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:11px;">
+      <span class="power-led" style="width:9px; height:9px; border-radius:50%; background:#4a2420; box-shadow:inset 0 1px 1px rgba(0,0,0,.55); flex-shrink:0; opacity:.55; transition:opacity .25s;"></span>
+      <span style="font-family:'Press Start 2P', monospace; font-size:7px; letter-spacing:1px; color:#9aa3a0;">POWER</span>
+      <span style="flex-grow:1; height:2px; border-radius:2px; background:linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,.02));"></span>
+      <span style="flex-shrink:0; white-space:nowrap; font-family:'Press Start 2P', monospace; font-size:7px; letter-spacing:1px; color:#6f7a76;">DOT-MATRIX</span>
+      <button id="settingsBtn" class="settings-btn" title="Settings" style="flex-shrink:0; display:inline-flex; align-items:center; gap:5px; margin-left:4px; font-family:'Press Start 2P', monospace; font-size:7px; letter-spacing:.5px; color:#e9edea; background:#4a4f55; border:none; padding:6px 9px; border-radius:6px; cursor:pointer; box-shadow:0 2px 0 #2a2e33, inset 0 1px 0 rgba(255,255,255,.18); transition:transform .06s ease-out, box-shadow .06s ease-out, filter .12s;"><span style="font-size:10px; line-height:1;">&#9881;</span>MENU</button>
     </div>
 
-    <div id="emulatorBox">
-      <iframe
-        id="emulatorFrame"
-        src="./emulator-iframe.html"
-        title="Gomulator Game Boy Emulator"
-        scrolling="no"
-      ></iframe>
-    </div>
-
-    <div class="info-box">
-      <div class="controls-layout">
-        <div class="dpad">
-          <div class="arrow up">↑</div>
-          <div class="arrow left">←</div>
-          <div class="center"></div>
-          <div class="arrow right">→</div>
-          <div class="arrow down">↓</div>
-        </div>
-
-        <div class="buttons">
-          <div class="round-button b">X</div>
-          <div class="round-button a">Z</div>
-        </div>
+    <!-- LCD bezel -->
+    <div class="lcd-bezel" style="position:relative; display:flex; justify-content:center; align-items:center; padding:12px; border-radius:8px; background:#0a0c0d; box-shadow: inset 0 0 0 2px #05070a, inset 0 0 18px rgba(0,0,0,.6);">
+      <div id="emulatorBox" style="width:480px; height:432px; max-width:100%; border-radius:3px; overflow:hidden; background:#000; box-shadow: inset 0 0 0 1px rgba(0,0,0,.6);">
+        <iframe id="emulatorFrame" src="./emulator-iframe.html" title="Gomulator Game Boy Emulator" scrolling="no" style="width:100%; height:100%; border:none; display:block; background:#000;"></iframe>
       </div>
+      <div class="lcd-glare" style="position:absolute; inset:12px; border-radius:3px; pointer-events:none; background:linear-gradient(125deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 38%);"></div>
+      <div id="lcdScan" class="lcd-scan" style="position:absolute; inset:12px; border-radius:3px; pointer-events:none; background:repeating-linear-gradient(0deg, rgba(0,0,0,.11) 0px, rgba(0,0,0,.11) 1px, transparent 1px, transparent 3px);"></div>
 
-      <div class="center-buttons">
-        <div class="pill-button select">Tab</div>
-        <div class="pill-button start">Enter</div>
+      <!-- On-device settings menu (overlays the LCD) -->
+      <div id="settingsMenu" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; border-radius:8px; background:rgba(5,9,7,.74); z-index:6; padding:18px;">
+        <div style="width:100%; max-width:340px; background:linear-gradient(#161b1f,#0e1215); border:1px solid rgba(255,255,255,.09); border-radius:12px; padding:16px 16px 15px; box-shadow:0 14px 34px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); font-family:'Press Start 2P', monospace;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:17px;">
+            <span style="font-size:10px; letter-spacing:1px; color:#e8edea;">SETTINGS</span>
+            <span id="settingsClose" class="settings-close" title="Close" style="font-size:10px; color:#8b9691; cursor:pointer; padding:3px 6px; border-radius:5px;">&#10005;</span>
+          </div>
+
+          <div style="margin-bottom:15px;">
+            <div style="font-size:7px; letter-spacing:1px; color:#7f8a86; margin-bottom:9px;">SHELL</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span class="opt" data-set="bodyColor" data-val="cream" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#e0ded2;"></span>
+              <span class="opt" data-set="bodyColor" data-val="charcoal" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#43464b;"></span>
+              <span class="opt" data-set="bodyColor" data-val="berry" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#b0475f;"></span>
+              <span class="opt" data-set="bodyColor" data-val="teal" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#329186;"></span>
+              <span class="opt" data-set="bodyColor" data-val="grape" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#7554a2;"></span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:15px;">
+            <div style="font-size:7px; letter-spacing:1px; color:#7f8a86; margin-bottom:9px;">A / B BUTTONS</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span class="opt" data-set="buttonColor" data-val="crimson" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#c33328;"></span>
+              <span class="opt" data-set="buttonColor" data-val="blue" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#2a63b3;"></span>
+              <span class="opt" data-set="buttonColor" data-val="graphite" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#3a3d42;"></span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div style="font-size:7px; letter-spacing:1px; color:#7f8a86; margin-bottom:9px;">D-PAD &amp; START</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span class="opt" data-set="padColor" data-val="graphite" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#3c3f44;"></span>
+              <span class="opt" data-set="padColor" data-val="slate" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#5a636b;"></span>
+              <span class="opt" data-set="padColor" data-val="indigo" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#454c7e;"></span>
+              <span class="opt" data-set="padColor" data-val="crimson" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#8b3a35;"></span>
+              <span class="opt" data-set="padColor" data-val="ivory" style="width:26px; height:26px; border-radius:6px; cursor:pointer; background:#dbd8cb;"></span>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:7px; letter-spacing:1px; color:#7f8a86;">SCANLINES</span>
+            <div style="display:flex; gap:6px;">
+              <span class="opt scan-opt" data-set="scanlines" data-val="on" style="font-size:8px; color:#c4cac5; padding:7px 10px; border-radius:6px; cursor:pointer; background:#20262a;">ON</span>
+              <span class="opt scan-opt" data-set="scanlines" data-val="off" style="font-size:8px; color:#c4cac5; padding:7px 10px; border-radius:6px; cursor:pointer; background:#20262a;">OFF</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script>
-    const romInput = document.getElementById("romInput");
-    const statusBarEl = document.getElementById("romStatusDisplay");
-    const statusTextEl = document.getElementById("statusText");
-    const loadTriggerEl = document.getElementById("loadTrigger");
-    const iframe = document.getElementById("emulatorFrame");
-    const emulatorBox = document.getElementById("emulatorBox");
-    const emulatorContainer = document.querySelector(".emulator-container");
-    const GB_SCREEN_WIDTH = 160;
-    const GB_SCREEN_HEIGHT = 144;
-    const MAX_EMULATOR_WIDTH = 700;
-    let isRomLoaded = false;
+  <!-- Brand wordmark -->
+  <div style="display:flex; align-items:baseline; gap:12px; padding:2px 4px 0; margin-bottom:20px;">
+    <span class="wordmark-main" style="font-family:'Press Start 2P', monospace; font-size:16px; letter-spacing:1px; color:#4b4e47; text-shadow:0 1px 0 rgba(255,255,255,.75), 0 -1px 0 rgba(0,0,0,.12);">GOMULATOR</span>
+    <span class="wordmark-sub" style="font-family:'Inter', sans-serif; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:#2f8a3c;">pocket&nbsp;system</span>
+  </div>
 
-    const pressed = {
-      up: false,
-      down: false,
-      left: false,
-      right: false,
-      a: false,
-      b: false,
-      start: false,
-      select: false,
-    };
+  <!-- Controls: D-pad + A/B -->
+  <div class="controls-layout" style="display:flex; justify-content:space-between; align-items:center; padding:0 10px 4px; gap:20px;">
 
-    const keyMap = {
-      ArrowUp: "up",
-      ArrowDown: "down",
-      ArrowLeft: "left",
-      ArrowRight: "right",
-      KeyZ: "a",
-      KeyX: "b",
-      Enter: "start",
-      Tab: "select",
-      ShiftLeft: "select",
-      ShiftRight: "select",
-    };
+    <div class="dpad" style="display:grid; grid-template-columns:repeat(3,42px); grid-template-rows:repeat(3,42px); gap:0; touch-action:none; filter:drop-shadow(0 4px 5px rgba(0,0,0,.35));">
+      <div class="arrow up" style="grid-column:2; grid-row:1; background:#3c3f44; color:rgba(255,255,255,.42); display:flex; align-items:center; justify-content:center; font-size:10px; user-select:none; cursor:pointer; touch-action:none; border-radius:7px 7px 0 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.12);">&#9650;</div>
+      <div class="arrow left" style="grid-column:1; grid-row:2; background:#3c3f44; color:rgba(255,255,255,.42); display:flex; align-items:center; justify-content:center; font-size:10px; user-select:none; cursor:pointer; touch-action:none; border-radius:7px 0 0 7px; box-shadow: inset 1px 0 0 rgba(255,255,255,.12);">&#9664;</div>
+      <div class="center" style="grid-column:2; grid-row:2; background:#34363b; display:flex; align-items:center; justify-content:center; user-select:none; box-shadow: inset 0 0 7px rgba(0,0,0,.55);"><span style="width:14px; height:14px; border-radius:50%; background:#232427; box-shadow: inset 0 1px 2px rgba(0,0,0,.8);"></span></div>
+      <div class="arrow right" style="grid-column:3; grid-row:2; background:#3c3f44; color:rgba(255,255,255,.42); display:flex; align-items:center; justify-content:center; font-size:10px; user-select:none; cursor:pointer; touch-action:none; border-radius:0 7px 7px 0; box-shadow: inset -1px 0 0 rgba(255,255,255,.12);">&#9654;</div>
+      <div class="arrow down" style="grid-column:2; grid-row:3; background:#34363b; color:rgba(255,255,255,.42); display:flex; align-items:center; justify-content:center; font-size:10px; user-select:none; cursor:pointer; touch-action:none; border-radius:0 0 7px 7px;">&#9660;</div>
+    </div>
 
-    const selectorMap = {
-      up: [".dpad .arrow.up"],
-      down: [".dpad .arrow.down"],
-      left: [".dpad .arrow.left"],
-      right: [".dpad .arrow.right"],
-      a: [".round-button.a"],
-      b: [".round-button.b"],
-      start: [".pill-button.start"],
-      select: [".pill-button.select"],
-    };
+    <div class="buttons" style="display:flex; flex-direction:row; align-items:center; gap:24px;">
+      <div class="round-button b" style="width:66px; height:66px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; user-select:none; cursor:pointer; touch-action:none; color:#fff; transform:translateY(16px); background:#c33328; box-shadow: 0 3px 0 #8f2018, inset 0 1px 0 rgba(255,255,255,.22); transition:transform .06s ease-out, box-shadow .06s ease-out, filter .06s ease-out;">
+        <span style="font-family:'Press Start 2P', monospace; font-size:15px; text-shadow:0 1px 1px rgba(0,0,0,.4);">B</span>
+        <span style="font-family:'Inter',sans-serif; font-size:8px; font-weight:600; letter-spacing:.5px; opacity:.62; margin-top:4px;">X</span>
+      </div>
+      <div class="round-button a" style="width:66px; height:66px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; user-select:none; cursor:pointer; touch-action:none; color:#fff; transform:translateY(-16px); background:#c33328; box-shadow: 0 3px 0 #8f2018, inset 0 1px 0 rgba(255,255,255,.22); transition:transform .06s ease-out, box-shadow .06s ease-out, filter .06s ease-out;">
+        <span style="font-family:'Press Start 2P', monospace; font-size:15px; text-shadow:0 1px 1px rgba(0,0,0,.4);">A</span>
+        <span style="font-family:'Inter',sans-serif; font-size:8px; font-weight:600; letter-spacing:.5px; opacity:.62; margin-top:4px;">Z</span>
+      </div>
+    </div>
+  </div>
 
-    const buttonSelectors = {
-      ".dpad .arrow.up": "up",
-      ".dpad .arrow.down": "down",
-      ".dpad .arrow.left": "left",
-      ".dpad .arrow.right": "right",
-      ".round-button.a": "a",
-      ".round-button.b": "b",
-      ".pill-button.start": "start",
-      ".pill-button.select": "select",
-    };
+  <!-- Start / Select -->
+  <div class="center-buttons" style="display:flex; justify-content:center; gap:34px; margin-top:14px;">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+      <div class="pill-button select" style="width:52px; height:15px; border-radius:9px; background:#3a3d42; cursor:pointer; touch-action:none; user-select:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 3px 4px rgba(0,0,0,.32);"></div>
+      <span class="btn-label" style="font-family:'Press Start 2P', monospace; font-size:7px; letter-spacing:1px; color:#7a7d74;">SELECT<span style="opacity:.5;">&middot;TAB</span></span>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+      <div class="pill-button start" style="width:52px; height:15px; border-radius:9px; background:#3a3d42; cursor:pointer; touch-action:none; user-select:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 3px 4px rgba(0,0,0,.32);"></div>
+      <span class="btn-label" style="font-family:'Press Start 2P', monospace; font-size:7px; letter-spacing:1px; color:#7a7d74;">START<span style="opacity:.5;">&middot;ENTER</span></span>
+    </div>
+  </div>
 
-    function setStatus(text) {
-      if (statusTextEl) statusTextEl.textContent = text;
+  <!-- Speaker grille -->
+  <div class="speaker-grille" style="position:absolute; right:30px; bottom:26px; display:flex; gap:6px; transform:rotate(-25deg); transform-origin:bottom right; pointer-events:none;">
+    <span style="width:4px; height:34px; border-radius:3px; background:linear-gradient(#c6c4b6,#adab9c); box-shadow: inset 0 1px 2px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);"></span>
+    <span style="width:4px; height:44px; border-radius:3px; background:linear-gradient(#c6c4b6,#adab9c); box-shadow: inset 0 1px 2px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);"></span>
+    <span style="width:4px; height:52px; border-radius:3px; background:linear-gradient(#c6c4b6,#adab9c); box-shadow: inset 0 1px 2px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);"></span>
+    <span style="width:4px; height:44px; border-radius:3px; background:linear-gradient(#c6c4b6,#adab9c); box-shadow: inset 0 1px 2px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);"></span>
+    <span style="width:4px; height:34px; border-radius:3px; background:linear-gradient(#c6c4b6,#adab9c); box-shadow: inset 0 1px 2px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.5);"></span>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "gomulator.appearance";
+  var GB_W = 160, GB_H = 144, MAX_W = 480;
+
+  var romInput = document.getElementById("romInput");
+  var statusBarEl = document.getElementById("romStatusDisplay");
+  var statusTextEl = document.getElementById("statusText");
+  var loadTriggerEl = document.getElementById("loadTrigger");
+  var iframe = document.getElementById("emulatorFrame");
+  var emulatorBox = document.getElementById("emulatorBox");
+  var emulatorContainer = document.querySelector(".emulator-container");
+  var powerLedEl = document.querySelector(".power-led");
+  var statusDotEl = document.getElementById("statusDot");
+  var scanEl = document.getElementById("lcdScan");
+
+  var isRomLoaded = false;
+
+  var pressed = { up:false, down:false, left:false, right:false, a:false, b:false, start:false, select:false };
+  var keyMap = { ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"right", KeyZ:"a", KeyX:"b", Enter:"start", Tab:"select", ShiftLeft:"select", ShiftRight:"select" };
+  var selectorMap = {
+    up:[".dpad .arrow.up"], down:[".dpad .arrow.down"], left:[".dpad .arrow.left"], right:[".dpad .arrow.right"],
+    a:[".round-button.a"], b:[".round-button.b"], start:[".pill-button.start"], select:[".pill-button.select"]
+  };
+  var buttonSelectors = {
+    ".dpad .arrow.up":"up", ".dpad .arrow.down":"down", ".dpad .arrow.left":"left", ".dpad .arrow.right":"right",
+    ".round-button.a":"a", ".round-button.b":"b", ".pill-button.start":"start", ".pill-button.select":"select"
+  };
+
+  function setStatus(t) { if (statusTextEl) statusTextEl.textContent = t; }
+
+  /* ---- tactile press feedback ------------------------------------- */
+  var allButtonSel = ".dpad .arrow, .round-button, .pill-button";
+  Array.prototype.forEach.call(document.querySelectorAll(allButtonSel), function (el) {
+    var cs = getComputedStyle(el);
+    el.dataset.baseTransform = (el.style.transform || "").trim();
+    el.dataset.baseShadow = el.style.boxShadow || cs.boxShadow;
+    el.style.transition = "transform .06s ease-out, box-shadow .06s ease-out, filter .06s ease-out";
+    el.style.willChange = "transform";
+  });
+
+  function pressVisual(el, isPressed) {
+    if (!el) return;
+    var base = el.dataset.baseTransform || "";
+    if (isPressed) {
+      var round = el.classList.contains("round-button");
+      var push = round ? 3 : 2.5;
+      el.style.transform = ("translateY(" + push + "px) " + base).trim();
+      el.style.boxShadow = round
+        ? "inset 0 1px 2px rgba(0,0,0,.35)"
+        : "inset 0 1px 2px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3)";
+      el.style.filter = "brightness(.9)";
+    } else {
+      el.style.transform = base;
+      el.style.boxShadow = el.dataset.baseShadow || "";
+      el.style.filter = "";
     }
+  }
 
-    function parseRomMetadata(buffer) {
-      const bytes = new Uint8Array(buffer);
-      const titleBytes = bytes.slice(0x0134, 0x0144);
-      const zeroIndex = titleBytes.indexOf(0);
-      const visibleTitleBytes = titleBytes.slice(0, zeroIndex === -1 ? titleBytes.length : zeroIndex);
-      const title = Array.from(visibleTitleBytes)
-        .map((value) => (value >= 32 && value <= 126 ? String.fromCharCode(value) : ""))
-        .join("")
-        .trim();
-      const cgbFlag = bytes[0x0143] || 0;
-      let mode = "DMG";
-
-      if (cgbFlag === 0xC0) {
-        mode = "GBC-only";
-      } else if (cgbFlag === 0x80) {
-        mode = "GBC-compatible, running DMG mode";
+  /* power LED + status dot lit only when a cartridge is running */
+  function setDeviceOn(on) {
+    if (powerLedEl) {
+      if (on) {
+        powerLedEl.style.background = "radial-gradient(circle at 35% 30%, #ff6b5e, #c9241a)";
+        powerLedEl.style.opacity = "1";
+        powerLedEl.style.animation = "ledpulse 2.6s ease-in-out infinite";
+      } else {
+        powerLedEl.style.background = "#4a2420";
+        powerLedEl.style.boxShadow = "inset 0 1px 1px rgba(0,0,0,.55)";
+        powerLedEl.style.opacity = ".55";
+        powerLedEl.style.animation = "none";
       }
-
-      return { title, cgbFlag, mode };
     }
-
-    function formatLoadedStatus(fileName, metadata) {
-      const romName = metadata.title ? `${fileName} (${metadata.title})` : fileName;
-      return `Loaded: ${romName} - ${metadata.mode}`;
+    if (statusDotEl) {
+      statusDotEl.style.background = on ? "#7ddb8a" : "#6b6f6a";
+      statusDotEl.style.boxShadow = on ? "0 0 7px rgba(120,220,132,.85)" : "none";
     }
+  }
+  setDeviceOn(false);
 
-    function resizeEmulatorBox() {
-      if (!emulatorBox || !emulatorContainer) return;
+  function parseRomMetadata(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var titleBytes = bytes.slice(0x0134, 0x0144);
+    var zeroIndex = titleBytes.indexOf(0);
+    var visible = titleBytes.slice(0, zeroIndex === -1 ? titleBytes.length : zeroIndex);
+    var title = Array.prototype.map.call(visible, function (v) {
+      return (v >= 32 && v <= 126) ? String.fromCharCode(v) : "";
+    }).join("").trim();
+    var cgbFlag = bytes[0x0143] || 0;
+    var mode = "DMG";
+    if (cgbFlag === 0xC0) mode = "GBC-only";
+    else if (cgbFlag === 0x80) mode = "GBC-compatible, running DMG mode";
+    return { title: title, cgbFlag: cgbFlag, mode: mode };
+  }
+  function formatLoadedStatus(fileName, m) {
+    return "Loaded: " + (m.title ? (fileName + " (" + m.title + ")") : fileName) + " - " + m.mode;
+  }
 
-      const containerWidth = emulatorContainer.clientWidth;
-      const sideInset = window.matchMedia("(max-width: 600px)").matches ? 24 : 40;
-      const availableWidth = Math.min(MAX_EMULATOR_WIDTH, Math.max(0, containerWidth - sideInset));
-      let width = availableWidth;
+  function resizeEmulatorBox() {
+    if (!emulatorBox || !emulatorContainer) return;
+    var cw = emulatorContainer.clientWidth;
+    var inset = window.matchMedia("(max-width: 600px)").matches ? 68 : 116;
+    var avail = Math.min(MAX_W, Math.max(0, cw - inset));
+    var width = avail;
+    if (avail >= GB_W * 2) width = Math.floor(avail / GB_W) * GB_W;
+    else if (avail >= GB_W) width = avail;
+    emulatorBox.style.width = width + "px";
+    emulatorBox.style.height = Math.round((width * GB_H) / GB_W) + "px";
+  }
 
-      if (availableWidth >= GB_SCREEN_WIDTH) {
-        const scale = Math.max(1, Math.floor(availableWidth / GB_SCREEN_WIDTH));
-        width = scale * GB_SCREEN_WIDTH;
+  function sendRomToEmulator(buffer, fileName, metadata) {
+    (function tryLoad(attempt) {
+      attempt = attempt || 0;
+      if (iframe && iframe.contentWindow && iframe.contentWindow.startRomLoad) {
+        iframe.contentWindow.startRomLoad(buffer, fileName);
+        setStatus(formatLoadedStatus(fileName, metadata));
+        if (loadTriggerEl) loadTriggerEl.textContent = "LOAD NEW";
+        isRomLoaded = true;
+        setDeviceOn(true);
+      } else if (attempt < 20) {
+        window.setTimeout(function () { tryLoad(attempt + 1); }, 200);
+      } else {
+        setStatus("Emulator failed to initialize in iframe.");
       }
+    })(0);
+  }
 
-      emulatorBox.style.width = `${width}px`;
-      emulatorBox.style.height = `${Math.round((width * GB_SCREEN_HEIGHT) / GB_SCREEN_WIDTH)}px`;
-    }
+  function handleFileSelect(file) {
+    if (!file) return;
+    setStatus("Loading: " + file.name);
+    var reader = new FileReader();
+    reader.onload = function (event) {
+      var buffer = event.target && event.target.result;
+      if (!buffer) { setStatus("Failed to read the file."); return; }
+      var metadata = parseRomMetadata(buffer);
+      if (isRomLoaded && iframe) {
+        setStatus("Reloading emulator for new ROM...");
+        iframe.onload = function () { sendRomToEmulator(buffer, file.name, metadata); iframe.onload = null; };
+        var currentSrc = iframe.src.split("?")[0];
+        iframe.src = currentSrc + "?reload=" + Date.now();
+      } else {
+        sendRomToEmulator(buffer, file.name, metadata);
+      }
+    };
+    reader.onerror = function () { setStatus("Failed to read the file."); };
+    reader.readAsArrayBuffer(file);
+  }
 
-    function sendRomToEmulator(buffer, fileName, metadata) {
-      const tryLoad = (attempt = 0) => {
-        if (iframe?.contentWindow?.startRomLoad) {
-          iframe.contentWindow.startRomLoad(buffer, fileName);
-          setStatus(formatLoadedStatus(fileName, metadata));
-          statusBarEl?.classList.add("loaded");
-          if (loadTriggerEl) loadTriggerEl.textContent = "LOAD NEW";
-          isRomLoaded = true;
-        } else if (attempt < 20) {
-          window.setTimeout(() => tryLoad(attempt + 1), 200);
-        } else {
-          setStatus("Emulator failed to initialize in iframe.");
-        }
+  function setVisual(button, isPressed) {
+    (selectorMap[button] || []).forEach(function (sel) {
+      Array.prototype.forEach.call(document.querySelectorAll(sel), function (el) { pressVisual(el, isPressed); });
+    });
+  }
+
+  function sendInput(button, pressedState) {
+    if (!iframe || !iframe.contentWindow) return;
+    var target = iframe.contentWindow;
+    try {
+      if (typeof target.emuInput === "function") { target.emuInput(button, pressedState); return; }
+    } catch (e) { /* cross-origin */ }
+    target.postMessage({ type: "emu-input", button: button, pressed: pressedState }, "*");
+  }
+
+  window.gomulatorDebugState = function () {
+    if (!iframe || !iframe.contentWindow) return null;
+    try {
+      var state = (iframe.contentWindow.gomulatorDebugState && iframe.contentWindow.gomulatorDebugState()) || null;
+      if (state) console.table(state);
+      return state;
+    } catch (e) { return null; }
+  };
+
+  if (statusBarEl) statusBarEl.addEventListener("click", function () { if (romInput) romInput.click(); });
+  if (romInput) romInput.addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (file) handleFileSelect(file);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    var button = keyMap[e.code];
+    if (!button) return;
+    if (!pressed[button]) { pressed[button] = true; sendInput(button, true); setVisual(button, true); }
+    e.preventDefault();
+  });
+  document.addEventListener("keyup", function (e) {
+    var button = keyMap[e.code];
+    if (!button) return;
+    if (pressed[button]) { pressed[button] = false; sendInput(button, false); setVisual(button, false); }
+    e.preventDefault();
+  });
+
+  Object.keys(buttonSelectors).forEach(function (selector) {
+    var button = buttonSelectors[selector];
+    Array.prototype.forEach.call(document.querySelectorAll(selector), function (element) {
+      var start = function (event) {
+        if (event.cancelable) event.preventDefault();
+        if (!pressed[button]) { pressed[button] = true; sendInput(button, true); }
+        pressVisual(element, true);
       };
-
-      tryLoad();
-    }
-
-    function handleFileSelect(file) {
-      if (!file) return;
-      setStatus(`Loading: ${file.name}`);
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const buffer = event.target?.result;
-        if (!buffer) {
-          setStatus("Failed to read the file.");
-          return;
-        }
-        const metadata = parseRomMetadata(buffer);
-
-        if (isRomLoaded && iframe) {
-          setStatus("Reloading emulator for new ROM...");
-          iframe.onload = () => {
-            sendRomToEmulator(buffer, file.name, metadata);
-            iframe.onload = null;
-          };
-          const currentSrc = iframe.src.split("?")[0];
-          iframe.src = `${currentSrc}?reload=${Date.now()}`;
-        } else {
-          sendRomToEmulator(buffer, file.name, metadata);
-        }
+      var end = function (event) {
+        if (event && event.cancelable) event.preventDefault();
+        if (pressed[button]) { pressed[button] = false; sendInput(button, false); }
+        pressVisual(element, false);
       };
-      reader.onerror = () => setStatus("Failed to read the file.");
-      reader.readAsArrayBuffer(file);
+      element.addEventListener("touchstart", start, { passive: false });
+      element.addEventListener("touchend", end, { passive: false });
+      element.addEventListener("touchcancel", end, { passive: false });
+      if (window.PointerEvent) {
+        element.addEventListener("pointerdown", start);
+        element.addEventListener("pointerup", end);
+        element.addEventListener("pointercancel", end);
+        element.addEventListener("pointerleave", end);
+      } else {
+        element.addEventListener("mousedown", start);
+        element.addEventListener("mouseup", end);
+        element.addEventListener("mouseleave", end);
+      }
+    });
+  });
+
+  resizeEmulatorBox();
+  window.addEventListener("resize", resizeEmulatorBox);
+  window.addEventListener("beforeunload", function () {
+    if (iframe && iframe.contentWindow && typeof iframe.contentWindow.flushSave === "function") iframe.contentWindow.flushSave();
+  });
+  if (window.ResizeObserver && emulatorContainer) new ResizeObserver(resizeEmulatorBox).observe(emulatorContainer);
+
+  /* ---- appearance (on-device settings menu, persisted) ------------ */
+  var conf = { bodyColor: "charcoal", buttonColor: "crimson", padColor: "graphite", scanlines: true };
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (saved && typeof saved === "object") {
+      if (saved.bodyColor) conf.bodyColor = saved.bodyColor;
+      if (saved.buttonColor) conf.buttonColor = saved.buttonColor;
+      if (saved.padColor) conf.padColor = saved.padColor;
+      if (typeof saved.scanlines === "boolean") conf.scanlines = saved.scanlines;
     }
+  } catch (e) { /* ignore */ }
 
-    function setVisual(button, isPressed) {
-      const selectors = selectorMap[button] || [];
-      selectors.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((element) => {
-          element.classList.toggle("pressed", !!isPressed);
-        });
-      });
+  var bodies = {
+    cream:    { hi: "#eeece3", mid: "#e0ded2", lo: "#ceccbe", ink: "#4b4e47", accent: "#2f8a3c", warm: "rgba(120,116,98,.4)", gHi: "#c6c4b6", gLo: "#adab9c" },
+    charcoal: { hi: "#54575d", mid: "#43464b", lo: "#33363b", ink: "#eceded", accent: "#9bdba6", warm: "rgba(0,0,0,.4)",       gHi: "#6c6f75", gLo: "#54575c" },
+    berry:    { hi: "#c65872", mid: "#b0475f", lo: "#95394e", ink: "#ffffff", accent: "#ffd7df", warm: "rgba(70,20,32,.42)",   gHi: "#a83f57", gLo: "#8b3348" },
+    teal:     { hi: "#43a89b", mid: "#329186", lo: "#26766d", ink: "#ffffff", accent: "#d6fff6", warm: "rgba(6,50,45,.42)",    gHi: "#2c847a", gLo: "#226a61" },
+    grape:    { hi: "#8a68b6", mid: "#7554a2", lo: "#5f4487", ink: "#ffffff", accent: "#e7d9ff", warm: "rgba(40,20,64,.42)",   gHi: "#6c4d96", gLo: "#573d7a" }
+  };
+  var btns = { crimson: "#c33328", blue: "#2a63b3", graphite: "#3a3d42" };
+  var btnShade = { crimson: "#8f2018", blue: "#1c4682", graphite: "#24262a" };
+  var pads = {
+    graphite: { base: "#3c3f44", dark: "#34363b", glyph: "rgba(255,255,255,.42)", nub: "#232427" },
+    indigo:   { base: "#454c7e", dark: "#3a4069", glyph: "rgba(255,255,255,.58)", nub: "#242849" },
+    crimson:  { base: "#8b3a35", dark: "#77322e", glyph: "rgba(255,255,255,.62)", nub: "#4f211d" },
+    slate:    { base: "#5a636b", dark: "#4c545b", glyph: "rgba(255,255,255,.55)", nub: "#333940" },
+    ivory:    { base: "#dbd8cb", dark: "#c9c6b9", glyph: "rgba(45,45,42,.55)",    nub: "#9a9789" }
+  };
+
+  function applyTheme() {
+    var c = bodies[conf.bodyColor] || bodies.cream;
+    if (emulatorContainer) {
+      emulatorContainer.style.background = "linear-gradient(157deg, " + c.hi + " 0%, " + c.mid + " 52%, " + c.lo + " 100%)";
+      emulatorContainer.style.boxShadow = "inset 0 3px 0 rgba(255,255,255,.6), inset 0 -7px 16px " + c.warm + ", inset 0 0 0 2px rgba(255,255,255,.28), 0 3px 5px rgba(0,0,0,.28), 0 44px 80px -32px rgba(0,0,0,.7)";
     }
-
-    function sendInput(button, pressedState) {
-      if (!iframe?.contentWindow) return;
-      const target = iframe.contentWindow;
-
-      try {
-        if (typeof target.emuInput === "function") {
-          target.emuInput(button, pressedState);
-          return;
-        }
-      } catch {
-        // Cross-origin embeds cannot directly access iframe functions.
-      }
-
-      target.postMessage({ type: "emu-input", button, pressed: pressedState }, "*");
+    var wm = document.querySelector(".wordmark-main");
+    if (wm) {
+      wm.style.color = c.ink;
+      wm.style.textShadow = conf.bodyColor === "cream" ? "0 1px 0 rgba(255,255,255,.75), 0 -1px 0 rgba(0,0,0,.12)" : "0 1px 0 rgba(0,0,0,.22)";
     }
-
-    window.gomulatorDebugState = () => {
-      if (!iframe?.contentWindow) return null;
-
-      try {
-        const state = iframe.contentWindow.gomulatorDebugState?.() || null;
-        if (state) console.table(state);
-        return state;
-      } catch (error) {
-        console.warn("Unable to read emulator debug state", error);
-        return null;
-      }
-    };
-
-    statusBarEl?.addEventListener("click", () => {
-      romInput?.click();
+    var ws = document.querySelector(".wordmark-sub");
+    if (ws) ws.style.color = c.accent;
+    Array.prototype.forEach.call(document.querySelectorAll(".speaker-grille span"), function (el) {
+      el.style.background = "linear-gradient(" + c.gHi + ", " + c.gLo + ")";
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".btn-label"), function (el) {
+      el.style.color = conf.bodyColor === "cream" ? "#7a7d74" : "rgba(255,255,255,.62)";
     });
 
-    romInput?.addEventListener("change", (event) => {
-      const file = event.target.files && event.target.files[0];
-      if (file) handleFileSelect(file);
+    if (scanEl) scanEl.style.display = conf.scanlines ? "block" : "none";
+
+    Array.prototype.forEach.call(document.querySelectorAll(".round-button"), function (el) {
+      el.style.background = btns[conf.buttonColor] || btns.crimson;
+      var sh = "0 3px 0 " + (btnShade[conf.buttonColor] || btnShade.crimson) + ", inset 0 1px 0 rgba(255,255,255,.22)";
+      el.style.boxShadow = sh;
+      el.dataset.baseShadow = sh;
     });
 
-    document.addEventListener("keydown", (event) => {
-      const button = keyMap[event.code];
-      if (!button) return;
-      if (!pressed[button]) {
-        pressed[button] = true;
-        sendInput(button, true);
-        setVisual(button, true);
-      }
-      event.preventDefault();
+    var p = pads[conf.padColor] || pads.graphite;
+    Array.prototype.forEach.call(document.querySelectorAll(".dpad .arrow"), function (el) {
+      el.style.background = el.classList.contains("down") ? p.dark : p.base;
+      el.style.color = p.glyph;
     });
-
-    document.addEventListener("keyup", (event) => {
-      const button = keyMap[event.code];
-      if (!button) return;
-      if (pressed[button]) {
-        pressed[button] = false;
-        sendInput(button, false);
-        setVisual(button, false);
-      }
-      event.preventDefault();
-    });
-
-    Object.entries(buttonSelectors).forEach(([selector, button]) => {
-      document.querySelectorAll(selector).forEach((element) => {
-        const start = (event) => {
-          if (event.cancelable) event.preventDefault();
-          if (!pressed[button]) {
-            pressed[button] = true;
-            sendInput(button, true);
-          }
-          element.classList.add("pressed");
-        };
-
-        const end = (event) => {
-          if (event && event.cancelable) event.preventDefault();
-          if (pressed[button]) {
-            pressed[button] = false;
-            sendInput(button, false);
-          }
-          element.classList.remove("pressed");
-        };
-
-        element.addEventListener("touchstart", start, { passive: false });
-        element.addEventListener("touchend", end, { passive: false });
-        element.addEventListener("touchcancel", end, { passive: false });
-
-        if (window.PointerEvent) {
-          element.addEventListener("pointerdown", start);
-          element.addEventListener("pointerup", end);
-          element.addEventListener("pointercancel", end);
-          element.addEventListener("pointerleave", end);
-        } else {
-          element.addEventListener("mousedown", start);
-          element.addEventListener("mouseup", end);
-          element.addEventListener("mouseleave", end);
-        }
-      });
-    });
-
-    resizeEmulatorBox();
-    window.addEventListener("resize", resizeEmulatorBox);
-    window.addEventListener("beforeunload", () => {
-      if (typeof iframe?.contentWindow?.flushSave === "function") {
-        iframe.contentWindow.flushSave();
-      }
-    });
-    if (window.ResizeObserver && emulatorContainer) {
-      new ResizeObserver(resizeEmulatorBox).observe(emulatorContainer);
+    var centerEl = document.querySelector(".dpad .center");
+    if (centerEl) {
+      centerEl.style.background = p.dark;
+      var nub = centerEl.querySelector("span");
+      if (nub) nub.style.background = p.nub;
     }
-  </script>
+    Array.prototype.forEach.call(document.querySelectorAll(".pill-button"), function (el) { el.style.background = p.base; });
+  }
+
+  function refreshMenu() {
+    Array.prototype.forEach.call(document.querySelectorAll("#settingsMenu .opt"), function (el) {
+      var set = el.dataset.set, val = el.dataset.val;
+      var current = set === "scanlines" ? (conf.scanlines ? "on" : "off") : conf[set];
+      var selected = current === val;
+      if (el.classList.contains("scan-opt")) {
+        el.style.background = selected ? "#37913f" : "#20262a";
+        el.style.color = selected ? "#fff" : "#c4cac5";
+      } else {
+        el.style.boxShadow = selected
+          ? "0 0 0 2px #0e1215, 0 0 0 4px #7ddb8a, 0 1px 2px rgba(0,0,0,.4)"
+          : "0 0 0 2px transparent, 0 1px 2px rgba(0,0,0,.4)";
+      }
+    });
+  }
+
+  function persist() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(conf)); } catch (e) { /* ignore */ }
+  }
+
+  var menuEl = document.getElementById("settingsMenu");
+  var settingsBtn = document.getElementById("settingsBtn");
+  var settingsClose = document.getElementById("settingsClose");
+  function openMenu(open) { if (menuEl) menuEl.style.display = open ? "flex" : "none"; }
+  if (settingsBtn) settingsBtn.addEventListener("click", function () { openMenu(menuEl.style.display === "none"); });
+  if (settingsClose) settingsClose.addEventListener("click", function () { openMenu(false); });
+  if (menuEl) menuEl.addEventListener("click", function (e) { if (e.target === menuEl) openMenu(false); });
+
+  Array.prototype.forEach.call(document.querySelectorAll("#settingsMenu .opt"), function (el) {
+    el.addEventListener("click", function () {
+      var set = el.dataset.set, val = el.dataset.val;
+      conf[set] = set === "scanlines" ? (val === "on") : val;
+      applyTheme();
+      refreshMenu();
+      persist();
+    });
+  });
+
+  applyTheme();
+  refreshMenu();
+})();
+</script>
 </body>
 </html>
